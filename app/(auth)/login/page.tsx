@@ -12,7 +12,28 @@ export default function LoginPage() {
 
   const router = useRouter();
 
-  // Check if user already has a session
+  // Helper function to securely route based on database role
+  const routeUserBasedOnRole = async (userId: string) => {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    if (error || !profile) {
+      setError("Error fetching user profile. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
+    if (profile.role === "admin") {
+      router.push("/admin/courses"); // Route to admin side
+    } else {
+      router.push("/dashboard"); // Route to user side
+    }
+  };
+
+  // Check if user already has a session on load
   useEffect(() => {
     const checkUser = async () => {
       const {
@@ -20,44 +41,39 @@ export default function LoginPage() {
       } = await supabase.auth.getSession();
 
       if (session) {
-        router.push("/dashboard");
+        await routeUserBasedOnRole(session.user.id);
       }
     };
 
     checkUser();
-  }, [router]);
-
-  // Listen for auth state changes
-  useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session) {
-          router.push("/dashboard");
-        }
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
-      setError(error.message);
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
       return;
     }
 
-    router.push("/dashboard");
+    if (data.user) {
+      // Force Next.js to read the new SSR cookies before navigating
+      router.refresh();
+      await routeUserBasedOnRole(data.user.id);
+    }
   };
 
   return (
@@ -141,7 +157,9 @@ export default function LoginPage() {
 
           {/* ERROR */}
           {error && (
-            <p className="text-red-500 text-xs mt-2">{error}</p>
+            <div className="bg-red-50 border-l-2 border-red-500 p-2 mt-3">
+              <p className="text-red-700 text-xs">{error}</p>
+            </div>
           )}
 
           {/* BUTTON */}
