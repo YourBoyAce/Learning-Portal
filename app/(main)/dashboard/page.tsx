@@ -89,7 +89,7 @@ export default function Dashboard() {
         </div>
         
         {/* Welcome Banner - Dark Blue */}
-        <div className="bg-[#0B1E6D] rounded-2xl p-8 text-white mb-8">
+        <div className="bg-[#174778] rounded-2xl p-8 text-white mb-8">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back to The Automate, {userName}.
           </h1>
@@ -97,7 +97,7 @@ export default function Dashboard() {
             Your intellectual journey continues. You have five modules to complete this week to stay on track for your fellowship.
           </p>
           <div className="flex gap-3">
-            <button className="bg-white text-[#0B1E6D] px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100">
+            <button className="bg-white text-[#174778] px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100">
               Resume Last Lesson
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -138,7 +138,7 @@ export default function Dashboard() {
                   <span className="text-xs text-gray-400">Joining soon...</span>
                 </div>
               </div>
-              <button className="w-10 h-10 bg-[#0B1E6D] rounded-lg flex items-center justify-center text-white">
+              <button className="w-10 h-10 bg-[#174778] rounded-lg flex items-center justify-center text-white">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z"/>
                 </svg>
@@ -150,8 +150,8 @@ export default function Dashboard() {
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Weekly Progress</h3>
             <div className="flex items-center justify-center mb-4">
-              <div className="w-24 h-24 rounded-full border-4 border-[#0B1E6D] flex items-center justify-center">
-                <span className="text-2xl font-bold text-[#0B1E6D]">75%</span>
+              <div className="w-24 h-24 rounded-full border-4 border-[#174778] flex items-center justify-center">
+                <span className="text-2xl font-bold text-[#174778]">75%</span>
               </div>
             </div>
             <div className="space-y-2">
@@ -173,7 +173,7 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-gray-800">Active Studies</h2>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Pick up exactly where you left off in your curated coursework.</span>
-              <button className="text-[#0B1E6D] text-sm font-medium flex items-center gap-1">
+              <button className="text-[#174778] text-sm font-medium flex items-center gap-1">
                 Browse All
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

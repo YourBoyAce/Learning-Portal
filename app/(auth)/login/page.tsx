@@ -81,12 +81,12 @@ export default function LoginPage() {
 
       {/* HEADER */}
       <div className="text-center mb-4 shrink-0">
-        <div className="w-12 h-12 mx-auto bg-[#0B1E6D] rounded-lg flex items-center justify-center text-white shadow-lg">
+        <div className="w-12 h-12 mx-auto bg-[#174778] rounded-lg flex items-center justify-center text-white shadow-lg">
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.09l-5.5-3.03L12 10l5.5 3.06L12 16.09zM5 13.62v3.07l7 3.89 7-3.89v-3.07l-7 3.89-7-3.89z" />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold mt-3 text-[#0B1E6D]">
+        <h1 className="text-2xl font-semibold mt-3 text-[#174778]">
           Academic The Automate
         </h1>
         <p className="text-sm text-gray-500">
@@ -130,7 +130,7 @@ export default function LoginPage() {
             <label className="text-[11px] font-semibold text-gray-500 tracking-wide">
               PASSWORD
             </label>
-            <span className="text-[11px] text-[#0B1E6D] cursor-pointer font-medium">
+            <span className="text-[11px] text-[#174778] cursor-pointer font-medium">
               Forgot?
             </span>
           </div>
@@ -166,7 +166,7 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-[#0B1E6D] text-white py-2 rounded-md mt-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full bg-[#174778] text-white py-2 rounded-md mt-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {loading ? "Signing in..." : (
               <>
@@ -230,7 +230,7 @@ export default function LoginPage() {
 
       {/* ENROLLMENT LINK */}
       <div className="text-sm text-gray-500 mt-4 shrink-0">
-        New to the Sanctuary? <span className="text-[#0B1E6D] font-semibold cursor-pointer">Request Enrollment</span>
+        New to the Sanctuary? <span className="text-[#174778] font-semibold cursor-pointer">Request Enrollment</span>
       </div>
     </div>
   );
