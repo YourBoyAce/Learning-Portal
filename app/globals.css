@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap");
 @import "tailwindcss";
 
 /* ─── Design Tokens ─── */
@@ -46,7 +47,7 @@
   --color-border: var(--border-glass);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Roboto", system-ui, sans-serif;
 }
 
 /* ─── Base ─── */
@@ -58,7 +59,7 @@ html {
 body {
   background: #0a0a0f !important;
   color: #f1f5f9 !important;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Roboto", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;

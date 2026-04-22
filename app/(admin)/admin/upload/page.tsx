@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState("");
 
@@ -30,11 +32,22 @@ export default function UploadPage() {
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
 
         {/* Header */}
-        <div className="page-header animate-fade-in-up">
-          <h1>
-            <span className="gradient-text">Upload</span> Video
-          </h1>
-          <p>Upload course videos to the platform for processing and delivery.</p>
+        <div className="page-header animate-fade-in-up flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-[#174778] transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-medium">Back</span>
+          </button>
+          <div className="flex-1">
+            <h1>
+              <span className="gradient-text">Upload</span> Video
+            </h1>
+            <p>Upload course videos to the platform for processing and delivery.</p>
+          </div>
         </div>
 
         {/* Upload Zone */}

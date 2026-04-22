@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminUsers() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -19,11 +21,22 @@ export default function AdminUsers() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
 
         {/* Header */}
-        <div className="page-header animate-fade-in-up">
-          <h1>
-            <span className="gradient-text">Manage</span> Users
-          </h1>
-          <p>Create accounts and manage platform users.</p>
+        <div className="page-header animate-fade-in-up flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-[#174778] transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-medium">Back</span>
+          </button>
+          <div className="flex-1">
+            <h1>
+              <span className="gradient-text">Manage</span> Users
+            </h1>
+            <p>Create accounts and manage platform users.</p>
+          </div>
         </div>
 
         {/* Create User Form */}

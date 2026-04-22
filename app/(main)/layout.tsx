@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 
@@ -11,8 +11,10 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,17 +54,21 @@ export default function MainLayout({
   if (loading) return null;
 
   const handleSignOut = async () => {
+    setShowSignOutDialog(true);
+  };
+
+  const confirmSignOut = async () => {
     await supabase.auth.signOut();
     router.replace("/login");
   };
 
   const navItems = [
-    { icon: "📊", label: "Dashboard", href: "/dashboard", active: true },
-    { icon: "📚", label: "My Learning", href: "/courses" },
-    { icon: "✅", label: "Completed Courses", href: "/completed" },
-    { icon: "📈", label: "Analytics", href: "/analytics" },
-    { icon: "📅", label: "Calendar", href: "/calendar" },
-    { icon: "👥", label: "Community", href: "/community" },
+    { label: "Dashboard", href: "/dashboard", active: pathname === "/dashboard" },
+    { label: "My Learning", href: "/courses", active: pathname === "/courses" },
+    { label: "Completed Courses", href: "/completed", active: pathname === "/completed" },
+    { label: "Analytics", href: "/analytics", active: pathname === "/analytics" },
+    { label: "Calendar", href: "/calendar", active: pathname === "/calendar" },
+    { label: "Community", href: "/community", active: pathname === "/community" },
   ];
 
   return (
@@ -91,13 +97,12 @@ export default function MainLayout({
               <li key={item.label}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                     item.active
                       ? "bg-[#174778] text-white"
-                      : "text-gray-600 hover:bg-gray-100"
+                      : "text-gray-700 hover:bg-[#174778]/10 hover:text-[#174778]"
                   }`}
                 >
-                  <span>{item.icon}</span>
                   {item.label}
                 </Link>
               </li>
@@ -105,31 +110,59 @@ export default function MainLayout({
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-gray-100 space-y-2">
+        <div className="p-4 border-t border-gray-100 space-y-3">
+          <Link href="/profile">
+            <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="w-10 h-10 bg-[#174778] rounded-full flex items-center justify-center shrink-0">
+                <span className="text-white text-lg font-semibold">
+                  {userEmail?.[0]?.toUpperCase() || "U"}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {userEmail?.split("@")[0]}
+                </p>
+                <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+              </div>
+            </div>
+          </Link>
+
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+            className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90"
           >
-            <span>🚪</span>
             Sign Out
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end">
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-700">{userEmail?.split("@")[0]}</p>
-              <p className="text-xs text-gray-400">{userEmail}</p>
-            </div>
-            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-lg">👤</span>
+      {showSignOutDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to sign out of your account?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSignOutDialog(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSignOut}
+                className="flex-1 px-4 py-2 bg-[#174778] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
-        </header>
+        </div>
+      )}
 
+      <main className="flex-1 overflow-y-auto">
         {children}
       </main>
     </div>

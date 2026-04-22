@@ -1,4 +1,10 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 export default function CourseDetail() {
+  const router = useRouter();
+
   const lessons = [
     { title: "Introduction to the Course", duration: "5:30", completed: true },
     { title: "Setting Up Your Environment", duration: "12:15", completed: true },
@@ -21,6 +27,15 @@ export default function CourseDetail() {
         {/* Course Header */}
         <div className="animate-fade-in-up" style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-gray-600 hover:text-[#174778] transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm font-medium">Back</span>
+            </button>
             <span className="badge badge-violet">Testing</span>
             <span className="badge badge-blue">Intermediate</span>
           </div>

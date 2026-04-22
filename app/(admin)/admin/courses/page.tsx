@@ -1,4 +1,10 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 export default function AdminCourses() {
+  const router = useRouter();
+
   const courses = [
     { id: 1, title: "Playwright Mastery", students: 1420, status: "Published", lessons: 25, revenue: "$14,200" },
     { id: 2, title: "Gen AI Fundamentals", students: 2310, status: "Published", lessons: 20, revenue: "$23,100" },
@@ -13,11 +19,22 @@ export default function AdminCourses() {
 
         {/* Header */}
         <div className="animate-fade-in-up" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
-          <div className="page-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: "none" }}>
-            <h1>
-              <span className="gradient-text">Manage</span> Courses
-            </h1>
-            <p>Create, edit, and publish your course catalog.</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-gray-600 hover:text-[#174778] transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            <div className="page-header" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: "none" }}>
+              <h1>
+                <span className="gradient-text">Manage</span> Courses
+              </h1>
+              <p>Create, edit, and publish your course catalog.</p>
+            </div>
           </div>
           <button className="btn-primary" style={{ padding: "12px 28px" }}>
             + New Course

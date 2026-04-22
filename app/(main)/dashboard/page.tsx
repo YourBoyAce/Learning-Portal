@@ -15,11 +15,6 @@ export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.replace("/login");
-  };
-
   useEffect(() => {
     let cancelled = false;
 
@@ -78,15 +73,6 @@ export default function Dashboard() {
   return (
     <div className="p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={handleSignOut}
-            className="text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            Sign out
-          </button>
-        </div>
         
         {/* Welcome Banner - Dark Blue */}
         <div className="bg-[#174778] rounded-2xl p-8 text-white mb-8">
