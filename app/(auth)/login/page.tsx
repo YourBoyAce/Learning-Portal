@@ -21,16 +21,21 @@ export default function LoginPage() {
       .eq("id", userId)
       .single();
 
+    // Log error for debugging
+    if (error) {
+      console.error("Profile fetch error:", error);
+    }
+
     if (error || !profile) {
-      setError("Error fetching user profile. Please contact support.");
+      setError("Invalid credentials. Please contact an administrator to create your account.");
       setLoading(false);
       return;
     }
 
     if (profile.role === "admin") {
-      router.push("/admin/courses"); // Route to admin side
+      router.push("/admin/courses");
     } else {
-      router.push("/dashboard"); // Route to user side
+      router.push("/dashboard");
     }
   };
 

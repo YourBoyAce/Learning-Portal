@@ -63,10 +63,10 @@ export default function AdminLayout({
   };
 
   const navItems = [
-    { label: "Dashboard", href: "/admin", active: pathname === "/admin" },
-    { label: "Manage Courses", href: "/admin/courses", active: pathname === "/admin/courses" },
-    { label: "Upload Video", href: "/admin/upload", active: pathname === "/admin/upload" },
-    { label: "Manage Users", href: "/admin/users", active: pathname === "/admin/users" },
+    { label: "Dashboard", href: "/admin", active: pathname === "/admin", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
+    { label: "Manage Courses", href: "/admin/courses", active: pathname === "/admin/courses", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> },
+    { label: "Upload Video", href: "/admin/upload", active: pathname === "/admin/upload", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg> },
+    { label: "Manage Users", href: "/admin/users", active: pathname === "/admin/users", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
   ];
 
   return (
@@ -95,12 +95,13 @@ export default function AdminLayout({
               <li key={item.label}>
                 <Link
                   href={item.href}
-                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                     item.active
                       ? "bg-[#174778] text-white"
                       : "text-gray-700 hover:bg-[#174778]/10 hover:text-[#174778]"
                   }`}
                 >
+                  {item.icon}
                   {item.label}
                 </Link>
               </li>
@@ -128,8 +129,11 @@ export default function AdminLayout({
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90"
+            className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2"
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
             Sign Out
           </button>
         </div>
