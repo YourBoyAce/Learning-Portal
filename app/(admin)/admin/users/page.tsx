@@ -2,339 +2,387 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
-import { createUser } from "@/app/actions/create-user";
+import { createUser, updateUserRole, deleteUser } from "@/app/actions/create-user";
+import { Eye, EyeOff, MoreVertical, Download, Filter, Search, CheckCircle2, Users } from "lucide-react";
 
 interface Scholar {
   id: string;
   name: string;
   email: string;
-  roles: string[];
+  role: string;
   engagement: number;
 }
 
+const AVAILABLE_ROLES = [
+  "Admin",
+  "User",
+  "Research Fellow",
+  "Academic Curator",
+  "Guest Scholar",
+  "Lead Curator"
+];
+
 export default function AdminUsers() {
+  // Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
-  const [scholars, setScholars] = useState<Scholar[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [role, setRole] = useState("User");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formFeedback, setFormFeedback] = useState({ type: "", message: "" });
 
-  // Fetch users from Supabase on component mount
+  // Table & Stats State
+  const [scholars, setScholars] = useState<Scholar[]>([]);
+  const [activeScholarsCount, setActiveScholarsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Filter State
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filterType, setFilterType] = useState<"email" | "role">("email");
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Action Menu State
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
+    setLoading(true);
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
-
-      // Transform profiles to scholar format
-      const transformedScholars: Scholar[] = profiles.map((profile: { id: string; email: string; role: string }) => ({
+    if (!error && profiles) {
+      const transformedScholars = profiles.map((profile: any) => ({
         id: profile.id,
-        name: profile.email?.split("@")[0] || "Unknown",
-        email: profile.email,
-        roles: [profile.role === "admin" ? "Admin" : "Student"],
-        engagement: Math.floor(Math.random() * 100),
+        name: profile.full_name || profile.email?.split("@")[0] || "Unknown",
+        email: profile.email || "No Email",
+        role: profile.role || "User",
+        engagement: Math.floor(Math.random() * 100), // Placeholder engagement
       }));
-
       setScholars(transformedScholars);
-    } catch (err: unknown) {
-      console.error("Error fetching users:", err);
-      setError("Failed to fetch users. Please ensure the profiles table exists.");
-    } finally {
-      setLoading(false);
+
+      // Simulate "Online Now" based on a fraction of total users until 
+      // Supabase Realtime Presence is explicitly configured in your database.
+      setActiveScholarsCount(Math.max(1, Math.ceil(transformedScholars.length * 0.3)));
     }
+    setLoading(false);
   };
 
-  const handleCreateUser = async () => {
-    if (!email || !password || !role) {
-      setError("Please fill in all fields");
-      return;
-    }
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setFormFeedback({ type: "", message: "" });
 
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+    formData.append("role", role);
 
-      const formData = new FormData();
-      formData.append("email", email);
-      formData.append("password", password);
-      formData.append("role", role);
+    const result = await createUser(formData);
 
-      const result = await createUser(formData);
-
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-
-      // Reset form and refresh users
+    if (result.success) {
+      setFormFeedback({ type: "success", message: "Scholar account created!" });
       setEmail("");
       setPassword("");
-      setRole("");
-      setSuccess("User created successfully!");
+      setRole("User");
       fetchUsers();
+    } else {
+      setFormFeedback({ type: "error", message: result.error || "Failed to create user." });
+    }
+    setIsSubmitting(false);
+  };
 
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err: unknown) {
-      console.error("Error creating user:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create user. Please check your permissions.";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+  const handleDownloadCSV = () => {
+    const headers = ["ID", "Name", "Email", "Role", "Engagement"];
+    const csvContent = [
+      headers.join(","),
+      ...scholars.map(s => `"${s.id}","${s.name}","${s.email}","${s.role}","${s.engagement}"`)
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "active_academic_registry.csv";
+    link.click();
+  };
+
+  const handleChangeRole = async (userId: string, newRole: string) => {
+    await updateUserRole(userId, newRole);
+    setOpenActionMenuId(null);
+    fetchUsers();
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (window.confirm("Are you sure you want to permanently remove this scholar?")) {
+      await deleteUser(userId);
+      setOpenActionMenuId(null);
+      fetchUsers();
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
+  const filteredScholars = scholars.filter(scholar => {
+    if (!filterQuery) return true;
+    const query = filterQuery.toLowerCase();
+    if (filterType === "email") return scholar.email.toLowerCase().includes(query);
+    if (filterType === "role") return scholar.role.toLowerCase().includes(query);
+    return true;
+  });
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-              User Management
-            </h1>
-            <p className="text-sm text-gray-500 max-w-2xl">
-              Manage the academic community members, assign roles, and monitor engagement levels across the sanctuary.
-            </p>
-          </div>
-          <button className="mt-4 md:mt-0 bg-[#2563EB] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create New User
-          </button>
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans text-gray-900">
+      <div className="max-w-[1400px] mx-auto">
+
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#174778] tracking-tight">User Management</h1>
+          <p className="text-gray-500 mt-1">Manage scholars, roles, and platform access.</p>
         </div>
 
-        {/* Main Content - 2 Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Panel - Forms */}
-          <div className="lg:col-span-1 space-y-6">
-            
-            {/* Add New Scholar Card */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Scholar</h3>
-              
-              <div className="space-y-4">
+        {/* MAIN LAYOUT GRID: Left Column (Form + Widget) | Right Column (Table) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[380px_1fr] gap-8 items-start">
+
+          {/* LEFT COLUMN */}
+          <div className="flex flex-col gap-6">
+
+            {/* 1. ADD NEW SCHOLAR FORM */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-lg font-bold text-[#0f172a] mb-6">Add New Scholar</h2>
+
+              <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
                     Email Address
                   </label>
                   <input
                     type="email"
-                    placeholder="scholar@atelier.edu"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                    placeholder="scholar@theautomate.edu"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    Temporary Password
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                    Initial Password
                   </label>
                   <div className="relative">
                     <input
-                      type="password"
-                      placeholder="••••••••"
+                      type={showPassword ? "text" : "password"}
+                      required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] pr-10"
+                      placeholder="••••••••"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all pr-10"
                     />
-                    <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    Academic Role
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                    Assign Role
                   </label>
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] cursor-pointer"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all appearance-none"
                   >
-                    <option value="">Select role...</option>
-                    <option>Research Fellow</option>
-                    <option>Academic Member</option>
-                    <option>Guest Scholar</option>
-                    <option>Lead Curator</option>
+                    {AVAILABLE_ROLES.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
                   </select>
                 </div>
 
-                <button 
-                  onClick={handleCreateUser}
-                  disabled={loading}
-                  className="w-full bg-[#2563EB] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                {formFeedback.message && (
+                  <div className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                    {formFeedback.message}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#174778] hover:bg-[#113a63] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm disabled:opacity-70 flex items-center justify-center mt-4"
                 >
-                  {loading ? "Registering..." : (
-                    <>
-                      Register Member
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </>
-                  )}
+                  {isSubmitting ? "Processing..." : "Create Scholar Account"}
                 </button>
-                
-                {error && (
-                  <div className="bg-red-50 border-l-2 border-red-500 p-2">
-                    <p className="text-red-700 text-xs">{error}</p>
-                  </div>
-                )}
-                
-                {success && (
-                  <div className="bg-green-50 border-l-2 border-green-500 p-2">
-                    <p className="text-green-700 text-xs">{success}</p>
-                  </div>
-                )}
+              </form>
+            </div>
+
+            {/* 2. ACTIVE SCHOLARS WIDGET */}
+            <div className="bg-[#0f172a] rounded-2xl shadow-lg p-6 flex items-center justify-between text-white relative overflow-hidden">
+              <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500 opacity-10 rounded-full blur-2xl"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-2.5 mb-1.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Active scholars right now</p>
+                </div>
+                <p className="text-4xl font-bold mt-2 text-white">
+                  {loading ? "-" : activeScholarsCount}
+                </p>
+              </div>
+
+              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative z-10 shrink-0">
+                <Users className="text-emerald-400" size={24} />
               </div>
             </div>
 
-            {/* Bottom Stats Cards */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#2563EB] rounded-xl p-4 text-white">
-                <p className="text-xs font-medium opacity-80 mb-1">Total Scholars</p>
-                <p className="text-2xl font-bold">{scholars.length}</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 mb-1">Admins</p>
-                <p className="text-2xl font-bold text-gray-900">{scholars.filter(s => s.roles.includes("Admin")).length}</p>
-              </div>
-            </div>
           </div>
 
-          {/* Right Panel - Active Academic Registry */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              
-              {/* Table Header */}
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Active Academic Registry</h3>
-                <div className="flex items-center gap-2">
-                  <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                  </button>
-                  <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+          {/* RIGHT COLUMN: ACADEMIC REGISTRY TABLE */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-lg font-bold text-[#0f172a]">Active Academic Registry</h2>
 
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Scholar
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Role
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Engagement
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {scholars.map((scholar) => (
-                      <tr key={scholar.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center">
+                  <div className="absolute left-3 text-gray-400">
+                    <Search size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={`Filter by ${filterType}...`}
+                    value={filterQuery}
+                    onChange={(e) => setFilterQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#174778] w-[200px]"
+                  />
+                </div>
+
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                    title="Filter Criteria"
+                  >
+                    <Filter size={18} />
+                  </button>
+
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-100 shadow-lg rounded-xl z-20 py-1 overflow-hidden">
+                      <button
+                        onClick={() => { setFilterType("email"); setShowFilterDropdown(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "email" ? "text-[#174778] font-semibold" : "text-gray-600"}`}
+                      >
+                        {filterType === "email" && <CheckCircle2 size={14} />} Email
+                      </button>
+                      <button
+                        onClick={() => { setFilterType("role"); setShowFilterDropdown(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "role" ? "text-[#174778] font-semibold" : "text-gray-600"}`}
+                      >
+                        {filterType === "role" && <CheckCircle2 size={14} />} Role
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleDownloadCSV}
+                  className="p-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                  title="Download CSV"
+                >
+                  <Download size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-100">
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Scholar</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Assigned Role</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Engagement</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">Loading scholars...</td></tr>
+                  ) : filteredScholars.length === 0 ? (
+                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">No scholars found.</td></tr>
+                  ) : (
+                    filteredScholars.map((scholar) => (
+                      <tr key={scholar.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors">
+                        <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                              {scholar.name.split(" ").map(n => n[0]).join("")}
+                            <div className="w-9 h-9 rounded-full bg-[#174778]/10 text-[#174778] flex items-center justify-center font-bold text-sm shrink-0">
+                              {scholar.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-gray-900">{scholar.name}</p>
+                              <p className="font-semibold text-gray-900 text-sm">{scholar.name}</p>
                               <p className="text-xs text-gray-500">{scholar.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {scholar.roles.map((r, i) => (
-                              <span
-                                key={i}
-                                className="px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700"
-                              >
-                                {r}
-                              </span>
-                            ))}
+                        <td className="py-4 px-6">
+                          <span className="inline-flex px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[11px] font-bold tracking-wide capitalize border border-blue-100">
+                            {scholar.role}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full max-w-[80px]">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scholar.engagement}%` }} />
+                            </div>
+                            <span className="text-xs font-semibold text-gray-600">{scholar.engagement}%</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="w-full max-w-[120px]">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-gray-500">{scholar.engagement}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-[#2563EB] h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${scholar.engagement}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
+                        <td className="py-4 px-6 text-right relative">
+                          <button
+                            onClick={() => setOpenActionMenuId(openActionMenuId === scholar.id ? null : scholar.id)}
+                            className="p-1.5 text-gray-400 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors"
+                          >
+                            <MoreVertical size={18} />
                           </button>
+                          {openActionMenuId === scholar.id && (
+                            <div className="absolute right-8 top-10 w-48 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 overflow-hidden text-left">
+                              <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                                Change Role To:
+                              </div>
+                              {AVAILABLE_ROLES.map(r => (
+                                <button
+                                  key={r}
+                                  onClick={() => handleChangeRole(scholar.id, r)}
+                                  className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 transition-colors"
+                                >
+                                  {r}
+                                </button>
+                              ))}
+                              <div className="border-t border-gray-100 mt-1 pt-1">
+                                <button
+                                  onClick={() => handleDelete(scholar.id)}
+                                  className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
+                                >
+                                  Remove Scholar
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Table Footer */}
-              <div className="p-6 border-t border-gray-100 flex items-center justify-between">
-                <p className="text-sm text-gray-500">
-                  Showing 4 of 286 scholars
-                </p>
-                <div className="flex items-center gap-1">
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2563EB] text-white text-sm font-medium">
-                    1
-                  </button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 text-sm font-medium transition-colors">
-                    2
-                  </button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 text-sm font-medium transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );

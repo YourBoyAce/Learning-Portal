@@ -1,48 +1,92 @@
 "use server";
 
-import { createServiceRoleClient } from "@/app/lib/supabase-server";
+// 1. MUST use the standard client for admin tasks, NOT the SSR package
+import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
+
+// 2. Initialize the pure Admin Client using your Service Role Key
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 export async function createUser(formData: FormData) {
-  const supabase = createServiceRoleClient();
-  
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const role = formData.get("role") as string;
 
   if (!email || !password || !role) {
-    return { error: "Please fill in all fields" };
+    return { success: false, error: "Please fill in all fields" };
   }
 
   try {
-    // Create user in Supabase Auth using service role
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // 1. Create the user in auth.users
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
     });
 
     if (authError) {
-      return { error: authError.message };
+      console.error("Auth Error:", authError.message);
+      return { success: false, error: authError.message };
     }
 
-    // Create profile in profiles table
-    const { error: profileError } = await supabase
+    // 2. Safely create or update their profile
+    if (authData.user) {
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .upsert({
+          id: authData.user.id,
+          email: email,
+          role: role,
+          created_at: new Date().toISOString(),
+        });
+
+      if (profileError) {
+        console.error("Profile Error:", profileError.message);
+        return { success: false, error: "User created, but profile failed: " + profileError.message };
+      }
+    }
+
+    revalidatePath("/admin/users");
+    return { success: true, message: "Scholar added successfully!" };
+  } catch (error: any) {
+    console.error("Server Action Error:", error);
+    return { success: false, error: "An unexpected server error occurred." };
+  }
+}
+
+export async function updateUserRole(userId: string, newRole: string) {
+  try {
+    const { error } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        id: authData.user.id,
-        email: email,
-        role: role === "Lead Curator" ? "admin" : "student",
-        created_at: new Date().toISOString(),
-      });
+      .update({ role: newRole })
+      .eq("id", userId);
 
-    if (profileError) {
-      return { error: profileError.message };
-    }
+    if (error) throw new Error(error.message);
 
-    return { success: true, userId: authData.user.id };
-  } catch (error: unknown) {
-    console.error("Error creating user:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to create user";
-    return { error: errorMessage };
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteUser(userId: string) {
+  try {
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
