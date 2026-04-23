@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@cloudflare/stream-react": "^1.9.3",
     "@mux/mux-node": "^12.8.1",
     "@mux/mux-player-react": "^3.11.7",
     "@supabase/ssr": "^0.10.2",
