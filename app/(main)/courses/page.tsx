@@ -266,6 +266,7 @@ export default function MyLearningDashboard() {
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
   const [curriculum, setCurriculum] = useState<any[]>([
     {
       id: 1,
@@ -372,7 +373,7 @@ export default function MyLearningDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Left: Heading & Paragraph (h-48 equivalent) */}
-          <div className="lg:col-span-2 flex flex-col justify-center min-h-[12rem]">
+          <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
             <h1 className="text-4xl md:text-[44px] font-bold text-[#174778] mb-4 tracking-tight leading-tight">
               Continuing your journey
             </h1>
@@ -470,7 +471,7 @@ export default function MyLearningDashboard() {
                   {/* Video Thumbnail Placeholder */}
                   <div className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer">
                     <PlayCircle className="text-white/70 group-hover:text-white transition-colors z-10" size={40} strokeWidth={1.5} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent" />
                   </div>
 
                   {/* Content & Progress */}
@@ -513,7 +514,7 @@ export default function MyLearningDashboard() {
             {insights.length > 0 ? (
               <>
                 <p className="text-[16px] text-[#3e2218] font-serif italic leading-relaxed max-w-4xl">
-                  "{currentInsight.content}"
+                  &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
                   <p className="text-[11px] text-gray-500 font-bold mt-4 tracking-wider uppercase">
