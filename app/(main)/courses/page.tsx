@@ -364,6 +364,74 @@ export default function MyLearningDashboard() {
   const circleRadius = 45;
   const circleCircumference = 2 * Math.PI * circleRadius;
   const circleOffset = circleCircumference - (circleCircumference * weeklyProgressPct) / 100;
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { supabase } from "@/app/lib/supabase";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  lessons_count: number;
+  status: string;
+  cover_image_url?: string;
+  created_at: string;
+}
+
+export default function Courses() {
+  const textPrimary = "#0f172a";
+  const textSecondary = "#475569";
+  const textMuted = "#64748b";
+  const cardBodyBackground = "#ffffff";
+  const cardBodyBorder = "#e2e8f0";
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  const loadCourses = async () => {
+    try {
+      setLoading(true);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) {
+        setCourses([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("courses")
+        .select("*")
+        .eq("instructor_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setCourses(data || []);
+    } catch (err) {
+      setError("Failed to load courses");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categoryColors: Record<string, string> = {
+    Testing: "badge-violet",
+    "AI / ML": "badge-cyan",
+    API: "badge-blue",
+    Performance: "badge-amber",
+    Mobile: "badge-rose",
+    Default: "badge-emerald",
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans">
@@ -398,6 +466,40 @@ export default function MyLearningDashboard() {
                       : "Complete more modules to reach your goal."}
                   </p>
                 </div>
+    <div style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        {/* Header with Create Button */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 32,
+          }}
+          className="animate-fade-in-up"
+        >
+          <div className="page-header">
+            <h1 style={{ color: "black" }}>
+              Explore <span className="text">Courses</span>
+            </h1>
+            <p style={{ color: textSecondary }}>
+              Choose from our expert-crafted curriculum and start learning
+              today.
+            </p>
+          </div>
+          <Link href="/courses/create" style={{ textDecoration: "none" }}>
+            <button
+              className="btn-primary"
+              style={{
+                padding: "12px 24px",
+                fontSize: "0.95rem",
+                whiteSpace: "nowrap",
+              }}
+            >
+              + Create Course
+            </button>
+          </Link>
+        </div>
 
                 {/* Custom SVG Circular Progress */}
                 <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
@@ -418,8 +520,85 @@ export default function MyLearningDashboard() {
               {/* Decorative background shapes */}
               <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-[#E6A15C] opacity-5 rounded-full blur-3xl" />
             </section>
+        {/* Search Bar */}
+        <div
+          className="animate-fade-in-up delay-100"
+          style={{ marginBottom: 32 }}
+        >
+          <div
+            className="glass-card-static"
+            style={{
+              padding: "12px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <span style={{ color: textMuted, fontSize: "1.1rem" }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Search courses..."
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                color: textPrimary,
+                fontSize: "0.95rem",
+              }}
+            />
           </div>
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px",
+              color: textSecondary,
+            }}
+          >
+            <p>Loading courses...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div
+            className="glass-card"
+            style={{
+              padding: "20px",
+              background: "rgba(239, 68, 68, 0.1)",
+              borderLeft: "4px solid #ef4444",
+              color: "#fca5a5",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && courses.length === 0 && (
+          <div
+            className="glass-card"
+            style={{
+              padding: "60px 40px",
+              textAlign: "center",
+              color: textSecondary,
+            }}
+          >
+            <p style={{ fontSize: "1.1rem", marginBottom: 16 }}>
+              📚 No courses yet
+            </p>
+            <p style={{ marginBottom: 24 }}>
+              Create your first course to get started!
+            </p>
+            <Link href="/courses/create" style={{ textDecoration: "none" }}>
+              <button className="btn-primary">Create Your First Course</button>
+            </Link>
+          </div>
+        )}
 
         {/* UPCOMING WEBINARS (Light UI Design) */}
         <section>
@@ -486,6 +665,75 @@ export default function MyLearningDashboard() {
                       <span className="text-xs font-bold text-gray-400">{course.progress}%</span>
                     </div>
                   </div>
+        {/* Course Grid */}
+        {!loading && courses.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+              gap: 24,
+            }}
+          >
+            {courses.map((course, i) => (
+              <a
+                key={course.id}
+                href={`/admin/upload?courseId=${course.id}`}
+                style={{ textDecoration: "none" }}
+              >
+                <div
+                  className={`glass-card animate-fade-in-up delay-${Math.min((i + 1) * 100, 600)}`}
+                  style={{
+                    padding: 0,
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    height: "100%",
+                  }}
+                >
+                  {/* Thumbnail placeholder */}
+                  <div
+                    style={{
+                      height: 160,
+                      background: `linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      position: "relative",
+                    }}
+                  >
+                    <span style={{ fontSize: "2.5rem", opacity: 0.3 }}>▶</span>
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        left: 12,
+                      }}
+                    >
+                      <span
+                        className={`badge ${categoryColors["Default"]}`}
+                        style={{ fontSize: "0.75rem" }}
+                      >
+                        Course
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                      }}
+                    >
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgba(0,0,0,0.5)",
+                          color: "var(--text-primary)",
+                          fontSize: "0.75rem",
+                        }}
+                      >
+                        {course.status}
+                      </span>
+                    </div>
+                  </div>
 
                   {/* Resume Button */}
                   <div className="w-full sm:w-auto shrink-0 px-2">
@@ -539,6 +787,57 @@ export default function MyLearningDashboard() {
           </div>
         </section>
 
+                  {/* Content */}
+                  <div
+                    style={{
+                      padding: "20px 24px 24px",
+                      background: cardBodyBackground,
+                      borderTop: `1px solid ${cardBodyBorder}`,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "1.1rem",
+                        fontWeight: 700,
+                        color: "#000",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {course.title}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: "0.85rem",
+                        color: textSecondary,
+                        lineHeight: 1.6,
+                        marginBottom: 20,
+                      }}
+                    >
+                      {course.description}
+                    </p>
+
+                    {/* Meta */}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.8rem",
+                        color: textMuted,
+                        borderTop: `1px solid ${cardBodyBorder}`,
+                        paddingTop: 16,
+                      }}
+                    >
+                      <span>📖 {course.lessons_count || 0} lessons</span>
+                      <span>
+                        📅 {new Date(course.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

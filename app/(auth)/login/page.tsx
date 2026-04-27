@@ -56,7 +56,6 @@ export default function LoginPage() {
     if (authError) {
       setError(authError.message);
       setLoading(false);
-      return;
     }
 
     if (data.user) {
@@ -88,7 +87,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md mx-auto shrink-0">
 
         {/* LOGIN CARD */}
-        <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm">
+          <form
+            className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm"
+            onSubmit={handleLogin}
+          >
 
           <h2 className="text-base font-semibold text-gray-800">
             Welcome Back

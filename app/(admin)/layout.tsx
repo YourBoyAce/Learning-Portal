@@ -42,7 +42,7 @@ export default function AdminLayout({
         if (!session) {
           router.replace("/login");
         }
-      }
+      },
     );
 
     return () => {
@@ -63,10 +63,86 @@ export default function AdminLayout({
   };
 
   const navItems = [
-    { label: "Dashboard", href: "/admin", active: pathname === "/admin", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
-    { label: "Manage Courses", href: "/admin/courses", active: pathname === "/admin/courses", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> },
-    { label: "Upload Video", href: "/admin/upload", active: pathname === "/admin/upload", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg> },
-    { label: "Manage Users", href: "/admin/users", active: pathname === "/admin/users", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
+    {
+      label: "Dashboard",
+      href: "/admin",
+      active: pathname === "/admin",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Manage Courses",
+      href: "/admin/courses",
+      active: pathname === "/admin/courses",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Upload Video",
+      href: "/admin/upload",
+      active: pathname === "/admin/upload",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Manage Users",
+      href: "/admin/users",
+      active: pathname === "/admin/users",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+          />
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -80,8 +156,12 @@ export default function AdminLayout({
               </svg>
             </div>
             <div>
-              <h1 className="font-semibold text-[#174778] text-sm">The Automate</h1>
-              <p className="text-[10px] text-gray-400">INTELLECTUAL SANCTUARY</p>
+              <h1 className="font-semibold text-[#174778] text-sm">
+                The Automate
+              </h1>
+              <p className="text-[10px] text-gray-400">
+                INTELLECTUAL SANCTUARY
+              </p>
             </div>
           </div>
         </div>
@@ -131,8 +211,18 @@ export default function AdminLayout({
             onClick={handleSignOut}
             className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
             </svg>
             Sign Out
           </button>
@@ -142,7 +232,9 @@ export default function AdminLayout({
       {showSignOutDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Sign Out
+            </h3>
             <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to sign out of your account?
             </p>
@@ -164,7 +256,152 @@ export default function AdminLayout({
         </div>
       )}
 
+      <main className="flex-1 overflow-y-auto">{children}</main>
+    </div>
+  );
+}
+
+("use client");
+
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/app/lib/supabase";
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const user = session?.user ?? null;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      if (cancelled) return;
+      setUserEmail(user.email ?? null);
+      setLoading(false);
+    };
+
+    load();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!session) {
+          router.replace("/login");
+        }
+      },
+    );
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [router]);
+
+  if (loading) return null;
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  };
+
+  const adminNavItems = [
+    { icon: "📦", label: "Batch Management", href: "/admin/batch_management" },
+    { icon: "👥", label: "Users", href: "/admin/users" },
+    { icon: "📚", label: "Courses", href: "/admin/courses" },
+    { icon: "⬆️", label: "Upload", href: "/admin/upload" },
+  ];
+
+  return (
+    <div className="flex h-screen bg-[#F5F7FA]">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#0B1E6D] rounded-lg flex items-center justify-center text-white">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.09l-5.5-3.03L12 10l5.5 3.06L12 16.09zM5 13.62v3.07l7 3.89 7-3.89v-3.07l-7 3.89-7-3.89z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-semibold text-[#0B1E6D] text-sm">
+                The Automate
+              </h1>
+              <p className="text-[10px] text-gray-400">ADMIN PANEL</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">
+            Management
+          </p>
+          <ul className="space-y-1">
+            {adminNavItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? "bg-[#0B1E6D] text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span>{item.icon}</span>
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="p-4 border-t border-gray-100 space-y-2">
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+          >
+            <span>🚪</span>
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
       <main className="flex-1 overflow-y-auto">
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Admin Dashboard
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-700">
+                {userEmail?.split("@")[0]}
+              </p>
+              <p className="text-xs text-gray-400">{userEmail}</p>
+            </div>
+            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-lg">👤</span>
+            </div>
+          </div>
+        </header>
+
         {children}
       </main>
     </div>

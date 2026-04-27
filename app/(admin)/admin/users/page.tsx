@@ -2,8 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
-import { createUser, updateUserRole, deleteUser } from "@/app/actions/create-user";
-import { Eye, EyeOff, MoreVertical, Download, Filter, Search, CheckCircle2, Users } from "lucide-react";
+import {
+  createUser,
+  updateUserRole,
+  deleteUser,
+} from "@/app/actions/create-user";
+import {
+  Eye,
+  EyeOff,
+  MoreVertical,
+  Download,
+  Filter,
+  Search,
+  CheckCircle2,
+  Users,
+} from "lucide-react";
 
 interface Scholar {
   id: string;
@@ -19,7 +32,7 @@ const AVAILABLE_ROLES = [
   "Research Fellow",
   "Academic Curator",
   "Guest Scholar",
-  "Lead Curator"
+  "Lead Curator",
 ];
 
 export default function AdminUsers() {
@@ -65,9 +78,11 @@ export default function AdminUsers() {
       }));
       setScholars(transformedScholars);
 
-      // Simulate "Online Now" based on a fraction of total users until 
+      // Simulate "Online Now" based on a fraction of total users until
       // Supabase Realtime Presence is explicitly configured in your database.
-      setActiveScholarsCount(Math.max(1, Math.ceil(transformedScholars.length * 0.3)));
+      setActiveScholarsCount(
+        Math.max(1, Math.ceil(transformedScholars.length * 0.3)),
+      );
     }
     setLoading(false);
   };
@@ -91,7 +106,10 @@ export default function AdminUsers() {
       setRole("User");
       fetchUsers();
     } else {
-      setFormFeedback({ type: "error", message: result.error || "Failed to create user." });
+      setFormFeedback({
+        type: "error",
+        message: result.error || "Failed to create user.",
+      });
     }
     setIsSubmitting(false);
   };
@@ -100,7 +118,10 @@ export default function AdminUsers() {
     const headers = ["ID", "Name", "Email", "Role", "Engagement"];
     const csvContent = [
       headers.join(","),
-      ...scholars.map(s => `"${s.id}","${s.name}","${s.email}","${s.role}","${s.engagement}"`)
+      ...scholars.map(
+        (s) =>
+          `"${s.id}","${s.name}","${s.email}","${s.role}","${s.engagement}"`,
+      ),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -117,39 +138,48 @@ export default function AdminUsers() {
   };
 
   const handleDelete = async (userId: string) => {
-    if (window.confirm("Are you sure you want to permanently remove this scholar?")) {
+    if (
+      window.confirm(
+        "Are you sure you want to permanently remove this scholar?",
+      )
+    ) {
       await deleteUser(userId);
       setOpenActionMenuId(null);
       fetchUsers();
     }
   };
 
-  const filteredScholars = scholars.filter(scholar => {
+  const filteredScholars = scholars.filter((scholar) => {
     if (!filterQuery) return true;
     const query = filterQuery.toLowerCase();
-    if (filterType === "email") return scholar.email.toLowerCase().includes(query);
-    if (filterType === "role") return scholar.role.toLowerCase().includes(query);
+    if (filterType === "email")
+      return scholar.email.toLowerCase().includes(query);
+    if (filterType === "role")
+      return scholar.role.toLowerCase().includes(query);
     return true;
   });
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans text-gray-900">
       <div className="max-w-[1400px] mx-auto">
-
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#174778] tracking-tight">User Management</h1>
-          <p className="text-gray-500 mt-1">Manage scholars, roles, and platform access.</p>
+          <h1 className="text-3xl font-bold text-[#174778] tracking-tight">
+            User Management
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Manage scholars, roles, and platform access.
+          </p>
         </div>
 
         {/* MAIN LAYOUT GRID: Left Column (Form + Widget) | Right Column (Table) */}
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[380px_1fr] gap-8 items-start">
-
           {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
-
             {/* 1. ADD NEW SCHOLAR FORM */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-lg font-bold text-[#0f172a] mb-6">Add New Scholar</h2>
+              <h2 className="text-lg font-bold text-[#0f172a] mb-6">
+                Add New Scholar
+              </h2>
 
               <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
@@ -198,14 +228,18 @@ export default function AdminUsers() {
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all appearance-none"
                   >
-                    {AVAILABLE_ROLES.map(r => (
-                      <option key={r} value={r}>{r}</option>
+                    {AVAILABLE_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 {formFeedback.message && (
-                  <div className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                  <div
+                    className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === "error" ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}
+                  >
                     {formFeedback.message}
                   </div>
                 )}
@@ -230,7 +264,9 @@ export default function AdminUsers() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Active scholars right now</p>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Active scholars right now
+                  </p>
                 </div>
                 <p className="text-4xl font-bold mt-2 text-white">
                   {loading ? "-" : activeScholarsCount}
@@ -241,13 +277,14 @@ export default function AdminUsers() {
                 <Users className="text-emerald-400" size={24} />
               </div>
             </div>
-
           </div>
 
           {/* RIGHT COLUMN: ACADEMIC REGISTRY TABLE */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-lg font-bold text-[#0f172a]">Active Academic Registry</h2>
+              <h2 className="text-lg font-bold text-[#0f172a]">
+                Active Academic Registry
+              </h2>
 
               <div className="flex items-center gap-3">
                 <div className="relative flex items-center">
@@ -275,16 +312,24 @@ export default function AdminUsers() {
                   {showFilterDropdown && (
                     <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-100 shadow-lg rounded-xl z-20 py-1 overflow-hidden">
                       <button
-                        onClick={() => { setFilterType("email"); setShowFilterDropdown(false); }}
+                        onClick={() => {
+                          setFilterType("email");
+                          setShowFilterDropdown(false);
+                        }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "email" ? "text-[#174778] font-semibold" : "text-gray-600"}`}
                       >
-                        {filterType === "email" && <CheckCircle2 size={14} />} Email
+                        {filterType === "email" && <CheckCircle2 size={14} />}{" "}
+                        Email
                       </button>
                       <button
-                        onClick={() => { setFilterType("role"); setShowFilterDropdown(false); }}
+                        onClick={() => {
+                          setFilterType("role");
+                          setShowFilterDropdown(false);
+                        }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "role" ? "text-[#174778] font-semibold" : "text-gray-600"}`}
                       >
-                        {filterType === "role" && <CheckCircle2 size={14} />} Role
+                        {filterType === "role" && <CheckCircle2 size={14} />}{" "}
+                        Role
                       </button>
                     </div>
                   )}
@@ -304,28 +349,57 @@ export default function AdminUsers() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Scholar</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Assigned Role</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Engagement</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      Scholar
+                    </th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      Assigned Role
+                    </th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      Engagement
+                    </th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">Loading scholars...</td></tr>
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center py-10 text-gray-500"
+                      >
+                        Loading scholars...
+                      </td>
+                    </tr>
                   ) : filteredScholars.length === 0 ? (
-                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">No scholars found.</td></tr>
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center py-10 text-gray-500"
+                      >
+                        No scholars found.
+                      </td>
+                    </tr>
                   ) : (
                     filteredScholars.map((scholar) => (
-                      <tr key={scholar.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors">
+                      <tr
+                        key={scholar.id}
+                        className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors"
+                      >
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#174778]/10 text-[#174778] flex items-center justify-center font-bold text-sm shrink-0">
                               {scholar.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900 text-sm">{scholar.name}</p>
-                              <p className="text-xs text-gray-500">{scholar.email}</p>
+                              <p className="font-semibold text-gray-900 text-sm">
+                                {scholar.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {scholar.email}
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -337,14 +411,25 @@ export default function AdminUsers() {
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-1.5 bg-gray-100 rounded-full max-w-[80px]">
-                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${scholar.engagement}%` }} />
+                              <div
+                                className="h-full bg-emerald-500 rounded-full"
+                                style={{ width: `${scholar.engagement}%` }}
+                              />
                             </div>
-                            <span className="text-xs font-semibold text-gray-600">{scholar.engagement}%</span>
+                            <span className="text-xs font-semibold text-gray-600">
+                              {scholar.engagement}%
+                            </span>
                           </div>
                         </td>
                         <td className="py-4 px-6 text-right relative">
                           <button
-                            onClick={() => setOpenActionMenuId(openActionMenuId === scholar.id ? null : scholar.id)}
+                            onClick={() =>
+                              setOpenActionMenuId(
+                                openActionMenuId === scholar.id
+                                  ? null
+                                  : scholar.id,
+                              )
+                            }
                             className="p-1.5 text-gray-400 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors"
                           >
                             <MoreVertical size={18} />
@@ -354,10 +439,12 @@ export default function AdminUsers() {
                               <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
                                 Change Role To:
                               </div>
-                              {AVAILABLE_ROLES.map(r => (
+                              {AVAILABLE_ROLES.map((r) => (
                                 <button
                                   key={r}
-                                  onClick={() => handleChangeRole(scholar.id, r)}
+                                  onClick={() =>
+                                    handleChangeRole(scholar.id, r)
+                                  }
                                   className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 transition-colors"
                                 >
                                   {r}
@@ -381,7 +468,6 @@ export default function AdminUsers() {
               </table>
             </div>
           </div>
-
         </div>
       </div>
     </div>

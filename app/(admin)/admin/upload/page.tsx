@@ -1,5 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { supabase } from "@/app/lib/supabase";
+
+interface Course {
+  id: string;
+  title: string;
+}
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -11,7 +19,65 @@ type Course = {
 };
 
 export default function UploadPage() {
+  const textPrimary = "#0f172a";
+  const textSecondary = "#334155";
+  const inputBorder = "#cbd5e1";
+  const inputBackground = "#ffffff";
+  const searchParams = useSearchParams();
+  const preselectedCourseId = searchParams.get("courseId") || "";
+
+  const [userId, setUserId] = useState<string>("");
+  const [courses, setCourses] = useState<Course[]>([]);
+
+  const [selectedCourseId, setSelectedCourseId] = useState(preselectedCourseId);
+
+  const [moduleName, setModuleName] = useState("");
+  const [videoTitle, setVideoTitle] = useState("");
+  const [videoDescription, setVideoDescription] = useState("");
+  const [lessonOrder, setLessonOrder] = useState(1);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const fileName = useMemo(() => selectedFile?.name || "", [selectedFile]);
+
+  useEffect(() => {
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setError("You must be signed in to upload videos.");
+        return;
+      }
+
+      setUserId(user.id);
+
+      const { data, error: coursesError } = await supabase
+        .from("courses")
+        .select("id, title")
+        .eq("instructor_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (coursesError) {
+        setError(coursesError.message || "Failed to load courses.");
+        return;
+      }
+
+      const loadedCourses = (data || []) as Course[];
+      setCourses(loadedCourses);
+
+      if (!preselectedCourseId && loadedCourses.length > 0) {
+        setSelectedCourseId(loadedCourses[0].id);
+      }
+    };
+
+    void init();
+  }, [preselectedCourseId]);
   const [fileName, setFileName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [courseTitle, setCourseTitle] = useState("");
@@ -43,6 +109,7 @@ export default function UploadPage() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
+    if (file) setSelectedFile(file);
     if (file) {
       setVideoFile(file);
       setFileName(file.name);
@@ -51,6 +118,162 @@ export default function UploadPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+  };
+
+  const handleUploadVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!selectedCourseId) {
+      setError("Select a course first.");
+      return;
+    }
+
+    if (!moduleName.trim()) {
+      setError("Module name is required.");
+      return;
+    }
+
+    if (!videoTitle.trim()) {
+      setError("Video title is required.");
+      return;
+    }
+
+    if (!selectedFile) {
+      setError("Select a video file to upload.");
+      return;
+    }
+
+    if (!userId) {
+      setError("You must be signed in.");
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      let moduleId = "";
+      const normalizedModuleName = moduleName.trim();
+
+      const { data: existingModules, error: moduleLookupError } = await supabase
+        .from("course_modules")
+        .select("id, name")
+        .eq("course_id", selectedCourseId)
+        .eq("name", normalizedModuleName)
+        .limit(1);
+
+      if (moduleLookupError) {
+        throw moduleLookupError;
+      }
+
+      if (existingModules && existingModules.length > 0) {
+        moduleId = existingModules[0].id;
+      } else {
+        const { data: latestModule, error: latestModuleError } = await supabase
+          .from("course_modules")
+          .select("position")
+          .eq("course_id", selectedCourseId)
+          .order("position", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestModuleError) {
+          throw latestModuleError;
+        }
+
+        const nextPosition = (latestModule?.position || 0) + 1;
+        const { data: createdModule, error: createModuleError } = await supabase
+          .from("course_modules")
+          .insert({
+            course_id: selectedCourseId,
+            name: normalizedModuleName,
+            position: nextPosition,
+            created_by: userId,
+          })
+          .select("id")
+          .single();
+
+        if (createModuleError) {
+          throw createModuleError;
+        }
+
+        moduleId = createdModule.id;
+      }
+
+      const directUploadRes = await fetch(
+        "/api/cloudflare/stream/direct-upload",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            courseId: selectedCourseId,
+            moduleId,
+            title: videoTitle.trim(),
+          }),
+        },
+      );
+
+      const directUploadJson = await directUploadRes.json();
+
+      if (!directUploadRes.ok) {
+        throw new Error(
+          directUploadJson?.error || "Failed to create upload URL.",
+        );
+      }
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const cloudflareUploadRes = await fetch(directUploadJson.uploadURL, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!cloudflareUploadRes.ok) {
+        throw new Error("Upload to Cloudflare Stream failed.");
+      }
+
+      const { error: videoInsertError } = await supabase
+        .from("course_videos")
+        .insert({
+          course_id: selectedCourseId,
+          module_id: moduleId,
+          title: videoTitle.trim(),
+          description: videoDescription.trim() || null,
+          lesson_order: lessonOrder,
+          stream_uid: directUploadJson.uid,
+          stream_status: "uploaded",
+          created_by: userId,
+        });
+
+      if (videoInsertError) throw videoInsertError;
+
+      const { data: courseRow, error: courseFetchError } = await supabase
+        .from("courses")
+        .select("lessons_count")
+        .eq("id", selectedCourseId)
+        .single();
+
+      if (!courseFetchError && courseRow) {
+        const nextLessonsCount = (courseRow.lessons_count || 0) + 1;
+        await supabase
+          .from("courses")
+          .update({ lessons_count: nextLessonsCount })
+          .eq("id", selectedCourseId);
+      }
+
+      setModuleName("");
+      setVideoTitle("");
+      setVideoDescription("");
+      setLessonOrder((prev) => prev + 1);
+      setSelectedFile(null);
+      setSuccess("Video uploaded to Cloudflare Stream and saved successfully.");
+    } catch (err: any) {
+      setError(err.message || "Failed to upload video.");
+    } finally {
+      setIsBusy(false);
+    }
     if (file) {
       setVideoFile(file);
       setFileName(file.name);
@@ -231,6 +454,11 @@ export default function UploadPage() {
   };
 
   return (
+    <div style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <div className="page-header animate-fade-in-up">
+          <h1 style={{ color: "black" }}>
+            <span className="text">Upload</span> Videos
     <div className="min-h-screen bg-gray-50 p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -241,6 +469,79 @@ export default function UploadPage() {
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">
             Course & Video Management
           </h1>
+          <p style={{ color: textSecondary }}>
+            Add modules and upload course videos to Cloudflare Stream.
+          </p>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              padding: "12px 16px",
+              marginBottom: 16,
+              background: "rgba(244, 63, 94, 0.1)",
+              border: "1px solid rgba(244, 63, 94, 0.3)",
+              borderRadius: "8px",
+              color: "#f43f5e",
+              fontSize: "0.85rem",
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {success && (
+          <div
+            style={{
+              padding: "12px 16px",
+              marginBottom: 16,
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: "8px",
+              color: "#10b981",
+              fontSize: "0.85rem",
+            }}
+          >
+            {success}
+          </div>
+        )}
+
+        <div
+          className="glass-card-static animate-fade-in-up delay-100 upload-surface"
+          style={{ padding: 24, marginBottom: 20 }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: textSecondary,
+                  marginBottom: 8,
+                }}
+              >
+                Course
+              </label>
+              <select
+                className="glass-input"
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+                style={{
+                  cursor: "pointer",
+                  color: "#000",
+                  background: inputBackground,
+                  borderColor: inputBorder,
+                }}
+              >
+                <option value="">Select course...</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <p className="text-sm text-gray-500 max-w-3xl">
             Orchestrate your intellectual offerings. Create new curricula,
             upload high-fidelity instructional media, and curate the learner
@@ -248,6 +549,46 @@ export default function UploadPage() {
           </p>
         </div>
 
+        <div
+          className="animate-fade-in-up delay-200"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{
+            border: `2px dashed ${isDragging ? "var(--accent-violet)" : "var(--border-glass)"}`,
+            borderRadius: "var(--radius-lg)",
+            padding: "48px 32px",
+            textAlign: "center",
+            transition: "all 0.3s ease",
+            background: isDragging ? "rgba(124, 58, 237, 0.06)" : "#f8fafc",
+            cursor: "pointer",
+            position: "relative",
+            marginBottom: 20,
+            boxShadow: isDragging ? "var(--glow-violet)" : "none",
+          }}
+          onClick={() => document.getElementById("file-input")?.click()}
+        >
+          <input
+            id="file-input"
+            type="file"
+            accept="video/*"
+            onChange={handleFileChange}
+            style={{ display: "none" }}
+          />
+          <p
+            style={{
+              fontSize: "1rem",
+              fontWeight: 700,
+              color: textPrimary,
+              marginBottom: 8,
+            }}
+          >
+            {fileName || "Drag & drop your video here"}
+          </p>
+          <p style={{ color: textSecondary, fontSize: "0.88rem" }}>
+            MP4, MOV, WebM up to 5GB
+          </p>
+        </div>
         {/* Main Content - 2 Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Left Panel - Forms */}
@@ -406,6 +747,106 @@ export default function UploadPage() {
                   )}
                 </div>
 
+        <div
+          className="glass-card-static animate-fade-in-up delay-300 upload-surface"
+          style={{ padding: 24 }}
+        >
+          <h3
+            style={{
+              fontSize: "1.05rem",
+              fontWeight: 700,
+              marginBottom: 16,
+              color: textPrimary,
+            }}
+          >
+            Video Details
+          </h3>
+          <form
+            onSubmit={handleUploadVideo}
+            style={{ display: "flex", flexDirection: "column", gap: 16 }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  Module Name
+                </label>
+                <input
+                  className="glass-input"
+                  value={moduleName}
+                  onChange={(e) => setModuleName(e.target.value)}
+                  placeholder="e.g., Module 1 - Basics"
+                  style={{
+                    color: "#000",
+                    background: inputBackground,
+                    borderColor: inputBorder,
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  Lesson Order
+                </label>
+                <input
+                  className="glass-input"
+                  type="number"
+                  min={1}
+                  value={lessonOrder}
+                  onChange={(e) => setLessonOrder(Number(e.target.value) || 1)}
+                  style={{
+                    color: "#000",
+                    background: inputBackground,
+                    borderColor: inputBorder,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: textSecondary,
+                  marginBottom: 8,
+                }}
+              >
+                Video Title
+              </label>
+              <input
+                className="glass-input"
+                value={videoTitle}
+                onChange={(e) => setVideoTitle(e.target.value)}
+                placeholder="e.g., Intro to Assertions"
+                style={{
+                  color: "#000",
+                  background: inputBackground,
+                  borderColor: inputBorder,
+                }}
+              />
+            </div>
                 <button
                   type="button"
                   onClick={handleQueueVideo}
@@ -517,6 +958,30 @@ export default function UploadPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: textSecondary,
+                  marginBottom: 8,
+                }}
+              >
+                Description
+              </label>
+              <textarea
+                className="glass-input"
+                rows={4}
+                value={videoDescription}
+                onChange={(e) => setVideoDescription(e.target.value)}
+                placeholder="Brief description of this lesson..."
+                style={{
+                  resize: "vertical",
+                  color: "#000",
+                  background: inputBackground,
+                  borderColor: inputBorder,
+                }}
+              />
               <h3 className="text-lg font-semibold text-gray-900 mb-1">
                 Management Analytics
               </h3>
@@ -525,6 +990,13 @@ export default function UploadPage() {
                 engagement is up 23% compared to last period.
               </p>
             </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button type="submit" className="btn-primary" disabled={isBusy}>
+                {isBusy ? "Uploading..." : "Upload To Cloudflare Stream"}
+              </button>
+            </div>
+          </form>
             <div className="flex gap-8">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
@@ -542,6 +1014,17 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
+      <style jsx>{`
+        .upload-surface :global(.glass-input::placeholder) {
+          color: #64748b;
+          opacity: 1;
+        }
+        .upload-surface :global(.glass-input option) {
+          color: #000;
+          background: #fff;
+        }
+      `}</style>
     </div>
   );
 }
+
