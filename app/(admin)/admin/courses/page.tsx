@@ -1,335 +1,568 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/app/lib/supabase";
+import {
+  BookOpen,
+  Users,
+  CheckCircle,
+  DollarSign,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+  Loader2,
+} from "lucide-react";
 
 interface Course {
   id: number;
   title: string;
   description: string;
-  students: number;
-  status: "Published" | "Draft";
-  lessons: number;
-  revenue: string;
-  category: string;
-  duration: string;
-  level: "Beginner" | "Intermediate" | "Advanced";
+  created_at?: string;
+  category?: string;
 }
 
 export default function AdminCourses() {
-  const textPrimary = "#000";
-  const textSecondary = "#1f2937";
-  const textMuted = "#334155";
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const courses = [
-    {
-      id: 1,
-      title: "Playwright Mastery",
-      students: 1420,
-      status: "Published",
-      lessons: 25,
-      revenue: "$14,200",
-    },
-    {
-      id: 2,
-      title: "Gen AI Fundamentals",
-      students: 2310,
-      status: "Published",
-      lessons: 20,
-      revenue: "$23,100",
-    },
-    {
-      id: 3,
-      title: "Selenium Advanced",
-      students: 980,
-      status: "Published",
-      lessons: 30,
-      revenue: "$9,800",
-    },
-    {
-      id: 4,
-      title: "API Testing with Postman",
-      students: 1850,
-      status: "Draft",
-      lessons: 15,
-      revenue: "$0",
-    },
-    {
-      id: 5,
-      title: "Performance Testing",
-      students: 720,
-      status: "Published",
-      lessons: 18,
-      revenue: "$7,200",
-    },
-  ];
+  // Create/Edit Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [modalMessage, setModalMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const filteredCourses = courses.filter(course =>
-    course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Delete Confirmation State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleSelectCourse = (course: Course) => {
-    setSelectedCourse(course);
-    setEditedCourse({ ...course });
-  };
+  useEffect(() => {
+    fetchCourses();
+  }, []);
 
-  const handleSaveCourse = () => {
-    // In a real app, this would save to a database
-    setSelectedCourse(editedCourse);
-    // Show success message
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        console.error("Auth error:", sessionError);
+        return;
+      }
+
+      const response = await fetch("/api/admin/courses", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && Array.isArray(result?.courses)) {
+        setCourses(result.courses);
+      }
+    } catch (error) {
+      console.error("Failed to fetch courses:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreateNew = () => {
-    const newCourse: Course = {
-      id: courses.length + 1,
-      title: "",
-      description: "",
-      students: 0,
-      status: "Draft",
-      lessons: 0,
-      revenue: "$0",
-      category: "",
-      duration: "",
-      level: "Beginner"
-    };
-    setSelectedCourse(newCourse);
-    setEditedCourse({ ...newCourse });
+    setIsEditing(false);
+    setEditingCourseId(null);
+    setCourseTitle("");
+    setCourseDescription("");
+    setModalMessage(null);
+    setShowModal(true);
   };
 
+  const handleEdit = (course: Course) => {
+    setIsEditing(true);
+    setEditingCourseId(course.id);
+    setCourseTitle(course.title);
+    setCourseDescription(course.description || "");
+    setModalMessage(null);
+    setShowModal(true);
+  };
+
+  const handleSaveCourse = async () => {
+    const title = courseTitle.trim();
+    const description = courseDescription.trim();
+
+    if (!title || !description) {
+      setModalMessage({
+        type: "error",
+        text: "Please add both course title and description.",
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setModalMessage(null);
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
+
+      if (isEditing && editingCourseId) {
+        // Update existing course
+        const response = await fetch("/api/admin/courses", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            id: editingCourseId,
+            title,
+            description,
+          }),
+        });
+
+        // If PUT isn't implemented, fall back to direct Supabase update
+        if (response.status === 405) {
+          const supabaseAdmin = supabase;
+          const { error: updateError } = await supabaseAdmin
+            .from("maincourses")
+            .update({ title, description })
+            .eq("id", editingCourseId);
+
+          if (updateError) throw updateError;
+        } else {
+          const result = await response.json().catch(() => null);
+          if (!response.ok) {
+            throw new Error(
+              result?.error || `Request failed (${response.status}).`
+            );
+          }
+        }
+      } else {
+        // Create new course
+        const response = await fetch("/api/admin/courses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({ title, description }),
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            result?.error || `Request failed (${response.status}).`
+          );
+        }
+      }
+
+      await fetchCourses();
+      setShowModal(false);
+      setCourseTitle("");
+      setCourseDescription("");
+    } catch (error) {
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to save course. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteClick = (course: Course) => {
+    setDeletingCourse(course);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingCourse) return;
+
+    try {
+      setIsDeleting(true);
+
+      const { error } = await supabase
+        .from("maincourses")
+        .delete()
+        .eq("id", deletingCourse.id);
+
+      if (error) throw error;
+
+      await fetchCourses();
+      setShowDeleteConfirm(false);
+      setDeletingCourse(null);
+    } catch (error) {
+      console.error("Failed to delete course:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const filteredCourses = courses.filter((course) =>
+    course.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const stats = [
+    {
+      label: "Total Courses",
+      value: courses.length.toString(),
+      icon: BookOpen,
+      iconBg: "bg-violet-50",
+      iconColor: "text-violet-600",
+    },
+    {
+      label: "Total Students",
+      value: "—",
+      icon: Users,
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      label: "Published",
+      value: courses.length.toString(),
+      icon: CheckCircle,
+      iconBg: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+    },
+    {
+      label: "Revenue",
+      value: "—",
+      icon: DollarSign,
+      iconBg: "bg-amber-50",
+      iconColor: "text-amber-600",
+    },
+  ];
+
   return (
-    <div
-      className="courses-admin-page"
-      style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+    <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div
-          className="animate-fade-in-up"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 32,
-            flexWrap: "wrap",
-            gap: 16,
-          }}
-        >
-          <div
-            className="page-header"
-            style={{ marginBottom: 0, paddingBottom: 0, borderBottom: "none" }}
-          >
-            <h1 style={{ color: textPrimary }}>
-              <span className="gradient-text">Manage</span> Courses
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-[#174778] tracking-tight">
+              Manage Courses
             </h1>
-            <p style={{ color: textSecondary }}>
+            <p className="text-sm text-gray-500 mt-1">
               Create, edit, and publish your course catalog.
             </p>
           </div>
-          <button 
+          <button
             onClick={handleCreateNew}
-            className="mt-4 md:mt-0 bg-[#2563EB] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors flex items-center gap-2"
+            className="bg-[#174778] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors flex items-center gap-2 shadow-sm"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus className="w-4 h-4" />
             New Course
           </button>
         </div>
 
         {/* Stats Row */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 16,
-            marginBottom: 32,
-          }}
-        >
-          {[
-            {
-              label: "Total Courses",
-              value: "5",
-              icon: "📚",
-              color: "icon-violet",
-            },
-            {
-              label: "Total Students",
-              value: "7,280",
-              icon: "👥",
-              color: "icon-blue",
-            },
-            {
-              label: "Published",
-              value: "4",
-              icon: "✅",
-              color: "icon-emerald",
-            },
-            {
-              label: "Revenue",
-              value: "$54,300",
-              icon: "💰",
-              color: "icon-amber",
-            },
-          ].map((stat, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => (
             <div
               key={stat.label}
-              className={`glass-card animate-fade-in-up delay-${(i + 1) * 100}`}
-              style={{
-                padding: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-              }}
+              className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4"
             >
-              <div className={`icon-wrapper ${stat.color}`}>
-                <span>{stat.icon}</span>
+              <div
+                className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}
+              >
+                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
               </div>
               <div>
-                <div
-                  style={{
-                    fontSize: "1.4rem",
-                    fontWeight: 800,
-                    color: textPrimary,
-                  }}
-                >
+                <div className="text-2xl font-bold text-gray-900">
                   {stat.value}
                 </div>
-                <div
-                  style={{
-                    fontSize: "0.78rem",
-                    color: textMuted,
-                    fontWeight: 500,
-                  }}
-                >
+                <div className="text-xs text-gray-500 font-medium">
                   {stat.label}
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Right Panel - Course Details/Edit */}
-          <div className="lg:col-span-2">
-            {editedCourse ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                
-                {/* Edit Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {editedCourse.id > courses.length ? "Create New Course" : "Edit Course"}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      editedCourse.status === "Published" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                    }`}>
-                      {editedCourse.status}
-                    </span>
-                  </div>
-                </div>
-
-        {/* Courses Table */}
-        <div
-          className="glass-card-static animate-fade-in-up delay-300"
-          style={{ padding: 0, overflow: "hidden" }}
-        >
-          <div
-            style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid var(--border-glass)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <h3
-              style={{ fontWeight: 700, fontSize: "1rem", color: textPrimary }}
-            >
-              All Courses
-            </h3>
-            <input
-              type="text"
-              placeholder="Search..."
-              className="glass-input"
-              style={{
-                maxWidth: 240,
-                padding: "8px 14px",
-                fontSize: "0.85rem",
-                color: textPrimary,
-                background: "#fff",
-                borderColor: "#cbd5e1",
-              }}
-            />
-          </div>
-
-          <div style={{ overflowX: "auto" }}>
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th style={{ color: textPrimary }}>Course</th>
-                  <th style={{ color: textPrimary }}>Lessons</th>
-                  <th style={{ color: textPrimary }}>Students</th>
-                  <th style={{ color: textPrimary }}>Revenue</th>
-                  <th style={{ color: textPrimary }}>Status</th>
-                  <th style={{ color: textPrimary }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {courses.map((course) => (
-                  <tr key={course.id}>
-                    <td style={{ fontWeight: 600, color: textPrimary }}>
-                      {course.title}
-                    </td>
-                    <td style={{ color: textPrimary }}>{course.lessons}</td>
-                    <td style={{ color: textPrimary }}>
-                      {course.students.toLocaleString()}
-                    </td>
-                    <td style={{ color: textPrimary }}>{course.revenue}</td>
-                    <td>
-                      <span
-                        className={`badge ${course.status === "Published" ? "badge-emerald" : "badge-amber"}`}
-                      >
-                        {course.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          className="btn-secondary"
-                          style={{
-                            padding: "6px 14px",
-                            fontSize: "0.78rem",
-                            borderRadius: "8px",
-                            color: textPrimary,
-                            background: "#fff",
-                            borderColor: "#cbd5e1",
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          style={{
-                            padding: "6px 14px",
-                            fontSize: "0.78rem",
-                            borderRadius: "8px",
-                            background: "rgba(244, 63, 94, 0.12)",
-                            color: "#fb7185",
-                            border: "1px solid rgba(244, 63, 94, 0.2)",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            transition: "all 0.2s ease",
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          ))}
         </div>
 
+        {/* Courses Table */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          {/* Table Header */}
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+            <h3 className="text-base font-bold text-gray-900">All Courses</h3>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-60"
+              />
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {loading && (
+            <div className="p-12 text-center">
+              <Loader2 className="w-8 h-8 text-[#174778] animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Loading courses...</p>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && filteredCourses.length === 0 && (
+            <div className="p-12 text-center">
+              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 font-medium mb-2">
+                {searchTerm
+                  ? "No courses match your search"
+                  : "No courses yet"}
+              </p>
+              {!searchTerm && (
+                <p className="text-sm text-gray-400 mb-4">
+                  Create your first course to get started.
+                </p>
+              )}
+              {!searchTerm && (
+                <button
+                  onClick={handleCreateNew}
+                  className="bg-[#174778] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Course
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Table */}
+          {!loading && filteredCourses.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Course
+                    </th>
+                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Created
+                    </th>
+                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="text-right px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCourses.map((course) => (
+                    <tr
+                      key={course.id}
+                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
+                            <BookOpen className="w-4 h-4 text-[#174778]" />
+                          </div>
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {course.title}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-500 line-clamp-1 max-w-xs block">
+                          {course.description || "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-500">
+                          {course.created_at
+                            ? new Date(course.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                }
+                              )
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Active
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEdit(course)}
+                            className="p-2 text-gray-400 hover:text-[#174778] hover:bg-[#174778]/5 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(course)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ─── CREATE / EDIT MODAL ─── */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">
+                {isEditing ? "Edit Course" : "Create New Course"}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Course Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Playwright Mastery"
+                  value={courseTitle}
+                  onChange={(e) => setCourseTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-2 focus:ring-[#174778]/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Description
+                </label>
+                <textarea
+                  placeholder="Describe the course content and learning objectives..."
+                  value={courseDescription}
+                  onChange={(e) => setCourseDescription(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-2 focus:ring-[#174778]/20 resize-none"
+                />
+              </div>
+
+              {modalMessage && (
+                <p
+                  className={`text-xs font-medium ${
+                    modalMessage.type === "success"
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {modalMessage.text}
+                </p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveCourse}
+                disabled={isSaving}
+                className="px-5 py-2 text-sm font-semibold text-white bg-[#174778] rounded-lg hover:bg-[#113a63] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSaving
+                  ? "Saving..."
+                  : isEditing
+                    ? "Save Changes"
+                    : "Create Course"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── DELETE CONFIRMATION MODAL ─── */}
+      {showDeleteConfirm && deletingCourse && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-5">
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+                Delete Course
+              </h3>
+              <p className="text-sm text-gray-500 text-center">
+                Are you sure you want to delete{" "}
+                <strong className="text-gray-900">
+                  {deletingCourse.title}
+                </strong>
+                ? This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletingCourse(null);
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

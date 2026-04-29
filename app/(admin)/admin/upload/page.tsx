@@ -4,13 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 
-interface Course {
-  id: string;
-  title: string;
-}
-import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabase";
-
 type Course = {
   id: string | number;
   title: string;
@@ -28,7 +21,6 @@ export default function UploadPage() {
 
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
-
   const [selectedCourseId, setSelectedCourseId] = useState(preselectedCourseId);
 
   const [moduleName, setModuleName] = useState("");
@@ -41,8 +33,25 @@ export default function UploadPage() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [isInitializingCourse, setIsInitializingCourse] = useState(false);
+  const [courseInitMessage, setCourseInitMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+  const [selectedCurriculum, setSelectedCurriculum] = useState("");
+  const [isQueueingVideo, setIsQueueingVideo] = useState(false);
+  const [videoQueueMessage, setVideoQueueMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const fileName = useMemo(() => selectedFile?.name || "", [selectedFile]);
+  const fileNameDisplay = useMemo(() => selectedFile?.name || "", [selectedFile]);
 
   useEffect(() => {
     const init = async () => {
@@ -72,31 +81,12 @@ export default function UploadPage() {
       setCourses(loadedCourses);
 
       if (!preselectedCourseId && loadedCourses.length > 0) {
-        setSelectedCourseId(loadedCourses[0].id);
+        setSelectedCourseId(String(loadedCourses[0].id));
       }
     };
 
     void init();
   }, [preselectedCourseId]);
-  const [fileName, setFileName] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [courseTitle, setCourseTitle] = useState("");
-  const [courseDescription, setCourseDescription] = useState("");
-  const [isInitializingCourse, setIsInitializingCourse] = useState(false);
-  const [courseInitMessage, setCourseInitMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
-  const [coursesError, setCoursesError] = useState<string | null>(null);
-  const [videoTitle, setVideoTitle] = useState("");
-  const [selectedCurriculum, setSelectedCurriculum] = useState("");
-  const [isQueueingVideo, setIsQueueingVideo] = useState(false);
-  const [videoQueueMessage, setVideoQueueMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -269,14 +259,10 @@ export default function UploadPage() {
       setLessonOrder((prev) => prev + 1);
       setSelectedFile(null);
       setSuccess("Video uploaded to Cloudflare Stream and saved successfully.");
-    } catch (err: any) {
-      setError(err.message || "Failed to upload video.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to upload video.");
     } finally {
       setIsBusy(false);
-    }
-    if (file) {
-      setVideoFile(file);
-      setFileName(file.name);
     }
   };
 
@@ -454,11 +440,6 @@ export default function UploadPage() {
   };
 
   return (
-    <div style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <div className="page-header animate-fade-in-up">
-          <h1 style={{ color: "black" }}>
-            <span className="text">Upload</span> Videos
     <div className="min-h-screen bg-gray-50 p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -583,7 +564,7 @@ export default function UploadPage() {
               marginBottom: 8,
             }}
           >
-            {fileName || "Drag & drop your video here"}
+            {fileNameDisplay || "Drag & drop your video here"}
           </p>
           <p style={{ color: textSecondary, fontSize: "0.88rem" }}>
             MP4, MOV, WebM up to 5GB
@@ -728,10 +709,10 @@ export default function UploadPage() {
                     </svg>
                   </div>
 
-                  {fileName ? (
+                  {fileNameDisplay ? (
                     <>
                       <p className="text-sm font-semibold text-gray-900 mb-1">
-                        {fileName}
+                        {fileNameDisplay}
                       </p>
                       <p className="text-xs text-gray-500">File selected</p>
                     </>
@@ -746,128 +727,134 @@ export default function UploadPage() {
                     </>
                   )}
                 </div>
-
-        <div
-          className="glass-card-static animate-fade-in-up delay-300 upload-surface"
-          style={{ padding: 24 }}
-        >
-          <h3
-            style={{
-              fontSize: "1.05rem",
-              fontWeight: 700,
-              marginBottom: 16,
-              color: textPrimary,
-            }}
-          >
-            Video Details
-          </h3>
-          <form
-            onSubmit={handleUploadVideo}
-            style={{ display: "flex", flexDirection: "column", gap: 16 }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 16,
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    color: textSecondary,
-                    marginBottom: 8,
-                  }}
-                >
-                  Module Name
-                </label>
-                <input
-                  className="glass-input"
-                  value={moduleName}
-                  onChange={(e) => setModuleName(e.target.value)}
-                  placeholder="e.g., Module 1 - Basics"
-                  style={{
-                    color: "#000",
-                    background: inputBackground,
-                    borderColor: inputBorder,
-                  }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    color: textSecondary,
-                    marginBottom: 8,
-                  }}
-                >
-                  Lesson Order
-                </label>
-                <input
-                  className="glass-input"
-                  type="number"
-                  min={1}
-                  value={lessonOrder}
-                  onChange={(e) => setLessonOrder(Number(e.target.value) || 1)}
-                  style={{
-                    color: "#000",
-                    background: inputBackground,
-                    borderColor: inputBorder,
-                  }}
-                />
               </div>
             </div>
 
-            <div>
-              <label
+            {/* Video Details Card */}
+            <div
+              className="glass-card-static animate-fade-in-up delay-300 upload-surface"
+              style={{ padding: 24 }}
+            >
+              <h3
                 style={{
-                  display: "block",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  color: textSecondary,
-                  marginBottom: 8,
+                  fontSize: "1.05rem",
+                  fontWeight: 700,
+                  marginBottom: 16,
+                  color: textPrimary,
                 }}
               >
-                Video Title
-              </label>
-              <input
-                className="glass-input"
-                value={videoTitle}
-                onChange={(e) => setVideoTitle(e.target.value)}
-                placeholder="e.g., Intro to Assertions"
-                style={{
-                  color: "#000",
-                  background: inputBackground,
-                  borderColor: inputBorder,
-                }}
-              />
-            </div>
-                <button
-                  type="button"
-                  onClick={handleQueueVideo}
-                  disabled={isQueueingVideo}
-                  className="w-full bg-[#1D4ED8] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                Video Details
+              </h3>
+              <form
+                onSubmit={handleUploadVideo}
+                style={{ display: "flex", flexDirection: "column", gap: 16 }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 16,
+                  }}
                 >
-                  {isQueueingVideo ? "Uploading..." : "Queue Video Asset"}
-                </button>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        color: textSecondary,
+                        marginBottom: 8,
+                      }}
+                    >
+                      Module Name
+                    </label>
+                    <input
+                      className="glass-input"
+                      value={moduleName}
+                      onChange={(e) => setModuleName(e.target.value)}
+                      placeholder="e.g., Module 1 - Basics"
+                      style={{
+                        color: "#000",
+                        background: inputBackground,
+                        borderColor: inputBorder,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        color: textSecondary,
+                        marginBottom: 8,
+                      }}
+                    >
+                      Lesson Order
+                    </label>
+                    <input
+                      className="glass-input"
+                      type="number"
+                      min={1}
+                      value={lessonOrder}
+                      onChange={(e) => setLessonOrder(Number(e.target.value) || 1)}
+                      style={{
+                        color: "#000",
+                        background: inputBackground,
+                        borderColor: inputBorder,
+                      }}
+                    />
+                  </div>
+                </div>
 
-                {videoQueueMessage && (
-                  <p
-                    className={`text-xs ${
-                      videoQueueMessage.type === "success"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: textSecondary,
+                      marginBottom: 8,
+                    }}
                   >
-                    {videoQueueMessage.text}
-                  </p>
-                )}
-              </div>
+                    Video Title
+                  </label>
+                  <input
+                    className="glass-input"
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    placeholder="e.g., Intro to Assertions"
+                    style={{
+                      color: "#000",
+                      background: inputBackground,
+                      borderColor: inputBorder,
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleQueueVideo}
+                    disabled={isQueueingVideo}
+                    className="w-full bg-[#1D4ED8] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isQueueingVideo ? "Uploading..." : "Queue Video Asset"}
+                  </button>
+
+                  {videoQueueMessage && (
+                    <p
+                      className={`text-xs ${
+                        videoQueueMessage.type === "success"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {videoQueueMessage.text}
+                    </p>
+                  )}
+                </div>
+              </form>
             </div>
           </div>
 
@@ -996,7 +983,6 @@ export default function UploadPage() {
                 {isBusy ? "Uploading..." : "Upload To Cloudflare Stream"}
               </button>
             </div>
-          </form>
             <div className="flex gap-8">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
@@ -1014,16 +1000,6 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
-      <style jsx>{`
-        .upload-surface :global(.glass-input::placeholder) {
-          color: #64748b;
-          opacity: 1;
-        }
-        .upload-surface :global(.glass-input option) {
-          color: #000;
-          background: #fff;
-        }
-      `}</style>
     </div>
   );
 }

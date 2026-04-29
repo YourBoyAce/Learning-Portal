@@ -71,25 +71,6 @@ export default function MainLayout({
   ];
 
   return (
-    <div className="flex h-screen bg-[#F5F7FA]">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#0B1E6D] rounded-lg flex items-center justify-center text-white">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.09l-5.5-3.03L12 10l5.5 3.06L12 16.09zM5 13.62v3.07l7 3.89 7-3.89v-3.07l-7 3.89-7-3.89z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-semibold text-[#0B1E6D] text-sm">
-                The Automate
-              </h1>
-              <p className="text-[10px] text-gray-400">
-                INTELLECTUAL SANCTUARY
-              </p>
-            </div>
-          </div>
-        </div>
     <div className="flex flex-col h-screen bg-[#F8FAFC]">
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -139,46 +120,51 @@ export default function MainLayout({
           </div>
         </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end">
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-700">
-                {userEmail?.split("@")[0]}
-              </p>
-              <p className="text-xs text-gray-400">{userEmail}</p>
-            </div>
-            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-lg">👤</span>
-        {showSignOutDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to sign out of your account?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSignOutDialog(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSignOut}
-                  className="flex-1 px-4 py-2 bg-[#174778] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
-                >
-                  Sign Out
-                </button>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end">
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-700">
+                  {userEmail?.split("@")[0]}
+                </p>
+                <p className="text-xs text-gray-400">{userEmail}</p>
+              </div>
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                <span className="text-lg">👤</span>
               </div>
             </div>
-          </div>
-        )}
+          </header>
 
-        <main className="flex-1 overflow-y-auto bg-[#F5F7FA]">
-          {children}
-        </main>
+          <main className="flex-1 overflow-y-auto bg-[#F5F7FA]">
+            {children}
+          </main>
+        </div>
       </div>
+
+      {showSignOutDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to sign out of your account?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSignOutDialog(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSignOut}
+                className="flex-1 px-4 py-2 bg-[#174778] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

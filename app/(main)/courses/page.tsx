@@ -1,235 +1,7 @@
-// "use client";
-
-// import { useRouter } from "next/navigation";
-
-// export default function Courses() {
-//   const router = useRouter();
-
-//   const courses = [
-//     {
-//       title: "Playwright Mastery",
-//       description: "End-to-end testing with Playwright — from basics to advanced CI/CD integration.",
-//       lessons: 25,
-//       duration: "12h 30m",
-//       level: "Intermediate",
-//       category: "Testing",
-//       enrolled: 1420,
-//       badgeColor: "badge-violet",
-//     },
-//     {
-//       title: "Gen AI Fundamentals",
-//       description: "Explore generative AI concepts, prompt engineering, and building AI-powered tools.",
-//       lessons: 20,
-//       duration: "10h 15m",
-//       level: "Beginner",
-//       category: "AI / ML",
-//       enrolled: 2310,
-//       badgeColor: "badge-cyan",
-//     },
-//     {
-//       title: "Selenium Advanced",
-//       description: "Advanced Selenium WebDriver techniques, Page Object Model, and framework design.",
-//       lessons: 30,
-//       duration: "15h 45m",
-//       level: "Advanced",
-//       category: "Testing",
-//       enrolled: 980,
-//       badgeColor: "badge-emerald",
-//     },
-//     {
-//       title: "API Testing with Postman",
-//       description: "REST & GraphQL API testing, automation with Newman, and CI/CD pipeline integration.",
-//       lessons: 20,
-//       duration: "8h 20m",
-//       level: "Beginner",
-//       category: "API",
-//       enrolled: 1850,
-//       badgeColor: "badge-blue",
-//     },
-//     {
-//       title: "Performance Testing",
-//       description: "Load testing with JMeter and k6 — identify bottlenecks and optimize applications.",
-//       lessons: 18,
-//       duration: "9h 10m",
-//       level: "Intermediate",
-//       category: "Performance",
-//       enrolled: 720,
-//       badgeColor: "badge-amber",
-//     },
-//     {
-//       title: "Mobile Testing with Appium",
-//       description: "Cross-platform mobile automation for iOS and Android using Appium framework.",
-//       lessons: 22,
-//       duration: "11h 00m",
-//       level: "Advanced",
-//       category: "Mobile",
-//       enrolled: 640,
-//       badgeColor: "badge-rose",
-//     },
-//   ];
-
-//   return (
-//     <div style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
-//       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-
-//         {/* Header */}
-//         <div className="page-header animate-fade-in-up flex items-center gap-4">
-//           <button
-//             onClick={() => router.back()}
-//             className="flex items-center gap-2 text-gray-600 hover:text-[#174778] transition-colors"
-//           >
-//             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-//             </svg>
-//             <span className="text-sm font-medium">Back</span>
-//           </button>
-//           <div className="flex-1">
-//             <h1>
-//               Explore <span className="gradient-text">Courses</span>
-//             </h1>
-//             <p>Choose from our expert-crafted curriculum and start learning today.</p>
-//           </div>
-//         </div>
-
-//         {/* Search Bar */}
-//         <div className="animate-fade-in-up delay-100" style={{ marginBottom: 32 }}>
-//           <div className="glass-card-static" style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-//             <span style={{ color: "var(--text-muted)", fontSize: "1.1rem" }}>🔍</span>
-//             <input
-//               type="text"
-//               placeholder="Search courses..."
-//               style={{
-//                 flex: 1,
-//                 background: "transparent",
-//                 border: "none",
-//                 outline: "none",
-//                 color: "var(--text-primary)",
-//                 fontSize: "0.95rem",
-//               }}
-//             />
-//             <div style={{ display: "flex", gap: 8 }}>
-//               {["All", "Testing", "AI / ML", "API"].map((filter) => (
-//                 <button
-//                   key={filter}
-//                   className={filter === "All" ? "badge badge-violet" : "badge"}
-//                   style={{
-//                     cursor: "pointer",
-//                     border: "none",
-//                     background: filter === "All" ? undefined : "var(--surface-glass)",
-//                     color: filter === "All" ? undefined : "var(--text-secondary)",
-//                   }}
-//                 >
-//                   {filter}
-//                 </button>
-//               ))}
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Course Grid */}
-//         <div
-//           style={{
-//             display: "grid",
-//             gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-//             gap: 24,
-//           }}
-//         >
-//           {courses.map((course, i) => (
-//             <a
-//               key={course.title}
-//               href={`/course-${i + 1}`}
-//               style={{ textDecoration: "none" }}
-//             >
-//               <div
-//                 className={`glass-card animate-fade-in-up delay-${Math.min((i + 1) * 100, 600)}`}
-//                 style={{ padding: 0, overflow: "hidden", cursor: "pointer", height: "100%" }}
-//               >
-//                 {/* Thumbnail placeholder */}
-//                 <div
-//                   style={{
-//                     height: 160,
-//                     background: `linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))`,
-//                     display: "flex",
-//                     alignItems: "center",
-//                     justifyContent: "center",
-//                     position: "relative",
-//                   }}
-//                 >
-//                   <span style={{ fontSize: "2.5rem", opacity: 0.3 }}>▶</span>
-//                   <div
-//                     style={{
-//                       position: "absolute",
-//                       top: 12,
-//                       left: 12,
-//                     }}
-//                   >
-//                     <span className={`badge ${course.badgeColor}`}>{course.category}</span>
-//                   </div>
-//                   <div
-//                     style={{
-//                       position: "absolute",
-//                       top: 12,
-//                       right: 12,
-//                     }}
-//                   >
-//                     <span className="badge" style={{ background: "rgba(0,0,0,0.5)", color: "var(--text-primary)" }}>
-//                       {course.level}
-//                     </span>
-//                   </div>
-//                 </div>
-
-//                 {/* Content */}
-//                 <div style={{ padding: "20px 24px 24px" }}>
-//                   <h3
-//                     style={{
-//                       fontSize: "1.1rem",
-//                       fontWeight: 700,
-//                       color: "var(--text-primary)",
-//                       marginBottom: 8,
-//                     }}
-//                   >
-//                     {course.title}
-//                   </h3>
-//                   <p
-//                     style={{
-//                       fontSize: "0.85rem",
-//                       color: "var(--text-secondary)",
-//                       lineHeight: 1.6,
-//                       marginBottom: 20,
-//                     }}
-//                   >
-//                     {course.description}
-//                   </p>
-
-//                   {/* Meta */}
-//                   <div
-//                     style={{
-//                       display: "flex",
-//                       justifyContent: "space-between",
-//                       fontSize: "0.8rem",
-//                       color: "var(--text-muted)",
-//                       borderTop: "1px solid var(--border-glass)",
-//                       paddingTop: 16,
-//                     }}
-//                   >
-//                     <span>📖 {course.lessons} lessons</span>
-//                     <span>⏱️ {course.duration}</span>
-//                     <span>👥 {course.enrolled.toLocaleString()}</span>
-//                   </div>
-//                 </div>
-//               </div>
-//             </a>
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
@@ -237,7 +9,7 @@ import {
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious
+  CarouselPrevious,
 } from "@/components/ui/carousel";
 import { BookOpen, PlayCircle, CheckCircle2, Calendar } from "lucide-react";
 
@@ -253,12 +25,25 @@ interface UserStats {
   pendingModules: number;
 }
 
+interface CurriculumCourse {
+  id: number;
+  title: string;
+  description: string;
+  module_label?: string;
+  progress: number;
+  thumbnail_url?: string;
+  duration?: string;
+}
+
 export default function MyLearningDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
   // Data States
-  const [stats, setStats] = useState<UserStats>({ liveSessions: 0, pendingModules: 0 });
+  const [stats, setStats] = useState<UserStats>({
+    liveSessions: 0,
+    pendingModules: 0,
+  });
   const [weeklyProgressPct, setWeeklyProgressPct] = useState(0);
 
   // Insight States
@@ -266,30 +51,61 @@ export default function MyLearningDashboard() {
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-  const [curriculum, setCurriculum] = useState<any[]>([
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([
     {
       id: 1,
-      title: "Full Stack Masterclass",
-      description: "Continue where you left off in module 4.",
-      progress: 45
-    }
+      title: "The Philosophy of Form and Shadow",
+      description:
+        "Exploring how visual silence redefines perception in 30% of modern aesthetics theory.",
+      module_label: "MODULE 24 · MODERN AESTHETICS",
+      progress: 45,
+      duration: "46:29",
+    },
   ]);
 
-  // Clean, light-themed Dummy Webinars 
+  // Upcoming Webinars
   const upcomingWebinars = [
-    { id: 1, title: "Future of AI in Software", date: "Nov 15, 2024 • 10:00 AM" },
-    { id: 2, title: "Advanced Systems Design", date: "Nov 18, 2024 • 2:00 PM" },
-    { id: 3, title: "Career Mastery Q&A", date: "Nov 22, 2024 • 1:00 PM" },
+    {
+      id: 1,
+      title: "Advanced Epistemology",
+      subtitle: "Seminar Room R12 · Prof. Ariadne",
+      date: "TOMORROW, 10:00 AM",
+      icon: "📋",
+      status: "streaming",
+      attendees: 2,
+    },
+    {
+      id: 2,
+      title: "The Architecture of Silence",
+      subtitle: "Virtual Session · Dr. Lena Vance",
+      date: "WED, 2:30 PM",
+      icon: "▶",
+      status: "link",
+      linkText: "Link Active Soon",
+      attendees: 1,
+    },
+    {
+      id: 3,
+      title: "Linguistic Relativity",
+      subtitle: "Workshop Room 12 · Prof. Ch...",
+      date: "FRI, 11:00 AM",
+      icon: "📋",
+      status: "streaming",
+      attendees: 0,
+    },
   ];
 
   useEffect(() => {
     loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadDashboardData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
 
@@ -322,26 +138,31 @@ export default function MyLearningDashboard() {
 
       const modulesCompletedThisWeek = recentProgress?.length || 0;
       const targetModulesPerWeek = 5;
-      const progressCalculation = Math.min(Math.round((modulesCompletedThisWeek / targetModulesPerWeek) * 100), 100);
+      const progressCalculation = Math.min(
+        Math.round((modulesCompletedThisWeek / targetModulesPerWeek) * 100),
+        100
+      );
       setWeeklyProgressPct(progressCalculation);
 
       // 4. Calculate Pending Modules
       const { count: completedVideosCount } = await supabase
         .from("user_video_progress")
-        .select("*", { count: 'exact', head: true })
+        .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
       const { count: totalVideosCount } = await supabase
         .from("videos")
-        .select("*", { count: 'exact', head: true });
+        .select("*", { count: "exact", head: true });
 
-      const pendingMods = Math.max(0, (totalVideosCount || 0) - (completedVideosCount || 0));
+      const pendingMods = Math.max(
+        0,
+        (totalVideosCount || 0) - (completedVideosCount || 0)
+      );
 
       setStats({
-        liveSessions: 0, // Update this query when your specific live_sessions table is created
-        pendingModules: pendingMods
+        liveSessions: upcomingWebinars.length,
+        pendingModules: pendingMods,
       });
-
     } catch (error) {
       console.error("Error loading dashboard:", error);
     } finally {
@@ -353,104 +174,58 @@ export default function MyLearningDashboard() {
     if (!userId || insights.length === 0) return;
     const nextIndex = (currentInsightIndex + 1) % insights.length;
     setCurrentInsightIndex(nextIndex);
-    await supabase.from("profiles").update({ current_insight_index: nextIndex }).eq("id", userId);
+    await supabase
+      .from("profiles")
+      .update({ current_insight_index: nextIndex })
+      .eq("id", userId);
   };
 
-  if (loading) return <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">Loading your journey...</div>;
+  if (loading)
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#174778] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">
+            Loading your journey...
+          </p>
+        </div>
+      </div>
+    );
 
-  const currentInsight = insights[currentInsightIndex] || { content: "Loading insight...", author: "" };
+  const currentInsight = insights[currentInsightIndex] || {
+    content: "Loading insight...",
+    author: "",
+  };
 
   // Calculate SVG Circle values
   const circleRadius = 45;
   const circleCircumference = 2 * Math.PI * circleRadius;
-  const circleOffset = circleCircumference - (circleCircumference * weeklyProgressPct) / 100;
-"use client";
-
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase } from "@/app/lib/supabase";
-
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  lessons_count: number;
-  status: string;
-  cover_image_url?: string;
-  created_at: string;
-}
-
-export default function Courses() {
-  const textPrimary = "#0f172a";
-  const textSecondary = "#475569";
-  const textMuted = "#64748b";
-  const cardBodyBackground = "#ffffff";
-  const cardBodyBorder = "#e2e8f0";
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    loadCourses();
-  }, []);
-
-  const loadCourses = async () => {
-    try {
-      setLoading(true);
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-      if (!user) {
-        setCourses([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("instructor_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setCourses(data || []);
-    } catch (err) {
-      setError("Failed to load courses");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const categoryColors: Record<string, string> = {
-    Testing: "badge-violet",
-    "AI / ML": "badge-cyan",
-    API: "badge-blue",
-    Performance: "badge-amber",
-    Mobile: "badge-rose",
-    Default: "badge-emerald",
-  };
+  const circleOffset =
+    circleCircumference - (circleCircumference * weeklyProgressPct) / 100;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
-
-        {/* TOP SECTION: Header Info (Left) & Weekly Progress (Right) */}
+        {/* ─── TOP SECTION: Header + Weekly Progress ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left: Heading & Paragraph (h-48 equivalent) */}
+          {/* Left: Heading & Stats */}
           <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
             <h1 className="text-4xl md:text-[44px] font-bold text-[#174778] mb-4 tracking-tight leading-tight">
-              Continuing your journey
+              Continuing Your Journey
             </h1>
             <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
-              Welcome back to our intellectual sanctuary. You have{" "}
-              <span className="font-semibold text-[#174778]">{stats.liveSessions} pending live sessions</span>{" "}
+              Welcome back to{" "}
+              <span className="font-bold text-[#174778]">The Automate</span>.
+              You have{" "}
+              <span className="font-semibold text-[#174778] underline decoration-dotted underline-offset-4">
+                {stats.liveSessions} upcoming webinars
+              </span>{" "}
               and{" "}
-              <span className="font-semibold text-[#174778]">{stats.pendingModules} pending modules</span>{" "}
-              across your enrolled masterclasses.
+              <span className="font-semibold text-[#174778] underline decoration-dotted underline-offset-4">
+                {stats.pendingModules} pending module
+                {stats.pendingModules !== 1 ? "s" : ""}
+              </span>{" "}
+              in your core curriculum.
             </p>
           </div>
 
@@ -459,170 +234,124 @@ export default function Courses() {
             <section className="bg-[#4A2B23] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
               <div className="relative z-10 flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-[#E8DCCA] mb-2">Weekly Progress</h3>
+                  <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-[#E8DCCA] mb-2">
+                    Weekly Progress
+                  </h3>
                   <p className="text-[13px] text-[#E8DCCA] leading-relaxed max-w-[140px]">
                     {weeklyProgressPct >= 100
                       ? "Weekly goal reached!"
                       : "Complete more modules to reach your goal."}
                   </p>
                 </div>
-    <div style={{ minHeight: "calc(100vh - 64px)", padding: "40px 24px 80px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* Header with Create Button */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 32,
-          }}
-          className="animate-fade-in-up"
-        >
-          <div className="page-header">
-            <h1 style={{ color: "black" }}>
-              Explore <span className="text">Courses</span>
-            </h1>
-            <p style={{ color: textSecondary }}>
-              Choose from our expert-crafted curriculum and start learning
-              today.
-            </p>
-          </div>
-          <Link href="/courses/create" style={{ textDecoration: "none" }}>
-            <button
-              className="btn-primary"
-              style={{
-                padding: "12px 24px",
-                fontSize: "0.95rem",
-                whiteSpace: "nowrap",
-              }}
-            >
-              + Create Course
-            </button>
-          </Link>
-        </div>
 
                 {/* Custom SVG Circular Progress */}
                 <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
                   <svg className="transform -rotate-90 w-full h-full">
-                    <circle cx="48" cy="48" r={circleRadius} stroke="rgba(255,255,255,0.1)" strokeWidth="6" fill="none" />
                     <circle
-                      cx="48" cy="48" r={circleRadius} stroke="#E6A15C" strokeWidth="6" fill="none"
-                      strokeDasharray={circleCircumference} strokeDashoffset={circleOffset} strokeLinecap="round"
+                      cx="48"
+                      cy="48"
+                      r={circleRadius}
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth="6"
+                      fill="none"
+                    />
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r={circleRadius}
+                      stroke="#E6A15C"
+                      strokeWidth="6"
+                      fill="none"
+                      strokeDasharray={circleCircumference}
+                      strokeDashoffset={circleOffset}
+                      strokeLinecap="round"
                       className="transition-all duration-1000 ease-out"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xl font-bold tracking-tighter">{weeklyProgressPct}%</span>
+                    <span className="text-xl font-bold tracking-tighter">
+                      {weeklyProgressPct}%
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Decorative background shapes */}
+              {/* Decorative background */}
               <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-[#E6A15C] opacity-5 rounded-full blur-3xl" />
             </section>
-        {/* Search Bar */}
-        <div
-          className="animate-fade-in-up delay-100"
-          style={{ marginBottom: 32 }}
-        >
-          <div
-            className="glass-card-static"
-            style={{
-              padding: "12px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <span style={{ color: textMuted, fontSize: "1.1rem" }}>🔍</span>
-            <input
-              type="text"
-              placeholder="Search courses..."
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                color: textPrimary,
-                fontSize: "0.95rem",
-              }}
-            />
           </div>
         </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px",
-              color: textSecondary,
-            }}
-          >
-            <p>Loading courses...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div
-            className="glass-card"
-            style={{
-              padding: "20px",
-              background: "rgba(239, 68, 68, 0.1)",
-              borderLeft: "4px solid #ef4444",
-              color: "#fca5a5",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && courses.length === 0 && (
-          <div
-            className="glass-card"
-            style={{
-              padding: "60px 40px",
-              textAlign: "center",
-              color: textSecondary,
-            }}
-          >
-            <p style={{ fontSize: "1.1rem", marginBottom: 16 }}>
-              📚 No courses yet
-            </p>
-            <p style={{ marginBottom: 24 }}>
-              Create your first course to get started!
-            </p>
-            <Link href="/courses/create" style={{ textDecoration: "none" }}>
-              <button className="btn-primary">Create Your First Course</button>
+        {/* ─── UPCOMING WEBINARS ─── */}
+        <section>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
+              Upcoming Webinars
+            </h2>
+            <Link
+              href="/calendar"
+              className="text-sm font-semibold text-[#174778] hover:underline"
+            >
+              View Calendar
             </Link>
           </div>
-        )}
 
-        {/* UPCOMING WEBINARS (Light UI Design) */}
-        <section>
-          <h2 className="text-xl font-bold text-[#0f172a] mb-5 tracking-tight">Upcoming Webinars</h2>
           <Carousel className="w-full">
             <CarouselContent>
               {upcomingWebinars.map((webinar) => (
-                <CarouselItem key={webinar.id} className="md:basis-1/2 lg:basis-1/3">
-                  <div className="p-6 rounded-2xl bg-white border border-gray-100 shadow-sm h-44 flex flex-col justify-between group hover:shadow-md transition-all">
+                <CarouselItem
+                  key={webinar.id}
+                  className="md:basis-1/2 lg:basis-1/3"
+                >
+                  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex flex-col justify-between group hover:shadow-md transition-all">
                     <div>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-wider mb-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live Event
-                      </span>
-                      <h3 className="font-bold text-[#0f172a] text-lg leading-snug">{webinar.title}</h3>
+                      {/* Date Badge */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider">
+                          {webinar.date}
+                        </span>
+                        <span className="text-gray-400 text-lg">
+                          {webinar.icon}
+                        </span>
+                      </div>
+
+                      {/* Title & Subtitle */}
+                      <h3 className="font-bold text-[#0f172a] text-[17px] leading-snug mb-1">
+                        {webinar.title}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {webinar.subtitle}
+                      </p>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-2">
-                      <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                        <Calendar size={14} />
-                        <span>{webinar.date}</span>
+                    {/* Bottom Row */}
+                    <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-2">
+                      <div className="flex items-center gap-1">
+                        {/* Attendee Avatars */}
+                        {Array.from({
+                          length: Math.min(webinar.attendees, 3),
+                        }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white -ml-1 first:ml-0 flex items-center justify-center"
+                          >
+                            <span className="text-[8px] text-gray-500">
+                              👤
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <Button variant="outline" size="sm" className="h-8 text-xs font-semibold rounded-md border-gray-200">
-                        Register
-                      </Button>
+
+                      {webinar.status === "streaming" ? (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Streaming
+                        </span>
+                      ) : webinar.linkText ? (
+                        <span className="text-[11px] font-semibold text-[#174778] underline cursor-pointer">
+                          {webinar.linkText}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </CarouselItem>
@@ -635,9 +364,48 @@ export default function Courses() {
           </Carousel>
         </section>
 
-        {/* CURATED CURRICULUM */}
+        {/* ─── CURATED VIDEO CURRICULUM ─── */}
         <section>
-          <h2 className="text-xl font-bold text-[#0f172a] mb-5 tracking-tight">Curated Curriculum</h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
+              Curated Video Curriculum
+            </h2>
+            <div className="flex items-center gap-4 text-sm">
+              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
+                </svg>
+                Filter
+              </button>
+              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                  />
+                </svg>
+                Sort By
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-4">
             {curriculum.length === 0 ? (
               <div className="bg-white p-8 rounded-2xl border border-gray-100 text-center text-gray-500 text-sm">
@@ -645,100 +413,56 @@ export default function Courses() {
               </div>
             ) : (
               curriculum.map((course) => (
-                <div key={course.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow">
-
-                  {/* Video Thumbnail Placeholder */}
+                <div
+                  key={course.id}
+                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow"
+                >
+                  {/* Video Thumbnail */}
                   <div className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer">
-                    <PlayCircle className="text-white/70 group-hover:text-white transition-colors z-10" size={40} strokeWidth={1.5} />
-                    <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent" />
+                    <PlayCircle
+                      className="text-white/70 group-hover:text-white transition-colors z-10"
+                      size={40}
+                      strokeWidth={1.5}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    {course.duration && (
+                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-10">
+                        {course.duration}
+                      </span>
+                    )}
                   </div>
 
                   {/* Content & Progress */}
                   <div className="flex-1 w-full py-1">
-                    <h3 className="font-bold text-[#0f172a] text-[18px]">{course.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1.5 mb-5">{course.description}</p>
+                    {course.module_label && (
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1.5">
+                        {course.module_label}
+                      </p>
+                    )}
+                    <h3 className="font-bold text-[#0f172a] text-[18px]">
+                      {course.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1.5 mb-5">
+                      {course.description}
+                    </p>
 
                     <div className="flex items-center gap-4">
                       <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#174778] h-full rounded-full" style={{ width: `${course.progress}%` }} />
+                        <div
+                          className="bg-[#174778] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${course.progress}%` }}
+                        />
                       </div>
-                      <span className="text-xs font-bold text-gray-400">{course.progress}%</span>
-                    </div>
-                  </div>
-        {/* Course Grid */}
-        {!loading && courses.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-              gap: 24,
-            }}
-          >
-            {courses.map((course, i) => (
-              <a
-                key={course.id}
-                href={`/admin/upload?courseId=${course.id}`}
-                style={{ textDecoration: "none" }}
-              >
-                <div
-                  className={`glass-card animate-fade-in-up delay-${Math.min((i + 1) * 100, 600)}`}
-                  style={{
-                    padding: 0,
-                    overflow: "hidden",
-                    cursor: "pointer",
-                    height: "100%",
-                  }}
-                >
-                  {/* Thumbnail placeholder */}
-                  <div
-                    style={{
-                      height: 160,
-                      background: `linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                    }}
-                  >
-                    <span style={{ fontSize: "2.5rem", opacity: 0.3 }}>▶</span>
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 12,
-                        left: 12,
-                      }}
-                    >
-                      <span
-                        className={`badge ${categoryColors["Default"]}`}
-                        style={{ fontSize: "0.75rem" }}
-                      >
-                        Course
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 12,
-                        right: 12,
-                      }}
-                    >
-                      <span
-                        className="badge"
-                        style={{
-                          background: "rgba(0,0,0,0.5)",
-                          color: "var(--text-primary)",
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {course.status}
+                      <span className="text-xs font-bold text-gray-400">
+                        {course.progress}%
                       </span>
                     </div>
                   </div>
 
                   {/* Resume Button */}
                   <div className="w-full sm:w-auto shrink-0 px-2">
-                    <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-lg flex items-center gap-2 px-6 py-5 shadow-sm">
-                      Resume <PlayCircle size={18} />
+                    <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
+                      <PlayCircle size={18} />
                     </Button>
                   </div>
                 </div>
@@ -747,21 +471,25 @@ export default function Courses() {
           </div>
         </section>
 
-        {/* SCHOLARLY INSIGHT (Moved to the bottom) */}
-        <section className="bg-[#FDFBF7] border-l-[6px] border-[#8B4513] p-7 rounded-r-2xl shadow-sm relative mt-4">
-          <div className="absolute right-4 top-4 text-[#8B4513]/5">
+        {/* ─── THE AUTOMATE INSIGHT ─── */}
+        <section className="bg-[#FDFBF7] border-l-[6px] border-[#174778] p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-[#174778]/5">
             <BookOpen size={80} />
           </div>
 
-          <div className="flex items-center gap-2 mb-4 relative z-10">
-            <BookOpen size={18} className="text-[#8B4513]" />
-            <h3 className="font-bold text-[#8B4513] text-xs uppercase tracking-wider">Scholarly Insight</h3>
+          <div className="flex items-center gap-3 mb-4 relative z-10">
+            <div className="w-10 h-10 bg-[#174778] rounded-full flex items-center justify-center shrink-0">
+              <BookOpen size={18} className="text-white" />
+            </div>
+            <h3 className="font-bold text-[#174778] text-base">
+              The Automate Insight
+            </h3>
           </div>
 
           <div className="mb-6 relative z-10">
             {insights.length > 0 ? (
               <>
-                <p className="text-[16px] text-[#3e2218] font-serif italic leading-relaxed max-w-4xl">
+                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
@@ -771,73 +499,22 @@ export default function Courses() {
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-500">Cultivating new insights...</p>
+              <p className="text-sm text-gray-500">
+                Cultivating new insights...
+              </p>
             )}
           </div>
 
-          <div className="relative z-10">
+          <div className="relative z-10 flex justify-end">
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              variant="outline"
-              className="bg-white border border-gray-200 text-[#8B4513] hover:bg-[#8B4513] hover:text-white hover:border-[#8B4513] rounded-lg transition-all flex items-center gap-2 shadow-sm font-semibold"
+              className="bg-[#174778] hover:bg-[#113a63] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
             >
               <CheckCircle2 size={16} /> Mark as Read
             </Button>
           </div>
         </section>
-
-                  {/* Content */}
-                  <div
-                    style={{
-                      padding: "20px 24px 24px",
-                      background: cardBodyBackground,
-                      borderTop: `1px solid ${cardBodyBorder}`,
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontSize: "1.1rem",
-                        fontWeight: 700,
-                        color: "#000",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {course.title}
-                    </h3>
-                    <p
-                      style={{
-                        fontSize: "0.85rem",
-                        color: textSecondary,
-                        lineHeight: 1.6,
-                        marginBottom: 20,
-                      }}
-                    >
-                      {course.description}
-                    </p>
-
-                    {/* Meta */}
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "0.8rem",
-                        color: textMuted,
-                        borderTop: `1px solid ${cardBodyBorder}`,
-                        paddingTop: 16,
-                      }}
-                    >
-                      <span>📖 {course.lessons_count || 0} lessons</span>
-                      <span>
-                        📅 {new Date(course.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
