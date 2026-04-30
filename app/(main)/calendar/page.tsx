@@ -68,10 +68,10 @@ const CalendarPage = () => {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('event_date', { ascending: true });
+        .from("calendar_events")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("event_date", { ascending: true });
 
       if (error) throw error;
 
@@ -112,7 +112,7 @@ const CalendarPage = () => {
   useEffect(() => {
     fetchEvents();
     fetchNotificationPreferences();
-    
+
     const eventsSubscription = supabase
       .channel('calendar_events_changes')
       .on(
@@ -178,7 +178,7 @@ const CalendarPage = () => {
           .from('notification_preferences')
           .update({ [key]: value })
           .eq('user_id', user.id);
-        
+
         if (error) throw error;
       } else {
         // Create new
@@ -190,7 +190,7 @@ const CalendarPage = () => {
             in_app_alerts: key === 'in_app_alerts' ? value : true,
             sms_reminders: key === 'sms_reminders' ? value : false
           });
-        
+
         if (error) throw error;
       }
     } catch (error) {
@@ -280,17 +280,17 @@ const CalendarPage = () => {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay.getDay(); i++) {
       days.push(null);
     }
-    
+
     // Add days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(today.getFullYear(), today.getMonth(), i));
     }
-    
+
     return days;
   };
 
@@ -298,7 +298,7 @@ const CalendarPage = () => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) return "Today";
     if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -409,11 +409,10 @@ const CalendarPage = () => {
                     <button
                       key={v}
                       onClick={() => setView(v)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        view === v
-                          ? "bg-[#174778] text-white"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === v
+                        ? "bg-[#174778] text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                        }`}
                     >
                       {v.charAt(0).toUpperCase() + v.slice(1)}
                     </button>
@@ -435,9 +434,8 @@ const CalendarPage = () => {
                 {generateCalendarDays().map((date, index) => (
                   <div
                     key={index}
-                    className={`min-h-[100px] p-2 rounded-lg border border-gray-100 transition-all hover:shadow-sm cursor-pointer ${
-                      isToday(date) ? "bg-blue-50 border-blue-200 ring-2 ring-blue-200 ring-opacity-50" : "bg-gray-50"
-                    } ${!date ? "opacity-0" : ""}`}
+                    className={`min-h-[100px] p-2 rounded-lg border border-gray-100 transition-all hover:shadow-sm cursor-pointer ${isToday(date) ? "bg-blue-50 border-blue-200 ring-2 ring-blue-200 ring-opacity-50" : "bg-gray-50"
+                      } ${!date ? "opacity-0" : ""}`}
                   >
                     {date && (
                       <>
@@ -545,14 +543,12 @@ const CalendarPage = () => {
                       setEmailNotif(!emailNotif);
                       updateNotificationPreference('email_notifications', !emailNotif);
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${
-                      emailNotif ? "bg-[#174778]" : "bg-gray-300"
-                    }`}
+                    className={`w-11 h-6 rounded-full transition-all ${emailNotif ? "bg-[#174778]" : "bg-gray-300"
+                      }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
-                        emailNotif ? "translate-x-5" : "translate-x-0.5"
-                      }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${emailNotif ? "translate-x-5" : "translate-x-0.5"
+                        }`}
                     />
                   </button>
                 </div>
@@ -563,14 +559,12 @@ const CalendarPage = () => {
                       setInAppAlerts(!inAppAlerts);
                       updateNotificationPreference('in_app_alerts', !inAppAlerts);
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${
-                      inAppAlerts ? "bg-[#174778]" : "bg-gray-300"
-                    }`}
+                    className={`w-11 h-6 rounded-full transition-all ${inAppAlerts ? "bg-[#174778]" : "bg-gray-300"
+                      }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
-                        inAppAlerts ? "translate-x-5" : "translate-x-0.5"
-                      }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${inAppAlerts ? "translate-x-5" : "translate-x-0.5"
+                        }`}
                     />
                   </button>
                 </div>
@@ -581,14 +575,12 @@ const CalendarPage = () => {
                       setSmsReminders(!smsReminders);
                       updateNotificationPreference('sms_reminders', !smsReminders);
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${
-                      smsReminders ? "bg-[#174778]" : "bg-gray-300"
-                    }`}
+                    className={`w-11 h-6 rounded-full transition-all ${smsReminders ? "bg-[#174778]" : "bg-gray-300"
+                      }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
-                        smsReminders ? "translate-x-5" : "translate-x-0.5"
-                      }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${smsReminders ? "translate-x-5" : "translate-x-0.5"
+                        }`}
                     />
                   </button>
                 </div>
@@ -787,3 +779,4 @@ const CalendarPage = () => {
 };
 
 export default CalendarPage;
+
