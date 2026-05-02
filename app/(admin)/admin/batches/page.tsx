@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import Select from "react-select";
 import {
   BookOpen,
   Users,
-  User,
   CheckCircle,
   Plus,
   Search,
@@ -18,28 +18,51 @@ import {
 } from "lucide-react";
 
 interface Batch {
-  id: number;
+  id: number | string;
   name: string;
   description: string;
   created_at?: string;
+  start_date?: string | null;
   category?: string;
+  course_id?: number | string | null;
+}
+
+interface BatchOption {
+  value: string;
+  label: string;
+}
+
+interface Profile {
+  id: string;
+  email: string | null;
+  full_name?: string | null;
+}
+
+interface Course {
+  id: number | string;
+  title: string;
 }
 
 export default function AdminBatches() {
   const [batches, setBatches] = useState<Batch[]>([]);
-  type NewType = Profile;
-
-  const [users, setUsers] = useState<NewType[]>([]);
-  const [events, setEvents] = useState<Batch[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<readonly BatchOption[]>(
+    [],
+  );
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<
+    readonly BatchOption[]
+  >([]);
   const [created_at, setCreated_At] = useState("");
-  const [selectedUser, setSelectedUser] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingBatchId, setEditingBatchId] = useState<number | null>(null);
+  const [editingBatchId, setEditingBatchId] = useState<number | string | null>(
+    null,
+  );
   const [batchName, setBatchName] = useState("");
   const [batchDescription, setBatchDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -56,26 +79,16 @@ export default function AdminBatches() {
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
+      const { data, error } = await supabase
+        .from("batches")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (sessionError || !sessionData.session?.access_token) {
-        console.error("Auth error:", sessionError);
+      if (error) {
+        console.error("Failed to fetch batches:", error.message);
         return;
       }
-
-      const response = await fetch("/api/admin/batches", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (response.ok && Array.isArray(result?.batches)) {
-        setBatches(result.batches);
-      }
+      setBatches(data ?? []);
     } catch (error) {
       console.error("Failed to fetch batches:", error);
     } finally {
@@ -88,97 +101,114 @@ export default function AdminBatches() {
   }, []);
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from("profiles").select("id, full_name");
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        console.error("Auth error:", sessionError);
+        return;
+      }
 
-    if (data) setUsers(data);
-  };
+      const response = await fetch(
+        "/api/admin/batches?includeUsers=true&includeCourses=true",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        },
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
+      }
 
-  const fetchEvents = async () => {
-    const { data } = await supabase
-      .from("batches")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (data) setEvents(data);
+      setUsers(Array.isArray(result?.users) ? result.users : []);
+      setCourses(Array.isArray(result?.courses) ? result.courses : []);
+    } catch (error) {
+      console.error(
+        "Failed to fetch users/courses for batch assignment:",
+        error,
+      );
+    }
   };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
-    fetchEvents();
-
-    const channel = supabase
-      .channel("batches")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "batches",
-        },
-        () => {
-          fetchEvents();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
-  const handleCreateNew = async () => {
-    setBatchName("");
-    setBatchDescription("");
-    setCreated_At("");
-
-    fetchEvents();
-    setIsEditing(false);
-    setEditingBatchId(null);
-    setModalMessage(null);
-
-    if (!selectedUser || !batchName || !created_at) {
-      alert("Please fill all required fields");
-      return;
-    }
-
-    try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("Please log in again to continue.");
-      }
-
-      const response = await fetch("/api/admin/batches", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-        body: JSON.stringify({
-          name: batchName,
-          description: batchDescription,
-          created: created_at,
-        }),
-      });
-
-      if (!response.ok) return new Error("not implemented");
-
-      setShowModal(false);
-    } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      return;
-    }
-  };
-
-  const handleEdit = (batch: Batch) => {
+  const handleEdit = async (batch: Batch) => {
     setIsEditing(true);
     setEditingBatchId(batch.id);
     setBatchName(batch.name);
     setBatchDescription(batch.description || "");
+    setCreated_At(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
     setModalMessage(null);
     setShowModal(true);
+
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) return;
+
+      const response = await fetch(
+        `/api/admin/batches?includeAssignments=true&includeUsers=true&includeCourses=true&batchId=${batch.id}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        },
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.assignment) return;
+
+      const memberEmails: string[] = Array.isArray(
+        result.assignment.memberEmails,
+      )
+        ? result.assignment.memberEmails
+        : [];
+      const courseIds: string[] = Array.isArray(result.assignment.courseIds)
+        ? result.assignment.courseIds
+        : [];
+      const latestUsers: Profile[] = Array.isArray(result?.users)
+        ? result.users
+        : users;
+      const latestCourses: Course[] = Array.isArray(result?.courses)
+        ? result.courses
+        : courses;
+
+      setUsers(latestUsers);
+      setCourses(latestCourses);
+
+      const userOptions = latestUsers
+        .filter((user) => Boolean(user.email))
+        .map((user) => ({
+          value: user.email as string,
+          label: user.email as string,
+        }));
+
+      const courseOptions = latestCourses.map((course) => ({
+        value: String(course.id),
+        label: course.title,
+      }));
+
+      setSelectedUsers(
+        userOptions.filter((option) =>
+          memberEmails.includes(String(option.value)),
+        ),
+      );
+      setSelectedCourses(
+        courseOptions.filter((option) =>
+          courseIds.includes(String(option.value)),
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to fetch existing batch assignments:", error);
+    }
   };
 
   const handleSaveBatch = async () => {
@@ -196,16 +226,13 @@ export default function AdminBatches() {
     try {
       setIsSaving(true);
       setModalMessage(null);
-
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-
       if (sessionError || !sessionData.session?.access_token) {
         throw new Error("Please log in again to continue.");
       }
 
       if (isEditing && editingBatchId) {
-        // Update existing batch
         const response = await fetch("/api/admin/batches", {
           method: "PUT",
           headers: {
@@ -216,37 +243,32 @@ export default function AdminBatches() {
             id: editingBatchId,
             name,
             description,
+            start_date: created_at || null,
+            assigned_scholars: selectedUsers.map((user) => user.value),
+            assigned_courses: selectedCourses.map((course) => course.value),
           }),
         });
-
-        // If PUT isn't implemented, fall back to direct Supabase update
-        if (response.status === 405) {
-          const supabaseAdmin = supabase;
-          const { error: updateError } = await supabaseAdmin
-            .from("batches")
-            .update({ name, description })
-            .eq("id", editingBatchId);
-
-          if (updateError) throw updateError;
-        } else {
-          const result = await response.json().catch(() => null);
-          if (!response.ok) {
-            throw new Error(
-              result?.error || `Request failed (${response.status}).`,
-            );
-          }
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            result?.error || `Request failed (${response.status}).`,
+          );
         }
       } else {
-        // Create new batch
         const response = await fetch("/api/admin/batches", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({ name, description }),
+          body: JSON.stringify({
+            name,
+            description,
+            start_date: created_at || null,
+            assigned_scholars: selectedUsers.map((user) => user.value),
+            assigned_courses: selectedCourses.map((course) => course.value),
+          }),
         });
-
         const result = await response.json().catch(() => null);
         if (!response.ok) {
           throw new Error(
@@ -259,6 +281,14 @@ export default function AdminBatches() {
       setShowModal(false);
       setBatchName("");
       setBatchDescription("");
+      setCreated_At("");
+      setSelectedUsers([]);
+      setSelectedCourses([]);
+      alert(
+        isEditing
+          ? "Batch updated successfully."
+          : "Batch created successfully.",
+      );
     } catch (error) {
       setModalMessage({
         type: "error",
@@ -282,13 +312,29 @@ export default function AdminBatches() {
 
     try {
       setIsDeleting(true);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
 
-      const { error } = await supabase
-        .from("mainbatches")
-        .delete()
-        .eq("id", deletingBatch.id);
-
-      if (error) throw error;
+      const response = await fetch(
+        `/api/admin/batches?id=${encodeURIComponent(String(deletingBatch.id))}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({ id: deletingBatch.id }),
+        },
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
+      }
 
       await fetchBatches();
       setShowDeleteConfirm(false);
@@ -303,6 +349,27 @@ export default function AdminBatches() {
   const filteredBatches = batches.filter((batch) =>
     batch.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+  const courseTitleById = new Map(
+    courses.map((course) => [String(course.id), course.title]),
+  );
+  const groupedBatches = filteredBatches.reduce(
+    (acc, batch) => {
+      const courseTitle = batch.course_id
+        ? (courseTitleById.get(String(batch.course_id)) ?? "Unassigned Course")
+        : "Unassigned Course";
+      if (!acc[courseTitle]) acc[courseTitle] = [];
+      acc[courseTitle].push(batch);
+      return acc;
+    },
+    {} as Record<string, Batch[]>,
+  );
+  Object.values(groupedBatches).forEach((courseBatches) => {
+    courseBatches.sort((a, b) => {
+      const aDate = a.start_date || a.created_at || "";
+      const bDate = b.start_date || b.created_at || "";
+      return aDate.localeCompare(bDate);
+    });
+  });
 
   const stats = [
     {
@@ -376,11 +443,13 @@ export default function AdminBatches() {
           ))}
         </div>
 
-        {/* Batches Table */}
+        {/* Batches Grid */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          {/* Table Header */}
+          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-base font-bold text-gray-900">All Batches</h3>
+            <h3 className="text-base font-bold text-gray-900">
+              Batches By Course
+            </h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -388,7 +457,7 @@ export default function AdminBatches() {
                 placeholder="Search batches..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-60"
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-60 text-black"
               />
             </div>
           </div>
@@ -415,7 +484,7 @@ export default function AdminBatches() {
               )}
               {!searchTerm && (
                 <button
-                  onClick={handleCreateNew}
+                  onClick={() => setShowModal(true)}
                   className="bg-[#174778] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
@@ -425,57 +494,49 @@ export default function AdminBatches() {
             </div>
           )}
 
-          {/* Table */}
+          {/* Grid */}
           {!loading && filteredBatches.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Batch
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Assigned Scholar
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="text-right px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBatches.map((batch) => (
-                    <tr
-                      key={batch.id}
-                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
-                            <BookOpen className="w-4 h-4 text-[#174778]" />
+            <div className="p-6 space-y-6">
+              {Object.entries(groupedBatches).map(([courseTitle, courseBatches]) => (
+                <div key={courseTitle} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-gray-900">
+                      {courseTitle}
+                    </h4>
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                      {courseBatches.length} Batch
+                      {courseBatches.length > 1 ? "es" : ""}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {courseBatches.map((batch) => (
+                      <div
+                        key={batch.id}
+                        className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
+                              <BookOpen className="w-4 h-4 text-[#174778]" />
+                            </div>
+                            <p className="font-semibold text-gray-900 text-sm truncate">
+                              {batch.name}
+                            </p>
                           </div>
-                          <span className="font-semibold text-gray-900 text-sm">
-                            {batch.name}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200 shrink-0">
+                            <CheckCircle className="w-3 h-3" />
+                            Active
                           </span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500 line-clamp-1 max-w-xs block">
+
+                        <p className="text-sm text-gray-500 line-clamp-2 min-h-[40px]">
                           {batch.description || "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500">
-                          {batch.created_at
-                            ? new Date(batch.created_at).toLocaleDateString(
+                        </p>
+
+                        <p className="text-xs text-gray-500 mt-3">
+                          {batch.start_date
+                            ? new Date(batch.start_date).toLocaleDateString(
                                 "en-US",
                                 {
                                   month: "short",
@@ -484,16 +545,9 @@ export default function AdminBatches() {
                                 },
                               )
                             : "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                          <CheckCircle className="w-3 h-3" />
-                          Active
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                        </p>
+
+                        <div className="flex items-center justify-end gap-2 mt-4">
                           <button
                             onClick={() => handleEdit(batch)}
                             className="p-2 text-gray-400 hover:text-[#174778] hover:bg-[#174778]/5 rounded-lg transition-colors"
@@ -509,11 +563,11 @@ export default function AdminBatches() {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -537,24 +591,76 @@ export default function AdminBatches() {
             </div>
 
             {/* Modal Body */}
-            <div className="space-y-5 p-4 ">
-              {/* User Select */}
+            <div className="p-6 space-y-4">
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <User size={14} /> Assign Scholar
+                  <Users size={14} /> Assign Members (Email)
                 </label>
-                <select
-                  value={selectedUser}
-                  onChange={(e) => setSelectedUser(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all appearance-none cursor-pointer text-black"
-                >
-                  <option value="">-- Select User --</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name || user.id}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  isMulti
+                  options={users
+                    .filter((user) => Boolean(user.email))
+                    .map((user) => ({
+                      value: user.email as string,
+                      label: user.email as string,
+                    }))}
+                  value={selectedUsers}
+                  onChange={(value) =>
+                    setSelectedUsers((value ?? []) as readonly BatchOption[])
+                  }
+                  placeholder="Select user emails..."
+                  menuPortalTarget={
+                    typeof window !== "undefined" ? document.body : null
+                  }
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                    option: (base) => ({ ...base, color: "#000000" }),
+                    input: (base) => ({ ...base, color: "#000000" }),
+                    singleValue: (base) => ({ ...base, color: "#000000" }),
+                    multiValueLabel: (base) => ({ ...base, color: "#000000" }),
+                    control: (base) => ({
+                      ...base,
+                      minHeight: "46px",
+                      borderColor: "#e5e7eb",
+                      boxShadow: "none",
+                    }),
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <BookOpen size={14} /> Courses
+                </label>
+                <Select
+                  isMulti={false}
+                  options={courses.map((course) => ({
+                    value: String(course.id),
+                    label: course.title,
+                  }))}
+                  value={selectedCourses[0] ?? null}
+                  onChange={(value) =>
+                    setSelectedCourses(
+                      value ? ([value] as readonly BatchOption[]) : [],
+                    )
+                  }
+                  placeholder="Select courses..."
+                  menuPortalTarget={
+                    typeof window !== "undefined" ? document.body : null
+                  }
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                    option: (base) => ({ ...base, color: "#000000" }),
+                    input: (base) => ({ ...base, color: "#000000" }),
+                    singleValue: (base) => ({ ...base, color: "#000000" }),
+                    multiValueLabel: (base) => ({ ...base, color: "#000000" }),
+                    control: (base) => ({
+                      ...base,
+                      minHeight: "46px",
+                      borderColor: "#e5e7eb",
+                      boxShadow: "none",
+                    }),
+                  }}
+                />
               </div>
 
               {/* Title */}
@@ -595,11 +701,26 @@ export default function AdminBatches() {
               />
 
               {/* Submit Button */}
+              {modalMessage && (
+                <div
+                  className={`text-sm px-3 py-2 rounded-lg ${
+                    modalMessage.type === "success"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {modalMessage.text}
+                </div>
+              )}
               <button
-                onClick={handleCreateNew}
+                onClick={handleSaveBatch}
                 className="w-full bg-[#174778] hover:bg-[#113a63] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
               >
-                Create Batch
+                {isSaving
+                  ? "Saving..."
+                  : isEditing
+                    ? "Update Batch"
+                    : "Create Batch"}
               </button>
             </div>
           </div>
