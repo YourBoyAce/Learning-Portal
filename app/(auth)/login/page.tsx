@@ -26,7 +26,9 @@ export default function LoginPage() {
     }
 
     if (error || !profile) {
-      setError("Invalid credentials. Please contact an administrator to create your account.");
+      setError(
+        "Invalid credentials. Please contact an administrator to create your account.",
+      );
       setLoading(false);
       return;
     }
@@ -67,7 +69,6 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen bg-[#F5F7FA] flex flex-col items-center justify-center">
-
       {/* HEADER */}
       <div className="text-center mb-4 shrink-0">
         <div className="w-12 h-12 mx-auto bg-[#174778] rounded-lg flex items-center justify-center text-white shadow-lg">
@@ -78,20 +79,16 @@ export default function LoginPage() {
         <h1 className="text-2xl font-semibold mt-3 text-[#174778]">
           Academic The Automate
         </h1>
-        <p className="text-sm text-gray-500">
-          Intellectual Sanctuary
-        </p>
+        <p className="text-sm text-gray-500">Intellectual Sanctuary</p>
       </div>
 
       {/* MAIN CONTAINER */}
       <div className="w-full max-w-md mx-auto shrink-0">
-
         {/* LOGIN CARD */}
         <form
           className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm"
           onSubmit={handleLogin}
         >
-
           <h2 className="text-base font-semibold text-gray-800">
             Welcome Back
           </h2>
@@ -104,8 +101,18 @@ export default function LoginPage() {
             EMAIL ADDRESS
           </label>
           <div className="flex items-center bg-[#F0F2F5] border border-gray-200 rounded-md px-3 mt-1">
-            <svg className="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+            <svg
+              className="w-4 h-4 text-gray-400 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"
+              />
             </svg>
             <input
               type="email"
@@ -122,8 +129,18 @@ export default function LoginPage() {
             PASSWORD
           </label>
           <div className="flex items-center bg-[#F0F2F5] border border-gray-200 rounded-md px-3 mt-1">
-            <svg className="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            <svg
+              className="w-4 h-4 text-gray-400 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
             <input
               type="password"
@@ -142,9 +159,11 @@ export default function LoginPage() {
               id="remember"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 border border-gray-300 rounded bg-white cursor-pointer"
+              className="w-4 h-4 border border-gray-300 rounded bg-white accent-black cursor-pointer"
             />
-            <label htmlFor="remember" className="cursor-pointer">Remember Me</label>
+            <label htmlFor="remember" className="cursor-pointer">
+              Remember Me
+            </label>
           </div>
 
           {/* ERROR */}
@@ -160,16 +179,27 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#174778] text-white py-2 rounded-md mt-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {loading ? "Signing in..." : (
+            {loading ? (
+              "Signing in..."
+            ) : (
               <>
                 Sign In
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                  />
                 </svg>
               </>
             )}
           </button>
-
         </form>
       </div>
 
@@ -178,7 +208,11 @@ export default function LoginPage() {
         {/* INFO CARD */}
         <div className="bg-[#F5F0EB] border-l-4 border-[#8B4513] p-4 rounded-r-md shadow-sm">
           <div className="w-6 h-6 mb-2">
-            <svg className="w-5 h-5 text-[#8B4513]" fill="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5 text-[#8B4513]"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zm-1 14h2v-1h-2v1zm-2-3h6v-1H9v1z" />
             </svg>
           </div>
@@ -194,7 +228,10 @@ export default function LoginPage() {
 
       {/* ENROLLMENT LINK */}
       <div className="text-sm text-gray-500 mt-4 shrink-0">
-        New to the Sanctuary? <span className="text-[#174778] font-semibold cursor-pointer">Request Enrollment</span>
+        New to the Sanctuary?{" "}
+        <span className="text-[#174778] font-semibold cursor-pointer">
+          Request Enrollment
+        </span>
       </div>
     </div>
   );

@@ -46,6 +46,7 @@ export default function AdminCourses() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchCourses();
   }, []);
 
@@ -148,7 +149,7 @@ export default function AdminCourses() {
           const result = await response.json().catch(() => null);
           if (!response.ok) {
             throw new Error(
-              result?.error || `Request failed (${response.status}).`
+              result?.error || `Request failed (${response.status}).`,
             );
           }
         }
@@ -166,7 +167,7 @@ export default function AdminCourses() {
         const result = await response.json().catch(() => null);
         if (!response.ok) {
           throw new Error(
-            result?.error || `Request failed (${response.status}).`
+            result?.error || `Request failed (${response.status}).`,
           );
         }
       }
@@ -217,7 +218,7 @@ export default function AdminCourses() {
   };
 
   const filteredCourses = courses.filter((course) =>
-    course.title.toLowerCase().includes(searchTerm.toLowerCase())
+    course.title.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const stats = [
@@ -327,9 +328,7 @@ export default function AdminCourses() {
             <div className="p-12 text-center">
               <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600 font-medium mb-2">
-                {searchTerm
-                  ? "No courses match your search"
-                  : "No courses yet"}
+                {searchTerm ? "No courses match your search" : "No courses yet"}
               </p>
               {!searchTerm && (
                 <p className="text-sm text-gray-400 mb-4">
@@ -401,7 +400,7 @@ export default function AdminCourses() {
                                   month: "short",
                                   day: "numeric",
                                   year: "numeric",
-                                }
+                                },
                               )
                             : "—"}
                         </span>

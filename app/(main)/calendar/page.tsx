@@ -38,33 +38,38 @@ const CalendarPage = () => {
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
     time: "",
     type: "session" as EventType,
-    tag: ""
+    tag: "",
   });
 
   const formatTime = useCallback((time: string) => {
-    const [hours, minutes] = time.split(':');
+    const [hours, minutes] = time.split(":");
     const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const ampm = hour >= 12 ? "PM" : "AM";
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minutes} ${ampm}`;
   }, []);
 
-  const transformDatabaseEvent = useCallback((dbEvent: DatabaseEvent): Event => ({
-    id: dbEvent.id,
-    title: dbEvent.title,
-    description: dbEvent.description || "",
-    date: new Date(dbEvent.event_date),
-    time: formatTime(dbEvent.event_time),
-    type: dbEvent.event_type,
-    tag: dbEvent.tag || ""
-  }), [formatTime]);
+  const transformDatabaseEvent = useCallback(
+    (dbEvent: DatabaseEvent): Event => ({
+      id: dbEvent.id,
+      title: dbEvent.title,
+      description: dbEvent.description || "",
+      date: new Date(dbEvent.event_date),
+      time: formatTime(dbEvent.event_time),
+      type: dbEvent.event_type,
+      tag: dbEvent.tag || "",
+    }),
+    [formatTime],
+  );
 
   const fetchEvents = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -78,24 +83,26 @@ const CalendarPage = () => {
       const transformedEvents = data?.map(transformDatabaseEvent) || [];
       setEvents(transformedEvents);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error("Error fetching events:", error);
     }
   }, [transformDatabaseEvent]);
 
   const fetchNotificationPreferences = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', user.id)
+        .from("notification_preferences")
+        .select("*")
+        .eq("user_id", user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error && error.code !== "PGRST116") {
         // PGRST116 means no rows returned, which is fine
-        console.error('Error fetching preferences:', error);
+        console.error("Error fetching preferences:", error);
         return;
       }
 
@@ -105,7 +112,7 @@ const CalendarPage = () => {
         setSmsReminders(data.sms_reminders);
       }
     } catch (error) {
-      console.error('Error fetching notification preferences:', error);
+      console.error("Error fetching notification preferences:", error);
     }
   }, []);
 
@@ -114,43 +121,53 @@ const CalendarPage = () => {
     fetchNotificationPreferences();
 
     const eventsSubscription = supabase
-      .channel('calendar_events_changes')
+      .channel("calendar_events_changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'calendar_events'
+          event: "*",
+          schema: "public",
+          table: "calendar_events",
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newEvent = transformDatabaseEvent(payload.new as DatabaseEvent);
-            setEvents(prev => [...prev, newEvent]);
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedEvent = transformDatabaseEvent(payload.new as DatabaseEvent);
-            setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-          } else if (payload.eventType === 'DELETE') {
-            setEvents(prev => prev.filter(e => e.id !== payload.old.id));
+          if (payload.eventType === "INSERT") {
+            const newEvent = transformDatabaseEvent(
+              payload.new as DatabaseEvent,
+            );
+            setEvents((prev) => [...prev, newEvent]);
+          } else if (payload.eventType === "UPDATE") {
+            const updatedEvent = transformDatabaseEvent(
+              payload.new as DatabaseEvent,
+            );
+            setEvents((prev) =>
+              prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)),
+            );
+          } else if (payload.eventType === "DELETE") {
+            setEvents((prev) => prev.filter((e) => e.id !== payload.old.id));
           }
-        }
+        },
       )
       .subscribe();
 
     const prefsSubscription = supabase
-      .channel('notification_preferences_changes')
+      .channel("notification_preferences_changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notification_preferences'
+          event: "UPDATE",
+          schema: "public",
+          table: "notification_preferences",
         },
         (payload) => {
-          const prefs = payload.new as { email_notifications: boolean; in_app_alerts: boolean; sms_reminders: boolean };
+          const prefs = payload.new as {
+            email_notifications: boolean;
+            in_app_alerts: boolean;
+            sms_reminders: boolean;
+          };
           setEmailNotif(prefs.email_notifications);
           setInAppAlerts(prefs.in_app_alerts);
           setSmsReminders(prefs.sms_reminders);
-        }
+        },
       )
       .subscribe();
 
@@ -162,62 +179,64 @@ const CalendarPage = () => {
 
   const updateNotificationPreference = async (key: string, value: boolean) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       // First, try to get existing preferences
       const { data: existing } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', user.id)
+        .from("notification_preferences")
+        .select("*")
+        .eq("user_id", user.id)
         .single();
 
       if (existing) {
         // Update existing
         const { error } = await supabase
-          .from('notification_preferences')
+          .from("notification_preferences")
           .update({ [key]: value })
-          .eq('user_id', user.id);
+          .eq("user_id", user.id);
 
         if (error) throw error;
       } else {
         // Create new
         const { error } = await supabase
-          .from('notification_preferences')
+          .from("notification_preferences")
           .insert({
             user_id: user.id,
-            email_notifications: key === 'email_notifications' ? value : true,
-            in_app_alerts: key === 'in_app_alerts' ? value : true,
-            sms_reminders: key === 'sms_reminders' ? value : false
+            email_notifications: key === "email_notifications" ? value : true,
+            in_app_alerts: key === "in_app_alerts" ? value : true,
+            sms_reminders: key === "sms_reminders" ? value : false,
           });
 
         if (error) throw error;
       }
     } catch (error) {
-      console.error('Error updating notification preference:', error);
+      console.error("Error updating notification preference:", error);
     }
   };
 
   const handleAddEvent = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [hours, minutes] = newEvent.time.split(':');
+      const [hours, minutes] = newEvent.time.split(":");
       const eventDate = new Date(newEvent.date);
       eventDate.setHours(parseInt(hours), parseInt(minutes));
 
-      const { error } = await supabase
-        .from('calendar_events')
-        .insert({
-          user_id: user.id,
-          title: newEvent.title,
-          description: newEvent.description,
-          event_date: newEvent.date,
-          event_time: newEvent.time,
-          event_type: newEvent.type,
-          tag: newEvent.tag
-        });
+      const { error } = await supabase.from("calendar_events").insert({
+        user_id: user.id,
+        title: newEvent.title,
+        description: newEvent.description,
+        event_date: newEvent.date,
+        event_time: newEvent.time,
+        event_type: newEvent.type,
+        tag: newEvent.tag,
+      });
 
       if (error) throw error;
 
@@ -225,23 +244,28 @@ const CalendarPage = () => {
       setNewEvent({
         title: "",
         description: "",
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         time: "",
         type: "session",
-        tag: ""
+        tag: "",
       });
     } catch (error) {
-      console.error('Error adding event:', error);
+      console.error("Error adding event:", error);
     }
   };
 
   const getEventColor = (type: EventType) => {
     switch (type) {
-      case "video": return "bg-blue-500";
-      case "course": return "bg-green-500";
-      case "session": return "bg-purple-500";
-      case "webinar": return "bg-orange-500";
-      default: return "bg-gray-500";
+      case "video":
+        return "bg-blue-500";
+      case "course":
+        return "bg-green-500";
+      case "session":
+        return "bg-purple-500";
+      case "webinar":
+        return "bg-orange-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
@@ -249,27 +273,72 @@ const CalendarPage = () => {
     switch (type) {
       case "video":
         return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
         );
       case "course":
         return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 14l9-5-9-5-9 5 9 5z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"
+            />
           </svg>
         );
       case "session":
         return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
         );
       case "webinar":
         return (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+            />
           </svg>
         );
     }
@@ -323,16 +392,9 @@ const CalendarPage = () => {
               Calendar & Schedule
             </h1>
             <p className="text-sm text-gray-600 max-w-2xl">
-              Stay aligned with upcoming learning sessions, scheduled content releases, and live academic engagements.
+              Stay aligned with upcoming learning sessions, scheduled content
+              releases, and live academic engagements.
             </p>
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={() => setShowAddEventModal(true)} className="bg-[#174778] hover:bg-[#0f3a63] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Event
-            </Button>
           </div>
         </div>
       </div>
@@ -342,54 +404,109 @@ const CalendarPage = () => {
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">8</div>
-          <div className="text-xs text-gray-500 font-medium">Upcoming Sessions</div>
+          <div className="text-xs text-gray-500 font-medium">
+            Upcoming Sessions
+          </div>
           <div className="text-xs text-gray-400 mt-1">Next 7 days</div>
         </div>
 
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              <svg
+                className="w-5 h-5 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
               </svg>
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">14</div>
-          <div className="text-xs text-gray-500 font-medium">Scheduled Video Releases</div>
+          <div className="text-xs text-gray-500 font-medium">
+            Scheduled Video Releases
+          </div>
           <div className="text-xs text-gray-400 mt-1">Queued content</div>
         </div>
 
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+              <svg
+                className="w-5 h-5 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 14l9-5-9-5-9 5 9 5z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"
+                />
               </svg>
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">3</div>
-          <div className="text-xs text-gray-500 font-medium">Enrolled Courses Starting Soon</div>
+          <div className="text-xs text-gray-500 font-medium">
+            Enrolled Courses Starting Soon
+          </div>
           <div className="text-xs text-gray-400 mt-1">Within 5 days</div>
         </div>
 
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <svg
+                className="w-5 h-5 text-orange-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
               </svg>
             </div>
           </div>
           <div className="text-3xl font-bold text-gray-900 mb-1">5</div>
-          <div className="text-xs text-gray-500 font-medium">Live Webinars Registered</div>
-          <div className="text-xs text-gray-400 mt-1">Don&apos;t miss these</div>
+          <div className="text-xs text-gray-500 font-medium">
+            Live Webinars Registered
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            Don&apos;t miss these
+          </div>
         </div>
       </div>
 
@@ -402,17 +519,21 @@ const CalendarPage = () => {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </h2>
                 <div className="flex gap-2">
                   {(["month", "week", "day"] as ViewType[]).map((v) => (
                     <button
                       key={v}
                       onClick={() => setView(v)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === v
-                        ? "bg-[#174778] text-white"
-                        : "text-gray-600 hover:bg-gray-100"
-                        }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        view === v
+                          ? "bg-[#174778] text-white"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
                     >
                       {v.charAt(0).toUpperCase() + v.slice(1)}
                     </button>
@@ -424,26 +545,39 @@ const CalendarPage = () => {
             {/* Calendar Grid */}
             <div className="p-6">
               <div className="grid grid-cols-7 gap-2 mb-4">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">
-                    {day}
-                  </div>
-                ))}
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                  (day) => (
+                    <div
+                      key={day}
+                      className="text-center text-xs font-semibold text-gray-500 py-2"
+                    >
+                      {day}
+                    </div>
+                  ),
+                )}
               </div>
               <div className="grid grid-cols-7 gap-2">
                 {generateCalendarDays().map((date, index) => (
                   <div
                     key={index}
-                    className={`min-h-[100px] p-2 rounded-lg border border-gray-100 transition-all hover:shadow-sm cursor-pointer ${isToday(date) ? "bg-blue-50 border-blue-200 ring-2 ring-blue-200 ring-opacity-50" : "bg-gray-50"
-                      } ${!date ? "opacity-0" : ""}`}
+                    className={`min-h-25 p-2 rounded-lg border border-gray-100 transition-all hover:shadow-sm cursor-pointer ${
+                      isToday(date)
+                        ? "bg-blue-50 border-blue-200 ring-2 ring-blue-200 ring-opacity-50"
+                        : "bg-gray-50"
+                    } ${!date ? "opacity-0" : ""}`}
                   >
                     {date && (
                       <>
-                        <div className={`text-sm font-medium mb-2 ${isToday(date) ? "text-blue-600" : "text-gray-700"}`}>
+                        <div
+                          className={`text-sm font-medium mb-2 ${isToday(date) ? "text-blue-600" : "text-gray-700"}`}
+                        >
                           {date.getDate()}
                         </div>
                         {events
-                          .filter((e) => e.date.toDateString() === date.toDateString())
+                          .filter(
+                            (e) =>
+                              e.date.toDateString() === date.toDateString(),
+                          )
                           .slice(0, 2)
                           .map((event) => (
                             <div
@@ -489,7 +623,9 @@ const CalendarPage = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming Events</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Upcoming Events
+              </h3>
             </div>
             <div className="p-4 space-y-3">
               {events.map((event) => (
@@ -499,8 +635,12 @@ const CalendarPage = () => {
                   className="p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all cursor-pointer bg-gray-50"
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${getEventColor(event.type)} bg-opacity-10 flex items-center justify-center shrink-0`}>
-                      <div className={`${getEventColor(event.type).replace("bg-", "text-")}`}>
+                    <div
+                      className={`w-10 h-10 rounded-lg ${getEventColor(event.type)} bg-opacity-10 flex items-center justify-center shrink-0`}
+                    >
+                      <div
+                        className={`${getEventColor(event.type).replace("bg-", "text-")}`}
+                      >
                         {getEventIcon(event.type)}
                       </div>
                     </div>
@@ -515,7 +655,9 @@ const CalendarPage = () => {
                         <div className="text-xs text-gray-600 font-medium">
                           {formatDate(event.date)}, {event.time}
                         </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getEventColor(event.type)} bg-opacity-10 ${getEventColor(event.type).replace("bg-", "text-")}`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${getEventColor(event.type)} bg-opacity-10 ${getEventColor(event.type).replace("bg-", "text-")}`}
+                        >
                           {event.tag}
                         </span>
                       </div>
@@ -529,7 +671,9 @@ const CalendarPage = () => {
           {/* Smart Alerts Section */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Smart Reminders</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Smart Reminders
+              </h3>
             </div>
             <div className="p-5">
               <p className="text-sm text-gray-600 mb-4">
@@ -537,18 +681,25 @@ const CalendarPage = () => {
               </p>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Email Notifications</span>
+                  <span className="text-sm text-gray-700">
+                    Email Notifications
+                  </span>
                   <button
                     onClick={() => {
                       setEmailNotif(!emailNotif);
-                      updateNotificationPreference('email_notifications', !emailNotif);
+                      updateNotificationPreference(
+                        "email_notifications",
+                        !emailNotif,
+                      );
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${emailNotif ? "bg-[#174778]" : "bg-gray-300"
-                      }`}
+                    className={`w-11 h-6 rounded-full transition-all ${
+                      emailNotif ? "bg-[#174778]" : "bg-gray-300"
+                    }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${emailNotif ? "translate-x-5" : "translate-x-0.5"
-                        }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
+                        emailNotif ? "translate-x-5" : "translate-x-0.5"
+                      }`}
                     />
                   </button>
                 </div>
@@ -557,14 +708,19 @@ const CalendarPage = () => {
                   <button
                     onClick={() => {
                       setInAppAlerts(!inAppAlerts);
-                      updateNotificationPreference('in_app_alerts', !inAppAlerts);
+                      updateNotificationPreference(
+                        "in_app_alerts",
+                        !inAppAlerts,
+                      );
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${inAppAlerts ? "bg-[#174778]" : "bg-gray-300"
-                      }`}
+                    className={`w-11 h-6 rounded-full transition-all ${
+                      inAppAlerts ? "bg-[#174778]" : "bg-gray-300"
+                    }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${inAppAlerts ? "translate-x-5" : "translate-x-0.5"
-                        }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
+                        inAppAlerts ? "translate-x-5" : "translate-x-0.5"
+                      }`}
                     />
                   </button>
                 </div>
@@ -573,14 +729,19 @@ const CalendarPage = () => {
                   <button
                     onClick={() => {
                       setSmsReminders(!smsReminders);
-                      updateNotificationPreference('sms_reminders', !smsReminders);
+                      updateNotificationPreference(
+                        "sms_reminders",
+                        !smsReminders,
+                      );
                     }}
-                    className={`w-11 h-6 rounded-full transition-all ${smsReminders ? "bg-[#174778]" : "bg-gray-300"
-                      }`}
+                    className={`w-11 h-6 rounded-full transition-all ${
+                      smsReminders ? "bg-[#174778]" : "bg-gray-300"
+                    }`}
                   >
                     <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${smsReminders ? "translate-x-5" : "translate-x-0.5"
-                        }`}
+                      className={`w-5 h-5 bg-white rounded-full shadow transition-all ${
+                        smsReminders ? "translate-x-5" : "translate-x-0.5"
+                      }`}
                     />
                   </button>
                 </div>
@@ -592,7 +753,8 @@ const CalendarPage = () => {
           <div className="bg-gradient-to-br from-[#174778] to-[#0f3a63] rounded-2xl shadow-sm overflow-hidden p-5 text-white">
             <h3 className="text-lg font-semibold mb-2">Engagement Insight</h3>
             <p className="text-sm text-blue-100 mb-4">
-              Users who attend scheduled sessions are 35% more likely to complete courses.
+              Users who attend scheduled sessions are 35% more likely to
+              complete courses.
             </p>
             <div className="flex items-end gap-2 h-16">
               <div className="flex-1 bg-white bg-opacity-20 rounded-t h-full flex items-end">
@@ -625,33 +787,53 @@ const CalendarPage = () => {
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Add New Event</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add New Event
+                </h3>
                 <button
                   onClick={() => setShowAddEventModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, title: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                   placeholder="Event title"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
                 <textarea
                   value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, description: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                   rows={3}
                   placeholder="Event description"
@@ -659,29 +841,44 @@ const CalendarPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
                   <input
                     type="date"
                     value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, date: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Time
+                  </label>
                   <input
                     type="time"
                     value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, time: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Event Type
+                </label>
                 <select
                   value={newEvent.type}
-                  onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value as EventType })}
+                  onChange={(e) =>
+                    setNewEvent({
+                      ...newEvent,
+                      type: e.target.value as EventType,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                 >
                   <option value="video">Video Release</option>
@@ -691,11 +888,15 @@ const CalendarPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tag</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tag
+                </label>
                 <input
                   type="text"
                   value={newEvent.tag}
-                  onChange={(e) => setNewEvent({ ...newEvent, tag: e.target.value })}
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, tag: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent"
                   placeholder="e.g., Live Session"
                 />
@@ -726,42 +927,84 @@ const CalendarPage = () => {
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Event Details</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Event Details
+                </h3>
                 <button
                   onClick={() => setSelectedEvent(null)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
             </div>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-12 h-12 rounded-xl ${getEventColor(selectedEvent.type)} bg-opacity-10 flex items-center justify-center`}>
-                  <div className={`${getEventColor(selectedEvent.type).replace("bg-", "text-")}`}>
+                <div
+                  className={`w-12 h-12 rounded-xl ${getEventColor(selectedEvent.type)} bg-opacity-10 flex items-center justify-center`}
+                >
+                  <div
+                    className={`${getEventColor(selectedEvent.type).replace("bg-", "text-")}`}
+                  >
                     {getEventIcon(selectedEvent.type)}
                   </div>
                 </div>
                 <div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${getEventColor(selectedEvent.type)} bg-opacity-10 ${getEventColor(selectedEvent.type).replace("bg-", "text-")}`}>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-medium ${getEventColor(selectedEvent.type)} bg-opacity-10 ${getEventColor(selectedEvent.type).replace("bg-", "text-")}`}
+                  >
                     {selectedEvent.tag}
                   </span>
                 </div>
               </div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">{selectedEvent.title}</h4>
-              <p className="text-sm text-gray-600 mb-4">{selectedEvent.description}</p>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">
+                {selectedEvent.title}
+              </h4>
+              <p className="text-sm text-gray-600 mb-4">
+                {selectedEvent.description}
+              </p>
               <div className="flex items-center gap-4 text-sm text-gray-600 mb-6">
                 <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
                   </svg>
                   {formatDate(selectedEvent.date)}
                 </div>
                 <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   {selectedEvent.time}
                 </div>
@@ -773,10 +1016,8 @@ const CalendarPage = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
 
 export default CalendarPage;
-
