@@ -416,7 +416,10 @@ export default function MyLearningDashboard() {
                   className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow"
                 >
                   {/* Video Thumbnail */}
-                  <div className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer">
+                  <Link
+                    href={`/courses/${course.id}`}
+                    className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer"
+                  >
                     <PlayCircle
                       className="text-white/70 group-hover:text-white transition-colors z-10"
                       size={40}
@@ -428,7 +431,7 @@ export default function MyLearningDashboard() {
                         {course.duration}
                       </span>
                     )}
-                  </div>
+                  </Link>
 
                   {/* Content & Progress */}
                   <div className="flex-1 w-full py-1">
@@ -437,9 +440,11 @@ export default function MyLearningDashboard() {
                         {course.module_label}
                       </p>
                     )}
-                    <h3 className="font-bold text-[#0f172a] text-[18px]">
-                      {course.title}
-                    </h3>
+                    <Link href={`/courses/${course.id}`}>
+                      <h3 className="font-bold text-[#0f172a] text-[18px] hover:text-[#174778] transition-colors">
+                        {course.title}
+                      </h3>
+                    </Link>
                     <p className="text-sm text-gray-500 mt-1.5 mb-5">
                       {course.description}
                     </p>
@@ -459,9 +464,11 @@ export default function MyLearningDashboard() {
 
                   {/* Resume Button */}
                   <div className="w-full sm:w-auto shrink-0 px-2">
-                    <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
-                      <PlayCircle size={18} />
-                    </Button>
+                    <Link href={`/courses/${course.id}`}>
+                      <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
+                        <PlayCircle size={18} />
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               ))
