@@ -75,6 +75,7 @@ export default function AdminBatches() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingBatch, setDeletingBatch] = useState<Batch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchBatches = async () => {
     try {
@@ -284,11 +285,12 @@ export default function AdminBatches() {
       setCreated_At("");
       setSelectedUsers([]);
       setSelectedCourses([]);
-      alert(
+      setToastMessage(
         isEditing
           ? "Batch updated successfully."
           : "Batch created successfully.",
       );
+      setTimeout(() => setToastMessage(null), 3000);
     } catch (error) {
       setModalMessage({
         type: "error",
@@ -764,6 +766,14 @@ export default function AdminBatches() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── TOAST NOTIFICATION ─── */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-[100] transform transition-all duration-300 translate-y-0 opacity-100">
+          <CheckCircle className="w-5 h-5" />
+          <span className="font-medium text-sm">{toastMessage}</span>
         </div>
       )}
     </div>

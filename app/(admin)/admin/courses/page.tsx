@@ -34,6 +34,7 @@ export default function AdminCourses() {
   const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
   const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
+  const [modules, setModules] = useState([{ title: "" }]);
   const [isSaving, setIsSaving] = useState(false);
   const [modalMessage, setModalMessage] = useState<{
     type: "success" | "error";
@@ -85,6 +86,7 @@ export default function AdminCourses() {
     setEditingCourseId(null);
     setCourseTitle("");
     setCourseDescription("");
+    setModules([{ title: "" }]);
     setModalMessage(null);
     setShowModal(true);
   };
@@ -94,18 +96,44 @@ export default function AdminCourses() {
     setEditingCourseId(course.id);
     setCourseTitle(course.title);
     setCourseDescription(course.description || "");
+    setModules([{ title: "" }]);
     setModalMessage(null);
     setShowModal(true);
+  };
+
+  const handleAddModule = () => {
+    setModules([...modules, { title: "" }]);
+  };
+
+  const handleModuleChange = (index: number, value: string) => {
+    const newModules = [...modules];
+    newModules[index].title = value;
+    setModules(newModules);
+  };
+
+  const handleRemoveModule = (index: number) => {
+    if (modules.length > 1) {
+      setModules(modules.filter((_, i) => i !== index));
+    }
   };
 
   const handleSaveCourse = async () => {
     const title = courseTitle.trim();
     const description = courseDescription.trim();
+    const validModules = modules.map(m => m.title.trim()).filter(Boolean);
 
     if (!title || !description) {
       setModalMessage({
         type: "error",
         text: "Please add both course title and description.",
+      });
+      return;
+    }
+
+    if (!isEditing && validModules.length === 0) {
+      setModalMessage({
+        type: "error",
+        text: "Please add at least one module title.",
       });
       return;
     }
@@ -161,7 +189,11 @@ export default function AdminCourses() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({ title, description }),
+          body: JSON.stringify({ 
+            title, 
+            description,
+            modules: validModules.map(t => ({ title: t }))
+          }),
         });
 
         const result = await response.json().catch(() => null);
@@ -217,9 +249,15 @@ export default function AdminCourses() {
     }
   };
 
-  const filteredCourses = courses.filter((course) =>
-    course.title.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredCourses = courses
+    .filter((course) =>
+      course.title.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+    .sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA; // Descending order (newest first)
+    });
 
   const stats = [
     {
@@ -230,25 +268,11 @@ export default function AdminCourses() {
       iconColor: "text-violet-600",
     },
     {
-      label: "Total Students",
-      value: "—",
-      icon: Users,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-    },
-    {
-      label: "Published",
+      label: "Active Courses",
       value: courses.length.toString(),
       icon: CheckCircle,
       iconBg: "bg-emerald-50",
       iconColor: "text-emerald-600",
-    },
-    {
-      label: "Revenue",
-      value: "—",
-      icon: DollarSign,
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-600",
     },
   ];
 
@@ -275,7 +299,7 @@ export default function AdminCourses() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}
@@ -298,144 +322,123 @@ export default function AdminCourses() {
           ))}
         </div>
 
-        {/* Courses Table */}
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          {/* Table Header */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-base font-bold text-gray-900">All Courses</h3>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-60"
-              />
-            </div>
+        {/* Course Catalog Header & Search */}
+        <div className="flex items-center justify-between flex-wrap gap-4 mt-12 mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Course Catalog</h3>
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search courses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+            />
           </div>
-
-          {/* Loading State */}
-          {loading && (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 text-[#174778] animate-spin mx-auto mb-3" />
-              <p className="text-sm text-gray-500">Loading courses...</p>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {!loading && filteredCourses.length === 0 && (
-            <div className="p-12 text-center">
-              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium mb-2">
-                {searchTerm ? "No courses match your search" : "No courses yet"}
-              </p>
-              {!searchTerm && (
-                <p className="text-sm text-gray-400 mb-4">
-                  Create your first course to get started.
-                </p>
-              )}
-              {!searchTerm && (
-                <button
-                  onClick={handleCreateNew}
-                  className="bg-[#174778] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors inline-flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Course
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Table */}
-          {!loading && filteredCourses.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Course
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="text-right px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCourses.map((course) => (
-                    <tr
-                      key={course.id}
-                      className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
-                            <BookOpen className="w-4 h-4 text-[#174778]" />
-                          </div>
-                          <span className="font-semibold text-gray-900 text-sm">
-                            {course.title}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500 line-clamp-1 max-w-xs block">
-                          {course.description || "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-gray-500">
-                          {course.created_at
-                            ? new Date(course.created_at).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                          <CheckCircle className="w-3 h-3" />
-                          Active
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleEdit(course)}
-                            className="p-2 text-gray-400 hover:text-[#174778] hover:bg-[#174778]/5 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(course)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <Loader2 className="w-10 h-10 text-[#174778] animate-spin mb-4" />
+            <p className="text-sm font-medium text-gray-500">Loading your catalog...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredCourses.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+              <BookOpen className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-lg text-gray-900 font-bold mb-2">
+              {searchTerm ? "No courses match your search" : "Your catalog is empty"}
+            </p>
+            {!searchTerm && (
+              <p className="text-sm text-gray-500 mb-6 max-w-md">
+                Get started by creating your first course. You can add modules, descriptions, and publish it right away.
+              </p>
+            )}
+            {!searchTerm && (
+              <button
+                onClick={handleCreateNew}
+                className="bg-[#174778] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#113a63] transition-colors inline-flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Create First Course
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Courses Grid */}
+        {!loading && filteredCourses.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredCourses.map((course) => (
+              <div
+                key={course.id}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col overflow-hidden relative"
+              >
+                {/* Card Header (Image/Gradient) */}
+                <div className="h-36 bg-gradient-to-br from-[#174778] to-[#2563eb] relative overflow-hidden">
+                  {/* Decorative Pattern */}
+                  <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:16px_16px]"></div>
+                  
+                  {/* Status Badge */}
+                  <div className="absolute top-4 left-4">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider shadow-sm border border-white/10">
+                      <CheckCircle className="w-3 h-3" /> Active
+                    </span>
+                  </div>
+
+                  {/* Center Icon */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
+                    <BookOpen className="w-16 h-16 text-white" />
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 flex-1 flex flex-col">
+                  <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#174778] transition-colors leading-tight">
+                    {course.title}
+                  </h4>
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-1">
+                    {course.description || "No description available."}
+                  </p>
+
+                  {/* Card Footer */}
+                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
+                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                      {course.created_at
+                        ? new Date(course.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Recently Added"}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEdit(course)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#174778] hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Course"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(course)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Course"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ─── CREATE / EDIT MODAL ─── */}
@@ -482,6 +485,49 @@ export default function AdminCourses() {
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-2 focus:ring-[#174778]/20 resize-none"
                 />
               </div>
+
+              {!isEditing && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Modules <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddModule}
+                      className="text-[#174778] hover:bg-[#174778]/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Module
+                    </button>
+                  </div>
+                  
+                  {modules.map((module, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder={`Module ${index + 1} Title`}
+                          value={module.title}
+                          onChange={(e) => handleModuleChange(index, e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778]"
+                        />
+                      </div>
+                      {modules.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveModule(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                          title="Remove Module"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-gray-500">At least one module is mandatory.</p>
+                </div>
+              )}
 
               {modalMessage && (
                 <p

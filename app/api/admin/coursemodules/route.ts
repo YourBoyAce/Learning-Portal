@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,7 +9,7 @@ const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN;
 
 type AuthContext =
   | { error: NextResponse }
-  | { supabaseAdmin: ReturnType<typeof createClient> };
+  | { supabaseAdmin: SupabaseClient<any, "public", any> };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -130,23 +130,35 @@ export async function POST(request: Request) {
 
   const videoUrl = `https://watch.cloudflarestream.com/${uid}`;
 
-  const { data: insertedModule, error: insertError } = await authContext.supabaseAdmin
-    .from("coursemodules")
-    .insert({
-      maincourse_id: maincourseId,
-      title,
-      video_cf_id: videoUrl,
-    })
-    .select("*")
-    .single();
+  const moduleId =
+    typeof formData.get("moduleId") === "string"
+      ? String(formData.get("moduleId")).trim()
+      : "";
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  const { data: moduleResult, error: dbError } = moduleId
+    ? await authContext.supabaseAdmin
+        .from("coursemodules")
+        .update({ video_cf_id: videoUrl })
+        .eq("id", moduleId)
+        .select("*")
+        .single()
+    : await authContext.supabaseAdmin
+        .from("coursemodules")
+        .insert({
+          maincourse_id: maincourseId,
+          title,
+          video_cf_id: videoUrl,
+        })
+        .select("*")
+        .single();
+
+  if (dbError) {
+    return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
   return NextResponse.json({
     success: true,
-    module: insertedModule,
+    module: moduleResult,
     videoUrl,
     cloudflareUid: uid,
   });

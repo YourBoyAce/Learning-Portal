@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -8,10 +8,10 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 type AuthContext =
   | { error: NextResponse }
   | {
-      token: string;
-      userId: string;
-      supabaseAdmin: ReturnType<typeof createClient>;
-    };
+    token: string;
+    userId: string;
+    supabaseAdmin: SupabaseClient<any, "public", any>;
+  };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -113,15 +113,40 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: insertError } = await authContext.supabaseAdmin
+  const { data: newCourse, error: insertError } = await authContext.supabaseAdmin
     .from("maincourses")
     .insert({
       title,
       description,
-    });
+    })
+    .select("id")
+    .single();
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
+
+  const modules = Array.isArray(body?.modules) ? body.modules : [];
+  if (modules.length > 0) {
+    const modulesToInsert = modules
+      .map((m: any) => ({
+        maincourse_id: newCourse.id,
+        title: typeof m.title === "string" ? m.title.trim() : "",
+      }))
+      .filter((m: any) => m.title !== "");
+
+    if (modulesToInsert.length > 0) {
+      const { error: modulesError } = await authContext.supabaseAdmin
+        .from("coursemodules")
+        .insert(modulesToInsert);
+
+      if (modulesError) {
+        return NextResponse.json(
+          { error: "Course created but failed to add modules: " + modulesError.message },
+          { status: 500 },
+        );
+      }
+    }
   }
 
   return NextResponse.json({ success: true });

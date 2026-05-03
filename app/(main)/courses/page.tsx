@@ -35,6 +35,17 @@ interface CurriculumCourse {
   duration?: string;
 }
 
+interface Webinar {
+  id: number;
+  title: string;
+  subtitle: string;
+  date: string;
+  icon: string;
+  status: string;
+  linkText: string;
+  attendees: number;
+}
+
 export default function MyLearningDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -51,50 +62,10 @@ export default function MyLearningDashboard() {
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([
-    {
-      id: 1,
-      title: "The Philosophy of Form and Shadow",
-      description:
-        "Exploring how visual silence redefines perception in 30% of modern aesthetics theory.",
-      module_label: "MODULE 24 · MODERN AESTHETICS",
-      progress: 45,
-      duration: "46:29",
-    },
-  ]);
+  const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([]);
 
   // Upcoming Webinars
-  const upcomingWebinars = [
-    {
-      id: 1,
-      title: "Advanced Epistemology",
-      subtitle: "Seminar Room R12 · Prof. Ariadne",
-      date: "TOMORROW, 10:00 AM",
-      icon: "📋",
-      status: "streaming",
-      attendees: 2,
-    },
-    {
-      id: 2,
-      title: "The Architecture of Silence",
-      subtitle: "Virtual Session · Dr. Lena Vance",
-      date: "WED, 2:30 PM",
-      icon: "▶",
-      status: "link",
-      linkText: "Link Active Soon",
-      attendees: 1,
-    },
-    {
-      id: 3,
-      title: "Linguistic Relativity",
-      subtitle: "Workshop Room 12 · Prof. Ch...",
-      date: "FRI, 11:00 AM",
-      icon: "📋",
-      status: "streaming",
-      attendees: 0,
-    },
-  ];
+  const [upcomingWebinars, setUpcomingWebinars] = useState<Webinar[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -144,7 +115,26 @@ export default function MyLearningDashboard() {
       );
       setWeeklyProgressPct(progressCalculation);
 
-      // 4. Calculate Pending Modules
+      // 4. Fetch Webinars
+      const { data: webinarsData } = await supabase
+        .from("webinars")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      const mappedWebinars = webinarsData?.map((w: any) => ({
+        id: w.id,
+        title: w.title,
+        subtitle: w.subtitle,
+        date: w.event_date,
+        icon: w.icon,
+        status: w.status,
+        linkText: w.link_text,
+        attendees: w.attendees_count,
+      })) || [];
+
+      setUpcomingWebinars(mappedWebinars);
+
+      // 5. Calculate Pending Modules
       const { count: completedVideosCount } = await supabase
         .from("user_video_progress")
         .select("*", { count: "exact", head: true })
@@ -160,9 +150,51 @@ export default function MyLearningDashboard() {
       );
 
       setStats({
-        liveSessions: upcomingWebinars.length,
+        liveSessions: mappedWebinars.length,
         pendingModules: pendingMods,
       });
+
+      // 6. Fetch Enrolled Courses & Calculate Progress
+      const { data: enrollmentsData } = await supabase
+        .from("course_enrollments")
+        .select(`
+          course_id,
+          maincourses (
+            id,
+            title,
+            description,
+            category
+          )
+        `)
+        .eq("user_id", user.id);
+
+      const { data: progressData } = await supabase
+        .from("user_video_progress")
+        .select("course_id, completed")
+        .eq("user_id", user.id);
+
+      if (enrollmentsData && enrollmentsData.length > 0) {
+        const validEnrollments = enrollmentsData.filter((e: any) => e.maincourses);
+        const mappedCurriculum = validEnrollments.map((e: any) => {
+          const course = e.maincourses;
+          const courseVideos = progressData?.filter((p: any) => p.course_id === course.id) || [];
+          const totalVideos = courseVideos.length;
+          const completedVideos = courseVideos.filter((p: any) => p.completed).length;
+          const progress = totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
+          
+          return {
+            id: course.id,
+            title: course.title,
+            description: course.description || "Course description unavailable.",
+            module_label: course.category ? course.category.toUpperCase() : "GENERAL",
+            progress: progress,
+            duration: progress === 0 ? "Ready to begin" : progress === 100 ? "Completed" : "In Progress",
+          };
+        });
+        setCurriculum(mappedCurriculum);
+      } else {
+        setCurriculum([]);
+      }
     } catch (error) {
       console.error("Error loading dashboard:", error);
     } finally {
@@ -370,46 +402,12 @@ export default function MyLearningDashboard() {
             <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
               Curated Video Curriculum
             </h2>
-            <div className="flex items-center gap-4 text-sm">
-              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                  />
-                </svg>
-                Filter
-              </button>
-              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-                Sort By
-              </button>
-            </div>
           </div>
 
           <div className="space-y-4">
             {curriculum.length === 0 ? (
               <div className="bg-white p-8 rounded-2xl border border-gray-100 text-center text-gray-500 text-sm">
-                No curriculum assigned yet.
+                no courses assigned
               </div>
             ) : (
               curriculum.map((course) => (
