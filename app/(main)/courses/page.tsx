@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { getMyLearningData } from "@/app/actions/my-learning";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import {
   Carousel,
   CarouselContent,
@@ -91,6 +92,8 @@ export default function MyLearningDashboard() {
   });
   const [weeklyProgressPct, setWeeklyProgressPct] = useState(0);
 
+  const router = useRouter();
+
   // Insight States
   const [insights, setInsights] = useState<Insight[]>([]);
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
@@ -174,10 +177,10 @@ export default function MyLearningDashboard() {
                 progress: 0,
                 duration: item.startDate
                   ? new Date(item.startDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
                   : undefined,
               })),
             );
@@ -552,31 +555,55 @@ export default function MyLearningDashboard() {
               No batch enrollments found yet.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {enrollments.map((item) => (
                 <div
                   key={`${item.batchId}-${item.courseId ?? "none"}`}
-                  className="rounded-xl border border-gray-100 bg-[#F8FAFC] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                  className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between"
                 >
+                  {/* TOP */}
                   <div>
-                    <p className="text-sm font-semibold text-[#0f172a]">
+                    {/* Tag */}
+                    <span className="text-[10px] uppercase tracking-wide text-blue-500 font-semibold">
+                      Batch
+                    </span>
+
+                    {/* Course Title */}
+                    <h3 className="text-base font-semibold text-[#0f172a] mt-2">
                       {item.courseTitle}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Batch: {item.batchName}
+                    </h3>
+
+                    {/* Batch Name */}
+                    <p className="text-sm text-gray-500 mt-1">
+                      {item.batchName}
                     </p>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {item.startDate
-                      ? `Starts ${new Date(item.startDate).toLocaleDateString(
+
+                  {/* BOTTOM */}
+                  <div className="mt-4">
+                    {/* Date */}
+                    <p className="text-xs text-gray-400 mb-3">
+                      {item.startDate
+                        ? `Starts ${new Date(item.startDate).toLocaleDateString(
                           "en-US",
                           {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
-                          },
+                          }
                         )}`
-                      : "Start date not set"}
+                        : "Start date not set"}
+                    </p>
+
+                    {/* CTA */}
+                    <Button
+                      onClick={() =>
+                        router.push(`/course/${item.courseId}`)
+                      }
+                      className="w-full bg-[#174778] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90"
+                    >
+                      View Details →
+                    </Button>
                   </div>
                 </div>
               ))}
