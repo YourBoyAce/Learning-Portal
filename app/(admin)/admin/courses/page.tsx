@@ -178,8 +178,8 @@ export default function AdminCourses() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({ 
-            title, 
+          body: JSON.stringify({
+            title,
             description,
             modules: validModules.map(t => ({ title: t }))
           }),
@@ -386,7 +386,7 @@ export default function AdminCourses() {
                 <div className="h-36 bg-gradient-to-br from-[#174778] to-[#2563eb] relative overflow-hidden">
                   {/* Decorative Pattern */}
                   <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:16px_16px]"></div>
-                  
+
                   {/* Status Badge */}
                   <div className="absolute top-4 left-4">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider shadow-sm border border-white/10">
@@ -414,10 +414,10 @@ export default function AdminCourses() {
                     <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                       {course.created_at
                         ? new Date(course.created_at).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
                         : "Recently Added"}
                     </span>
                     <div className="flex items-center gap-1">
@@ -504,7 +504,7 @@ export default function AdminCourses() {
                       Add Module
                     </button>
                   </div>
-                  
+
                   {modules.map((module, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <div className="flex-1">
@@ -534,11 +534,10 @@ export default function AdminCourses() {
 
               {modalMessage && (
                 <p
-                  className={`text-xs font-medium ${
-                    modalMessage.type === "success"
+                  className={`text-xs font-medium ${modalMessage.type === "success"
                       ? "text-emerald-600"
                       : "text-red-600"
-                  }`}
+                    }`}
                 >
                   {modalMessage.text}
                 </p>
