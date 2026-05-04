@@ -151,3 +151,87 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true });
 }
+
+export async function PUT(request: Request) {
+  const authContext = await authenticateAdmin(request);
+  if ("error" in authContext) {
+    return authContext.error;
+  }
+
+  const body = await request.json().catch(() => null);
+  const id = body?.id;
+  const title = typeof body?.title === "string" ? body.title.trim() : "";
+  const description =
+    typeof body?.description === "string" ? body.description.trim() : "";
+
+  if (!id || !title || !description) {
+    return NextResponse.json(
+      { error: "ID, title, and description are required." },
+      { status: 400 },
+    );
+  }
+
+  const { error } = await authContext.supabaseAdmin
+    .from("maincourses")
+    .update({ title, description })
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(request: Request) {
+  const authContext = await authenticateAdmin(request);
+  if ("error" in authContext) {
+    return authContext.error;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "Course ID is required." }, { status: 400 });
+  }
+
+  // Handle cascading deletions manually if not set in DB
+  // Delete modules first
+  await authContext.supabaseAdmin
+    .from("coursemodules")
+    .delete()
+    .eq("maincourse_id", id);
+
+  // Delete enrollments, ratings, progress, certificates (though these usually have ON DELETE CASCADE)
+  await authContext.supabaseAdmin
+    .from("user_video_progress")
+    .delete()
+    .eq("course_id", id);
+    
+  await authContext.supabaseAdmin
+    .from("course_enrollments")
+    .delete()
+    .eq("course_id", id);
+    
+  await authContext.supabaseAdmin
+    .from("course_ratings")
+    .delete()
+    .eq("course_id", id);
+    
+  await authContext.supabaseAdmin
+    .from("certificates")
+    .delete()
+    .eq("course_id", id);
+
+  const { error } = await authContext.supabaseAdmin
+    .from("maincourses")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

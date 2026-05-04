@@ -164,22 +164,11 @@ export default function AdminCourses() {
           }),
         });
 
-        // If PUT isn't implemented, fall back to direct Supabase update
-        if (response.status === 405) {
-          const supabaseAdmin = supabase;
-          const { error: updateError } = await supabaseAdmin
-            .from("maincourses")
-            .update({ title, description })
-            .eq("id", editingCourseId);
-
-          if (updateError) throw updateError;
-        } else {
-          const result = await response.json().catch(() => null);
-          if (!response.ok) {
-            throw new Error(
-              result?.error || `Request failed (${response.status}).`,
-            );
-          }
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            result?.error || `Request failed (${response.status}).`,
+          );
         }
       } else {
         // Create new course
@@ -232,18 +221,32 @@ export default function AdminCourses() {
     try {
       setIsDeleting(true);
 
-      const { error } = await supabase
-        .from("maincourses")
-        .delete()
-        .eq("id", deletingCourse.id);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
 
-      if (error) throw error;
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
+
+      const response = await fetch(`/api/admin/courses?id=${deletingCourse.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to delete course.");
+      }
 
       await fetchCourses();
       setShowDeleteConfirm(false);
       setDeletingCourse(null);
     } catch (error) {
       console.error("Failed to delete course:", error);
+      alert(error instanceof Error ? error.message : "Failed to delete course.");
     } finally {
       setIsDeleting(false);
     }

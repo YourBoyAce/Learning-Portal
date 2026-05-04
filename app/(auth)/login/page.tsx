@@ -1,16 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const router = useRouter();
+
+  useEffect(() => {
+    // Rectify "Invalid Refresh Token" error by clearing stale sessions on mount
+    const cleanupSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        await supabase.auth.signOut();
+      }
+    };
+    cleanupSession();
+  }, []);
 
   // Helper function to securely route based on database role
   const routeUserBasedOnRole = async (userId: string) => {
@@ -152,19 +162,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* REMEMBER */}
-          <div className="flex items-center gap-2 mt-3 text-xs text-gray-600">
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 border border-gray-300 rounded bg-white accent-black cursor-pointer"
-            />
-            <label htmlFor="remember" className="cursor-pointer">
-              Remember Me
-            </label>
-          </div>
 
           {/* ERROR */}
           {error && (
