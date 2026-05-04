@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {
   BookOpen,
-  Users,
   CheckCircle,
-  DollarSign,
   Plus,
   Search,
   Pencil,
@@ -16,7 +14,7 @@ import {
 } from "lucide-react";
 
 interface Course {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   created_at?: string;
@@ -31,7 +29,9 @@ export default function AdminCourses() {
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const [editingCourseId, setEditingCourseId] = useState<
+    number | string | null
+  >(null);
   const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
   const [modules, setModules] = useState([{ title: "" }]);
@@ -120,7 +120,7 @@ export default function AdminCourses() {
   const handleSaveCourse = async () => {
     const title = courseTitle.trim();
     const description = courseDescription.trim();
-    const validModules = modules.map(m => m.title.trim()).filter(Boolean);
+    const validModules = modules.map((m) => m.title.trim()).filter(Boolean);
 
     if (!title || !description) {
       setModalMessage({
@@ -181,7 +181,7 @@ export default function AdminCourses() {
           body: JSON.stringify({
             title,
             description,
-            modules: validModules.map(t => ({ title: t }))
+            modules: validModules.map((t) => ({ title: t })),
           }),
         });
 
@@ -212,6 +212,7 @@ export default function AdminCourses() {
 
   const handleDeleteClick = (course: Course) => {
     setDeletingCourse(course);
+    setModalMessage(null);
     setShowDeleteConfirm(true);
   };
 
@@ -220,7 +221,6 @@ export default function AdminCourses() {
 
     try {
       setIsDeleting(true);
-
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
@@ -228,12 +228,15 @@ export default function AdminCourses() {
         throw new Error("Please log in again to continue.");
       }
 
-      const response = await fetch(`/api/admin/courses?id=${deletingCourse.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
+      const response = await fetch(
+        `/api/admin/courses?id=${deletingCourse.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
         },
-      });
+      );
 
       const result = await response.json().catch(() => null);
 
@@ -245,8 +248,13 @@ export default function AdminCourses() {
       setShowDeleteConfirm(false);
       setDeletingCourse(null);
     } catch (error) {
-      console.error("Failed to delete course:", error);
-      alert(error instanceof Error ? error.message : "Failed to delete course.");
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete course. Please try again.",
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -344,7 +352,9 @@ export default function AdminCourses() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
             <Loader2 className="w-10 h-10 text-[#174778] animate-spin mb-4" />
-            <p className="text-sm font-medium text-gray-500">Loading your catalog...</p>
+            <p className="text-sm font-medium text-gray-500">
+              Loading your catalog...
+            </p>
           </div>
         )}
 
@@ -355,11 +365,14 @@ export default function AdminCourses() {
               <BookOpen className="w-8 h-8 text-gray-400" />
             </div>
             <p className="text-lg text-gray-900 font-bold mb-2">
-              {searchTerm ? "No courses match your search" : "Your catalog is empty"}
+              {searchTerm
+                ? "No courses match your search"
+                : "Your catalog is empty"}
             </p>
             {!searchTerm && (
               <p className="text-sm text-gray-500 mb-6 max-w-md">
-                Get started by creating your first course. You can add modules, descriptions, and publish it right away.
+                Get started by creating your first course. You can add modules,
+                descriptions, and publish it right away.
               </p>
             )}
             {!searchTerm && (
@@ -413,11 +426,14 @@ export default function AdminCourses() {
                   <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
                     <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                       {course.created_at
-                        ? new Date(course.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
+                        ? new Date(course.created_at).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )
                         : "Recently Added"}
                     </span>
                     <div className="flex items-center gap-1">
@@ -512,7 +528,9 @@ export default function AdminCourses() {
                           type="text"
                           placeholder={`Module ${index + 1} Title`}
                           value={module.title}
-                          onChange={(e) => handleModuleChange(index, e.target.value)}
+                          onChange={(e) =>
+                            handleModuleChange(index, e.target.value)
+                          }
                           className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778]"
                         />
                       </div>
@@ -528,7 +546,9 @@ export default function AdminCourses() {
                       )}
                     </div>
                   ))}
-                  <p className="text-[11px] text-gray-500">At least one module is mandatory.</p>
+                  <p className="text-[11px] text-gray-500">
+                    At least one module is mandatory.
+                  </p>
                 </div>
               )}
 
@@ -587,6 +607,11 @@ export default function AdminCourses() {
                 </strong>
                 ? This action cannot be undone.
               </p>
+              {modalMessage?.type === "error" && (
+                <p className="text-xs text-red-600 text-center mt-3 font-medium">
+                  {modalMessage.text}
+                </p>
+              )}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button

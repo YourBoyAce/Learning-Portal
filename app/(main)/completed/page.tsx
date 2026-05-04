@@ -45,11 +45,7 @@ export default function Completed() {
     topCourseRate: 0
   });
 
-  useEffect(() => {
-    loadCompletedCourses();
-  }, []);
-
-  const loadCompletedCourses = async () => {
+  async function loadCompletedCourses() {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -146,7 +142,12 @@ export default function Completed() {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCompletedCourses();
+  }, []);
 
   const getPerformanceColor = (performance: string) => {
     switch (performance) {

@@ -117,6 +117,7 @@ const CalendarPage = () => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
     fetchNotificationPreferences();
 

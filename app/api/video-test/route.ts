@@ -44,13 +44,14 @@ export async function GET() {
 
     const data = await response.json();
     return NextResponse.json({ success: true, message: "CONNECTED! 🚀", data });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // This will tell us the exact SYSTEM reason it is failing
     console.error(err);
+    const maybeErr = err as { cause?: { code?: string }; code?: string; message?: string };
     return NextResponse.json({
       error: "Hard Connection Failure",
-      code: err.cause?.code || err.code,
-      message: err.message,
+      code: maybeErr.cause?.code || maybeErr.code,
+      message: maybeErr.message || "Unknown error",
     });
   }
 }

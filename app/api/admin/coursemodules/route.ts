@@ -27,7 +27,9 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     : null;
 
   if (!token) {
-    return { error: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) };
+    return {
+      error: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
+    };
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -35,7 +37,9 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     await supabase.auth.getUser(token);
 
   if (authError || !authData.user) {
-    return { error: NextResponse.json({ error: "Invalid session." }, { status: 401 }) };
+    return {
+      error: NextResponse.json({ error: "Invalid session." }, { status: 401 }),
+    };
   }
 
   const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
@@ -53,7 +57,9 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     .maybeSingle();
 
   if (profileError || profile?.role !== "admin") {
-    return { error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
+    return {
+      error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
+    };
   }
 
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -61,7 +67,7 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
       autoRefreshToken: false,
       persistSession: false,
     },
-  });
+  }) as unknown as SupabaseClient;
 
   return { supabaseAdmin };
 }
@@ -71,7 +77,6 @@ export async function POST(request: Request) {
   if ("error" in authContext) {
     return authContext.error;
   }
-
   if (!cloudflareAccountId || !cloudflareApiToken) {
     return NextResponse.json(
       { error: "Cloudflare environment variables are not configured." },

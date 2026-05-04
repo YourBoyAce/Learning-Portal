@@ -45,8 +45,8 @@ export default function ProfilePage() {
             setMemberSince(formattedDate);
           }
         }
-      } catch (err: any) {
-        console.error(err.message);
+      } catch (err: unknown) {
+        console.error(err instanceof Error ? err.message : String(err));
       } finally {
         setIsLoading(false);
       }

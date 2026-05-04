@@ -28,22 +28,38 @@ export default function UploadPage() {
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
-  
-  const [selectedCurriculum, setSelectedCurriculum] = useState(preselectedCourseId);
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isModulesLoading, setIsModulesLoading] = useState(false);
-  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
   const [showAllCourses, setShowAllCourses] = useState(false);
-  
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [isInitializingCourse, setIsInitializingCourse] = useState(false);
+  const [courseInitMessage, setCourseInitMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+  const [selectedCurriculum, setSelectedCurriculum] = useState("");
+  const [isQueueingVideo, setIsQueueingVideo] = useState(false);
+  const [videoQueueMessage, setVideoQueueMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const fileNameDisplay = useMemo(() => selectedFile?.name || "", [selectedFile]);
+  const fileNameDisplay = useMemo(
+    () => selectedFile?.name || "",
+    [selectedFile],
+  );
 
   const fetchCourses = async () => {
     try {
@@ -64,10 +80,14 @@ export default function UploadPage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result?.error || `Request failed (${response.status}).`);
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
       }
 
-      const loadedCourses = Array.isArray(result?.courses) ? result.courses : [];
+      const loadedCourses = Array.isArray(result?.courses)
+        ? result.courses
+        : [];
       setCourses(loadedCourses);
       setError("");
     } catch (err) {
@@ -109,7 +129,7 @@ export default function UploadPage() {
           .from("coursemodules")
           .select("id, title")
           .eq("maincourse_id", selectedCurriculum);
-        
+
         if (error) throw error;
         setModules(data || []);
       } catch (err) {
@@ -134,6 +154,9 @@ export default function UploadPage() {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) setSelectedFile(file);
+    if (file) {
+      setVideoFile(file);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,8 +169,15 @@ export default function UploadPage() {
     setError("");
     setSuccess("");
 
-    if (!selectedCurriculum || !selectedModuleId || !videoTitle.trim() || !selectedFile) {
-      setError("Please select a curriculum, a module, add a video title, and choose a file.");
+    if (
+      !selectedCurriculum ||
+      !selectedModuleId ||
+      !videoTitle.trim() ||
+      !selectedFile
+    ) {
+      setError(
+        "Please select a curriculum, a module, add a video title, and choose a file.",
+      );
       return;
     }
 
@@ -183,7 +213,9 @@ export default function UploadPage() {
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result?.error || `Request failed (${response.status}).`);
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
       }
 
       setVideoTitle("");
@@ -288,7 +320,9 @@ export default function UploadPage() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {isModulesLoading ? "Loading modules..." : "Select module..."}
+                      {isModulesLoading
+                        ? "Loading modules..."
+                        : "Select module..."}
                     </option>
                     {modules.map((module) => (
                       <option key={module.id} value={String(module.id)}>
@@ -425,29 +459,51 @@ export default function UploadPage() {
 
                 {/* View More Card */}
                 {!showAllCourses && courses.length > 4 && (
-                  <div 
+                  <div
                     onClick={() => setShowAllCourses(true)}
                     className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#174778] hover:bg-gray-50 transition-all cursor-pointer"
                   >
                     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#174778]">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
                       </svg>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 mb-1">
                       View All Courses
                     </p>
-                    <p className="text-xs text-gray-500">Show {courses.length - 4} more</p>
+                    <p className="text-xs text-gray-500">
+                      Show {courses.length - 4} more
+                    </p>
                   </div>
                 )}
                 {showAllCourses && courses.length > 4 && (
-                  <div 
+                  <div
                     onClick={() => setShowAllCourses(false)}
                     className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#174778] hover:bg-gray-50 transition-all cursor-pointer"
                   >
                     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#174778]">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 15l7-7 7 7"
+                        />
                       </svg>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 mb-1">

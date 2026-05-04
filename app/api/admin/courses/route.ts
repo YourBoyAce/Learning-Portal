@@ -5,13 +5,26 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+function normalizeId(value: unknown): string | number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const asNumber = Number(trimmed);
+    return Number.isFinite(asNumber) && String(asNumber) === trimmed
+      ? asNumber
+      : trimmed;
+  }
+  return null;
+}
+
 type AuthContext =
   | { error: NextResponse }
   | {
-    token: string;
-    userId: string;
-    supabaseAdmin: SupabaseClient<any, "public", any>;
-  };
+      token: string;
+      userId: string;
+      supabaseAdmin: SupabaseClient<any, "public", any>;
+    };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -69,7 +82,7 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
       autoRefreshToken: false,
       persistSession: false,
     },
-  });
+  }) as unknown as SupabaseClient;
 
   return {
     token,
@@ -142,7 +155,11 @@ export async function POST(request: Request) {
 
       if (modulesError) {
         return NextResponse.json(
-          { error: "Course created but failed to add modules: " + modulesError.message },
+          {
+            error:
+              "Course created but failed to add modules: " +
+              modulesError.message,
+          },
           { status: 500 },
         );
       }
@@ -159,25 +176,25 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const id = body?.id;
+  const id = normalizeId(body?.id);
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
     typeof body?.description === "string" ? body.description.trim() : "";
 
-  if (!id || !title || !description) {
+  if (id === null || !title || !description) {
     return NextResponse.json(
-      { error: "ID, title, and description are required." },
+      { error: "id, title and description are required." },
       { status: 400 },
     );
   }
 
-  const { error } = await authContext.supabaseAdmin
+  const { error: updateError } = await authContext.supabaseAdmin
     .from("maincourses")
     .update({ title, description })
     .eq("id", id);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
@@ -189,12 +206,23 @@ export async function DELETE(request: Request) {
     return authContext.error;
   }
 
+  const body = await request.json().catch(() => null);
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
+  const rawId = body?.id ?? searchParams.get("id");
+  const id = normalizeId(rawId);
 
-  if (!id) {
-    return NextResponse.json({ error: "Course ID is required." }, { status: 400 });
+  if (id === null) {
+    return NextResponse.json(
+      { error: "Valid course id is required." },
+      { status: 400 },
+    );
   }
+
+  // Detach from batches
+  await authContext.supabaseAdmin
+    .from("batches")
+    .update({ course_id: null })
+    .eq("course_id", id);
 
   // Handle cascading deletions manually if not set in DB
   // Delete modules first
@@ -208,29 +236,29 @@ export async function DELETE(request: Request) {
     .from("user_video_progress")
     .delete()
     .eq("course_id", id);
-    
+
   await authContext.supabaseAdmin
     .from("course_enrollments")
     .delete()
     .eq("course_id", id);
-    
+
   await authContext.supabaseAdmin
     .from("course_ratings")
     .delete()
     .eq("course_id", id);
-    
+
   await authContext.supabaseAdmin
     .from("certificates")
     .delete()
     .eq("course_id", id);
 
-  const { error } = await authContext.supabaseAdmin
+  const { error: deleteError } = await authContext.supabaseAdmin
     .from("maincourses")
     .delete()
     .eq("id", id);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

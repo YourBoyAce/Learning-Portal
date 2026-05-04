@@ -51,9 +51,14 @@ export async function POST(request: Request) {
       uploadURL: json.result.uploadURL,
       uid: json.result.uid,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || "Failed to initialize Cloudflare upload." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to initialize Cloudflare upload.",
+      },
       { status: 500 },
     );
   }
