@@ -33,7 +33,6 @@ export default function UploadPage() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [fileName, setFileName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
@@ -102,7 +101,6 @@ export default function UploadPage() {
     if (file) setSelectedFile(file);
     if (file) {
       setVideoFile(file);
-      setFileName(file.name);
     }
   };
 
@@ -414,7 +412,6 @@ export default function UploadPage() {
       setVideoTitle("");
       setSelectedCurriculum("");
       setVideoFile(null);
-      setFileName("");
       setVideoQueueMessage({
         type: "success",
         text: "Video uploaded and module created successfully.",
@@ -1003,4 +1000,3 @@ export default function UploadPage() {
     </div>
   );
 }
-

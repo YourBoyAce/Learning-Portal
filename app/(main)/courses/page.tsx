@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import { getMyLearningData } from "@/app/actions/my-learning";
 import { Button } from "@/components/ui/button";
 import {
   Carousel,
@@ -11,7 +12,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { BookOpen, PlayCircle, CheckCircle2, Calendar } from "lucide-react";
+import { BookOpen, PlayCircle, CheckCircle2 } from "lucide-react";
 
 // --- Types ---
 interface Insight {
@@ -26,7 +27,7 @@ interface UserStats {
 }
 
 interface CurriculumCourse {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   module_label?: string;
@@ -35,9 +36,40 @@ interface CurriculumCourse {
   duration?: string;
 }
 
+interface Enrollment {
+  batchId: number | string;
+  batchName: string;
+  startDate: string | null;
+  courseId: number | string | null;
+  courseTitle: string;
+  courseDescription: string;
+}
+
+interface UpcomingEventRow {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_time: string;
+  event_type: "video" | "course" | "session" | "webinar";
+}
+
+interface UpcomingWebinarCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  date: string;
+  icon: string;
+  status: "streaming" | "link";
+  linkText?: string;
+  attendees: number;
+}
+
 export default function MyLearningDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [upcomingWebinars, setUpcomingWebinars] = useState<UpcomingWebinarCard[]>([]);
 
   // Data States
   const [stats, setStats] = useState<UserStats>({
@@ -51,7 +83,6 @@ export default function MyLearningDashboard() {
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([
     {
       id: 1,
@@ -64,56 +95,97 @@ export default function MyLearningDashboard() {
     },
   ]);
 
-  // Upcoming Webinars
-  const upcomingWebinars = [
-    {
-      id: 1,
-      title: "Advanced Epistemology",
-      subtitle: "Seminar Room R12 · Prof. Ariadne",
-      date: "TOMORROW, 10:00 AM",
-      icon: "📋",
-      status: "streaming",
-      attendees: 2,
-    },
-    {
-      id: 2,
-      title: "The Architecture of Silence",
-      subtitle: "Virtual Session · Dr. Lena Vance",
-      date: "WED, 2:30 PM",
-      icon: "▶",
-      status: "link",
-      linkText: "Link Active Soon",
-      attendees: 1,
-    },
-    {
-      id: 3,
-      title: "Linguistic Relativity",
-      subtitle: "Workshop Room 12 · Prof. Ch...",
-      date: "FRI, 11:00 AM",
-      icon: "📋",
-      status: "streaming",
-      attendees: 0,
-    },
-  ];
+  const formatWebinarDate = (date: string, time: string) => {
+    const dateObj = new Date(`${date}T${time}`);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-  useEffect(() => {
-    loadDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timeLabel = dateObj.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
 
-  const loadDashboardData = async () => {
+    if (dateObj.toDateString() === now.toDateString()) {
+      return `TODAY, ${timeLabel}`;
+    }
+    if (dateObj.toDateString() === tomorrow.toDateString()) {
+      return `TOMORROW, ${timeLabel}`;
+    }
+    return `${dateObj
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .toUpperCase()}, ${timeLabel}`;
+  };
+
+  async function loadDashboardData() {
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) return;
+      setUserId(session.user.id);
+
+      const learningResult = await getMyLearningData(session.access_token);
+      if (learningResult) {
+        const eventRows: UpcomingEventRow[] = Array.isArray(
+          learningResult?.upcomingEvents,
+        )
+          ? learningResult.upcomingEvents
+          : [];
+
+        const mappedWebinars: UpcomingWebinarCard[] = eventRows.map((event) => ({
+          id: event.id,
+          title: event.title,
+          subtitle: event.description?.trim() || "Scheduled from your calendar",
+          date: formatWebinarDate(event.event_date, event.event_time),
+          icon: event.event_type === "webinar" ? "📋" : "▶",
+          status: event.event_type === "webinar" ? "streaming" : "link",
+          linkText:
+            event.event_type === "webinar" ? undefined : "Scheduled Session",
+          attendees: 0,
+        }));
+        setUpcomingWebinars(mappedWebinars);
+
+        setStats((prev) => ({
+          ...prev,
+          liveSessions: mappedWebinars.length,
+        }));
+
+        if (Array.isArray(learningResult?.enrollments)) {
+          const enrollmentRows = learningResult.enrollments as Enrollment[];
+          setEnrollments(enrollmentRows);
+
+          if (enrollmentRows.length > 0) {
+            setCurriculum(
+              enrollmentRows.map((item, index) => ({
+                id: `${String(item.batchId)}-${String(item.courseId ?? index + 1)}`,
+                title: item.courseTitle,
+                description:
+                  item.courseDescription ||
+                  `You are enrolled in ${item.batchName}.`,
+                module_label: `BATCH · ${item.batchName}`,
+                progress: 0,
+                duration: item.startDate
+                  ? new Date(item.startDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : undefined,
+              })),
+            );
+          } else {
+            setCurriculum([]);
+          }
+        }
+      }
 
       // 1. Fetch User Profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("current_insight_index")
-        .eq("id", user.id)
+        .eq("id", session.user.id)
         .single();
 
       setCurrentInsightIndex(profile?.current_insight_index || 0);
@@ -133,7 +205,7 @@ export default function MyLearningDashboard() {
       const { data: recentProgress } = await supabase
         .from("user_video_progress")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", session.user.id)
         .gte("completed_at", sevenDaysAgo.toISOString());
 
       const modulesCompletedThisWeek = recentProgress?.length || 0;
@@ -148,7 +220,7 @@ export default function MyLearningDashboard() {
       const { count: completedVideosCount } = await supabase
         .from("user_video_progress")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", session.user.id);
 
       const { count: totalVideosCount } = await supabase
         .from("videos")
@@ -159,16 +231,22 @@ export default function MyLearningDashboard() {
         (totalVideosCount || 0) - (completedVideosCount || 0)
       );
 
-      setStats({
-        liveSessions: upcomingWebinars.length,
+      setStats((prev) => ({
+        ...prev,
         pendingModules: pendingMods,
-      });
+      }));
     } catch (error) {
       console.error("Error loading dashboard:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleMarkInsightAsRead = async () => {
     if (!userId || insights.length === 0) return;
@@ -298,7 +376,16 @@ export default function MyLearningDashboard() {
 
           <Carousel className="w-full">
             <CarouselContent>
-              {upcomingWebinars.map((webinar) => (
+              {upcomingWebinars.length === 0 ? (
+                <CarouselItem className="md:basis-1/2 lg:basis-1/3">
+                  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex items-center justify-center text-center">
+                    <p className="text-sm text-gray-500">
+                      No upcoming events in your calendar yet.
+                    </p>
+                  </div>
+                </CarouselItem>
+              ) : (
+                upcomingWebinars.map((webinar) => (
                 <CarouselItem
                   key={webinar.id}
                   className="md:basis-1/2 lg:basis-1/3"
@@ -355,13 +442,52 @@ export default function MyLearningDashboard() {
                     </div>
                   </div>
                 </CarouselItem>
-              ))}
+                ))
+              )}
             </CarouselContent>
             <div className="hidden sm:block">
               <CarouselPrevious className="-left-4 bg-white border-gray-200 shadow-sm" />
               <CarouselNext className="-right-4 bg-white border-gray-200 shadow-sm" />
             </div>
           </Carousel>
+        </section>
+
+        <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
+              Batch Enrollments
+            </h2>
+            <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+              {enrollments.length} Enrollment{enrollments.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          {enrollments.length === 0 ? (
+            <p className="text-sm text-gray-500">No batch enrollments found yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {enrollments.map((item) => (
+                <div
+                  key={`${item.batchId}-${item.courseId ?? "none"}`}
+                  className="rounded-xl border border-gray-100 bg-[#F8FAFC] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-[#0f172a]">{item.courseTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Batch: {item.batchName}</p>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {item.startDate
+                      ? `Starts ${new Date(item.startDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}`
+                      : "Start date not set"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ─── CURATED VIDEO CURRICULUM ─── */}

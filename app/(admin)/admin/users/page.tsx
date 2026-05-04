@@ -26,6 +26,13 @@ interface Scholar {
   engagement: number;
 }
 
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+};
+
 const AVAILABLE_ROLES = [
   "Admin",
   "User",
@@ -57,11 +64,7 @@ export default function AdminUsers() {
   // Action Menu State
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     setLoading(true);
     const { data: profiles, error } = await supabase
       .from("profiles")
@@ -69,7 +72,7 @@ export default function AdminUsers() {
       .order("created_at", { ascending: false });
 
     if (!error && profiles) {
-      const transformedScholars = profiles.map((profile: any) => ({
+      const transformedScholars = (profiles as ProfileRow[]).map((profile) => ({
         id: profile.id,
         name: profile.full_name || profile.email?.split("@")[0] || "Unknown",
         email: profile.email || "No Email",
@@ -85,7 +88,12 @@ export default function AdminUsers() {
       );
     }
     setLoading(false);
-  };
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchUsers();
+  }, []);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();

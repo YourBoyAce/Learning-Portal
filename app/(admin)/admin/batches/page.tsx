@@ -166,10 +166,12 @@ export default function AdminBatches() {
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.assignment) return;
 
-      const memberEmails: string[] = Array.isArray(
-        result.assignment.memberEmails,
-      )
+      const memberEmails: string[] = Array.isArray(result.assignment.memberEmails)
         ? result.assignment.memberEmails
+            .map((email: unknown) =>
+              typeof email === "string" ? email.trim().toLowerCase() : "",
+            )
+            .filter(Boolean)
         : [];
       const courseIds: string[] = Array.isArray(result.assignment.courseIds)
         ? result.assignment.courseIds
@@ -187,7 +189,7 @@ export default function AdminBatches() {
       const userOptions = latestUsers
         .filter((user) => Boolean(user.email))
         .map((user) => ({
-          value: user.email as string,
+          value: (user.email as string).trim().toLowerCase(),
           label: user.email as string,
         }));
 
@@ -197,9 +199,7 @@ export default function AdminBatches() {
       }));
 
       setSelectedUsers(
-        userOptions.filter((option) =>
-          memberEmails.includes(String(option.value)),
-        ),
+        userOptions.filter((option) => memberEmails.includes(option.value)),
       );
       setSelectedCourses(
         courseOptions.filter((option) =>

@@ -9,11 +9,30 @@ type Profile = {
   role?: string | null;
 };
 
+type Enrollment = {
+  batchId: number | string;
+  batchName: string;
+  startDate: string | null;
+  courseId: number | string | null;
+  courseTitle: string;
+};
+
+type CalendarEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_time: string;
+  event_type: "video" | "course" | "session" | "webinar";
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +57,38 @@ export default function Dashboard() {
         .select("full_name,role")
         .eq("id", user.id)
         .single();
+
+      const today = new Date().toISOString().split("T")[0];
+      const { data: calendarRows } = await supabase
+        .from("calendar_events")
+        .select("id,title,description,event_date,event_time,event_type")
+        .eq("user_id", user.id)
+        .gte("event_date", today)
+        .order("event_date", { ascending: true })
+        .order("event_time", { ascending: true })
+        .limit(5);
+
+      setUpcomingEvents((calendarRows ?? []) as CalendarEvent[]);
+
+      if (session?.access_token) {
+        const enrollmentsResponse = await fetch("/api/enrollments", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const enrollmentsResult = await enrollmentsResponse
+          .json()
+          .catch(() => null);
+
+        if (
+          enrollmentsResponse.ok &&
+          Array.isArray(enrollmentsResult?.enrollments)
+        ) {
+          setEnrollments(enrollmentsResult.enrollments as Enrollment[]);
+        }
+      }
 
       if (cancelled) return;
       setProfile((fetchedProfile ?? null) as Profile | null);
@@ -70,6 +121,27 @@ export default function Dashboard() {
 
   if (loading) return null;
 
+  const formatEventLabel = (eventDate: string, eventTime: string) => {
+    const start = new Date(`${eventDate}T${eventTime}`);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timeLabel = start.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    if (start.toDateString() === now.toDateString()) return `Today, ${timeLabel}`;
+    if (start.toDateString() === tomorrow.toDateString()) {
+      return `Tomorrow, ${timeLabel}`;
+    }
+    return `${start.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })}, ${timeLabel}`;
+  };
+
   return (
     <div className="p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -89,47 +161,77 @@ export default function Dashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            <button className="bg-transparent border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10">
+            <button
+              onClick={() => router.push("/calendar")}
+              className="bg-transparent border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"
+            >
               View Calendar
             </button>
           </div>
         </div>
 
-        {/* Active Course & Progress */}
+        {/* Upcoming Webinars & Progress */}
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          {/* Active Course */}
+          {/* Upcoming Webinars */}
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-semibold text-orange-500 uppercase tracking-wide">In Next</span>
-              <span className="text-xs text-gray-500">02:45:00</span>
+              <span className="text-xs font-semibold text-orange-500 uppercase tracking-wide">
+                Upcoming Webinars
+              </span>
+              <span className="text-xs text-gray-500">
+                {upcomingEvents.length} scheduled
+              </span>
             </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-1">Advanced Semiotics in Digital Architecture</h2>
-            <p className="text-xs text-gray-500 mb-4">Your next module is ready</p>
-            
-            {/* Course Card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+
+            <h2 className="text-xl font-semibold text-gray-800 mb-1">
+              Sessions from your calendar
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">
+              These are pulled live from events created in Calendar.
+            </p>
+
+            {upcomingEvents.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-gray-500">
+                No upcoming events found. Add one in Calendar to see it here.
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800">Module 4: The Language of Space</h3>
-                <p className="text-xs text-gray-500">Hosted by Dr. Aria Thorne • 14:00 GMT</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex -space-x-1">
-                    <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-                    <div className="w-5 h-5 bg-gray-400 rounded-full"></div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4"
+                  >
+                    <div className="w-12 h-12 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
+                      <svg
+                        className="w-6 h-6 text-[#174778]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-800">{event.title}</h3>
+                      <p className="text-xs text-gray-500">
+                        {event.description?.trim() || "Scheduled session"}
+                      </p>
+                      <p className="text-xs text-[#174778] mt-1 font-medium">
+                        {formatEventLabel(event.event_date, event.event_time)}
+                      </p>
+                    </div>
+                    <span className="text-[11px] uppercase tracking-wide text-gray-500">
+                      {event.event_type}
+                    </span>
                   </div>
-                  <span className="text-xs text-gray-400">Joining soon...</span>
-                </div>
+                ))}
               </div>
-              <button className="w-10 h-10 bg-[#174778] rounded-lg flex items-center justify-center text-white">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z"/>
-                </svg>
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Weekly Progress */}
@@ -151,6 +253,52 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Enrollment Summary */}
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-800">
+              Batch Enrollment Summary
+            </h2>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              {enrollments.length} Enrollment{enrollments.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          {enrollments.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              You are not enrolled in any batch yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {enrollments.slice(0, 3).map((item) => (
+                <div
+                  key={`${item.batchId}-${item.courseId ?? "none"}`}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                >
+                  <p className="text-sm text-gray-800">
+                    <span className="font-medium">{item.courseTitle}</span>
+                    <span className="text-gray-500"> • {item.batchName}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {item.startDate
+                      ? `Starts ${new Date(item.startDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}`
+                      : "Start date not set"}
+                  </p>
+                </div>
+              ))}
+              {enrollments.length > 3 ? (
+                <p className="text-xs text-gray-500">
+                  +{enrollments.length - 3} more. Open My Learning to view all.
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* Active Studies */}

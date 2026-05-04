@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,7 +9,7 @@ const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN;
 
 type AuthContext =
   | { error: NextResponse }
-  | { supabaseAdmin: ReturnType<typeof createClient> };
+  | { supabaseAdmin: SupabaseClient };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -61,7 +61,7 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
       autoRefreshToken: false,
       persistSession: false,
     },
-  });
+  }) as unknown as SupabaseClient;
 
   return { supabaseAdmin };
 }
@@ -71,7 +71,6 @@ export async function POST(request: Request) {
   if ("error" in authContext) {
     return authContext.error;
   }
-
   if (!cloudflareAccountId || !cloudflareApiToken) {
     return NextResponse.json(
       { error: "Cloudflare environment variables are not configured." },

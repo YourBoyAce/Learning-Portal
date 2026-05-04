@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {
+  createAdminCourse,
+  deleteAdminCourse,
+  listAdminCourses,
+  updateAdminCourse,
+} from "@/app/actions/admin-courses";
+import {
   BookOpen,
   Users,
   CheckCircle,
@@ -16,7 +22,7 @@ import {
 } from "lucide-react";
 
 interface Course {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   created_at?: string;
@@ -31,7 +37,9 @@ export default function AdminCourses() {
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const [editingCourseId, setEditingCourseId] = useState<number | string | null>(
+    null,
+  );
   const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -61,18 +69,8 @@ export default function AdminCourses() {
         return;
       }
 
-      const response = await fetch("/api/admin/courses", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (response.ok && Array.isArray(result?.courses)) {
-        setCourses(result.courses);
-      }
+      const data = await listAdminCourses(sessionData.session.access_token);
+      setCourses(Array.isArray(data) ? (data as Course[]) : []);
     } catch (error) {
       console.error("Failed to fetch courses:", error);
     } finally {
@@ -122,54 +120,18 @@ export default function AdminCourses() {
       }
 
       if (isEditing && editingCourseId) {
-        // Update existing course
-        const response = await fetch("/api/admin/courses", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify({
-            id: editingCourseId,
-            title,
-            description,
-          }),
-        });
-
-        // If PUT isn't implemented, fall back to direct Supabase update
-        if (response.status === 405) {
-          const supabaseAdmin = supabase;
-          const { error: updateError } = await supabaseAdmin
-            .from("maincourses")
-            .update({ title, description })
-            .eq("id", editingCourseId);
-
-          if (updateError) throw updateError;
-        } else {
-          const result = await response.json().catch(() => null);
-          if (!response.ok) {
-            throw new Error(
-              result?.error || `Request failed (${response.status}).`,
-            );
-          }
-        }
+        await updateAdminCourse(
+          sessionData.session.access_token,
+          editingCourseId,
+          title,
+          description,
+        );
       } else {
-        // Create new course
-        const response = await fetch("/api/admin/courses", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify({ title, description }),
-        });
-
-        const result = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(
-            result?.error || `Request failed (${response.status}).`,
-          );
-        }
+        await createAdminCourse(
+          sessionData.session.access_token,
+          title,
+          description,
+        );
       }
 
       await fetchCourses();
@@ -191,6 +153,7 @@ export default function AdminCourses() {
 
   const handleDeleteClick = (course: Course) => {
     setDeletingCourse(course);
+    setModalMessage(null);
     setShowDeleteConfirm(true);
   };
 
@@ -199,19 +162,29 @@ export default function AdminCourses() {
 
     try {
       setIsDeleting(true);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
 
-      const { error } = await supabase
-        .from("maincourses")
-        .delete()
-        .eq("id", deletingCourse.id);
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
 
-      if (error) throw error;
+      await deleteAdminCourse(
+        sessionData.session.access_token,
+        deletingCourse.id,
+      );
 
       await fetchCourses();
       setShowDeleteConfirm(false);
       setDeletingCourse(null);
     } catch (error) {
-      console.error("Failed to delete course:", error);
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete course. Please try again.",
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -539,6 +512,11 @@ export default function AdminCourses() {
                 </strong>
                 ? This action cannot be undone.
               </p>
+              {modalMessage?.type === "error" && (
+                <p className="text-xs text-red-600 text-center mt-3 font-medium">
+                  {modalMessage.text}
+                </p>
+              )}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button

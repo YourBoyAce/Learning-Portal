@@ -57,7 +57,7 @@ export async function createUser(formData: FormData) {
 
     revalidatePath("/admin/users");
     return { success: true, message: "Scholar added successfully!" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Server Action Error:", error);
     return { success: false, error: "An unexpected server error occurred." };
   }
@@ -74,8 +74,11 @@ export async function updateUserRole(userId: string, newRole: string) {
 
     revalidatePath("/admin/users");
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }
 
@@ -86,7 +89,10 @@ export async function deleteUser(userId: string) {
 
     revalidatePath("/admin/users");
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }
