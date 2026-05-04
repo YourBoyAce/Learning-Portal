@@ -36,6 +36,17 @@ interface CurriculumCourse {
   duration?: string;
 }
 
+interface Webinar {
+  id: number;
+  title: string;
+  subtitle: string;
+  date: string;
+  icon: string;
+  status: string;
+  linkText: string;
+  attendees: number;
+}
+
 interface Enrollment {
   batchId: number | string;
   batchName: string;
@@ -69,7 +80,9 @@ export default function MyLearningDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [upcomingWebinars, setUpcomingWebinars] = useState<UpcomingWebinarCard[]>([]);
+  const [upcomingWebinars, setUpcomingWebinars] = useState<
+    UpcomingWebinarCard[]
+  >([]);
 
   // Data States
   const [stats, setStats] = useState<UserStats>({
@@ -83,17 +96,7 @@ export default function MyLearningDashboard() {
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
-  const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([
-    {
-      id: 1,
-      title: "The Philosophy of Form and Shadow",
-      description:
-        "Exploring how visual silence redefines perception in 30% of modern aesthetics theory.",
-      module_label: "MODULE 24 · MODERN AESTHETICS",
-      progress: 45,
-      duration: "46:29",
-    },
-  ]);
+  const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([]);
 
   const formatWebinarDate = (date: string, time: string) => {
     const dateObj = new Date(`${date}T${time}`);
@@ -134,17 +137,20 @@ export default function MyLearningDashboard() {
           ? learningResult.upcomingEvents
           : [];
 
-        const mappedWebinars: UpcomingWebinarCard[] = eventRows.map((event) => ({
-          id: event.id,
-          title: event.title,
-          subtitle: event.description?.trim() || "Scheduled from your calendar",
-          date: formatWebinarDate(event.event_date, event.event_time),
-          icon: event.event_type === "webinar" ? "📋" : "▶",
-          status: event.event_type === "webinar" ? "streaming" : "link",
-          linkText:
-            event.event_type === "webinar" ? undefined : "Scheduled Session",
-          attendees: 0,
-        }));
+        const mappedWebinars: UpcomingWebinarCard[] = eventRows.map(
+          (event) => ({
+            id: event.id,
+            title: event.title,
+            subtitle:
+              event.description?.trim() || "Scheduled from your calendar",
+            date: formatWebinarDate(event.event_date, event.event_time),
+            icon: event.event_type === "webinar" ? "📋" : "▶",
+            status: event.event_type === "webinar" ? "streaming" : "link",
+            linkText:
+              event.event_type === "webinar" ? undefined : "Scheduled Session",
+            attendees: 0,
+          }),
+        );
         setUpcomingWebinars(mappedWebinars);
 
         setStats((prev) => ({
@@ -212,11 +218,31 @@ export default function MyLearningDashboard() {
       const targetModulesPerWeek = 5;
       const progressCalculation = Math.min(
         Math.round((modulesCompletedThisWeek / targetModulesPerWeek) * 100),
-        100
+        100,
       );
       setWeeklyProgressPct(progressCalculation);
 
-      // 4. Calculate Pending Modules
+      // 4. Fetch Webinars
+      const { data: webinarsData } = await supabase
+        .from("webinars")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      const mappedWebinars =
+        webinarsData?.map((w: any) => ({
+          id: w.id,
+          title: w.title,
+          subtitle: w.subtitle,
+          date: w.event_date,
+          icon: w.icon,
+          status: w.status,
+          linkText: w.link_text,
+          attendees: w.attendees_count,
+        })) || [];
+
+      setUpcomingWebinars(mappedWebinars);
+
+      // 5. Calculate Pending Modules
       const { count: completedVideosCount } = await supabase
         .from("user_video_progress")
         .select("*", { count: "exact", head: true })
@@ -228,13 +254,73 @@ export default function MyLearningDashboard() {
 
       const pendingMods = Math.max(
         0,
-        (totalVideosCount || 0) - (completedVideosCount || 0)
+        (totalVideosCount || 0) - (completedVideosCount || 0),
       );
 
       setStats((prev) => ({
         ...prev,
         pendingModules: pendingMods,
       }));
+
+      // 6. Fetch Enrolled Courses & Calculate Progress
+      const { data: enrollmentsData } = await supabase
+        .from("course_enrollments")
+        .select(
+          `
+          course_id,
+          maincourses (
+            id,
+            title,
+            description,
+            category
+          )
+        `,
+        )
+        .eq("user_id", user.id);
+
+      const { data: progressData } = await supabase
+        .from("user_video_progress")
+        .select("course_id, completed")
+        .eq("user_id", user.id);
+
+      if (enrollmentsData && enrollmentsData.length > 0) {
+        const validEnrollments = enrollmentsData.filter(
+          (e: any) => e.maincourses,
+        );
+        const mappedCurriculum = validEnrollments.map((e: any) => {
+          const course = e.maincourses;
+          const courseVideos =
+            progressData?.filter((p: any) => p.course_id === course.id) || [];
+          const totalVideos = courseVideos.length;
+          const completedVideos = courseVideos.filter(
+            (p: any) => p.completed,
+          ).length;
+          const progress =
+            totalVideos > 0
+              ? Math.round((completedVideos / totalVideos) * 100)
+              : 0;
+
+          return {
+            id: course.id,
+            title: course.title,
+            description:
+              course.description || "Course description unavailable.",
+            module_label: course.category
+              ? course.category.toUpperCase()
+              : "GENERAL",
+            progress: progress,
+            duration:
+              progress === 0
+                ? "Ready to begin"
+                : progress === 100
+                  ? "Completed"
+                  : "In Progress",
+          };
+        });
+        setCurriculum(mappedCurriculum);
+      } else {
+        setCurriculum([]);
+      }
     } catch (error) {
       console.error("Error loading dashboard:", error);
     } finally {
@@ -263,9 +349,7 @@ export default function MyLearningDashboard() {
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#174778] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">
-            Loading your journey...
-          </p>
+          <p className="text-gray-600 font-medium">Loading your journey...</p>
         </div>
       </div>
     );
@@ -386,62 +470,62 @@ export default function MyLearningDashboard() {
                 </CarouselItem>
               ) : (
                 upcomingWebinars.map((webinar) => (
-                <CarouselItem
-                  key={webinar.id}
-                  className="md:basis-1/2 lg:basis-1/3"
-                >
-                  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex flex-col justify-between group hover:shadow-md transition-all">
-                    <div>
-                      {/* Date Badge */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider">
-                          {webinar.date}
-                        </span>
-                        <span className="text-gray-400 text-lg">
-                          {webinar.icon}
-                        </span>
+                  <CarouselItem
+                    key={webinar.id}
+                    className="md:basis-1/2 lg:basis-1/3"
+                  >
+                    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex flex-col justify-between group hover:shadow-md transition-all">
+                      <div>
+                        {/* Date Badge */}
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider">
+                            {webinar.date}
+                          </span>
+                          <span className="text-gray-400 text-lg">
+                            {webinar.icon}
+                          </span>
+                        </div>
+
+                        {/* Title & Subtitle */}
+                        <h3 className="font-bold text-[#0f172a] text-[17px] leading-snug mb-1">
+                          {webinar.title}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {webinar.subtitle}
+                        </p>
                       </div>
 
-                      {/* Title & Subtitle */}
-                      <h3 className="font-bold text-[#0f172a] text-[17px] leading-snug mb-1">
-                        {webinar.title}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {webinar.subtitle}
-                      </p>
-                    </div>
+                      {/* Bottom Row */}
+                      <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-2">
+                        <div className="flex items-center gap-1">
+                          {/* Attendee Avatars */}
+                          {Array.from({
+                            length: Math.min(webinar.attendees, 3),
+                          }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white -ml-1 first:ml-0 flex items-center justify-center"
+                            >
+                              <span className="text-[8px] text-gray-500">
+                                👤
+                              </span>
+                            </div>
+                          ))}
+                        </div>
 
-                    {/* Bottom Row */}
-                    <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-2">
-                      <div className="flex items-center gap-1">
-                        {/* Attendee Avatars */}
-                        {Array.from({
-                          length: Math.min(webinar.attendees, 3),
-                        }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white -ml-1 first:ml-0 flex items-center justify-center"
-                          >
-                            <span className="text-[8px] text-gray-500">
-                              👤
-                            </span>
-                          </div>
-                        ))}
+                        {webinar.status === "streaming" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Streaming
+                          </span>
+                        ) : webinar.linkText ? (
+                          <span className="text-[11px] font-semibold text-[#174778] underline cursor-pointer">
+                            {webinar.linkText}
+                          </span>
+                        ) : null}
                       </div>
-
-                      {webinar.status === "streaming" ? (
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          Streaming
-                        </span>
-                      ) : webinar.linkText ? (
-                        <span className="text-[11px] font-semibold text-[#174778] underline cursor-pointer">
-                          {webinar.linkText}
-                        </span>
-                      ) : null}
                     </div>
-                  </div>
-                </CarouselItem>
+                  </CarouselItem>
                 ))
               )}
             </CarouselContent>
@@ -458,12 +542,15 @@ export default function MyLearningDashboard() {
               Batch Enrollments
             </h2>
             <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-              {enrollments.length} Enrollment{enrollments.length === 1 ? "" : "s"}
+              {enrollments.length} Enrollment
+              {enrollments.length === 1 ? "" : "s"}
             </span>
           </div>
 
           {enrollments.length === 0 ? (
-            <p className="text-sm text-gray-500">No batch enrollments found yet.</p>
+            <p className="text-sm text-gray-500">
+              No batch enrollments found yet.
+            </p>
           ) : (
             <div className="space-y-3">
               {enrollments.map((item) => (
@@ -472,16 +559,23 @@ export default function MyLearningDashboard() {
                   className="rounded-xl border border-gray-100 bg-[#F8FAFC] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-[#0f172a]">{item.courseTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Batch: {item.batchName}</p>
+                    <p className="text-sm font-semibold text-[#0f172a]">
+                      {item.courseTitle}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Batch: {item.batchName}
+                    </p>
                   </div>
                   <div className="text-xs text-gray-500">
                     {item.startDate
-                      ? `Starts ${new Date(item.startDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}`
+                      ? `Starts ${new Date(item.startDate).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          },
+                        )}`
                       : "Start date not set"}
                   </div>
                 </div>
@@ -496,46 +590,12 @@ export default function MyLearningDashboard() {
             <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
               Curated Video Curriculum
             </h2>
-            <div className="flex items-center gap-4 text-sm">
-              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                  />
-                </svg>
-                Filter
-              </button>
-              <button className="flex items-center gap-1.5 text-gray-500 hover:text-[#174778] font-medium transition-colors">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-                Sort By
-              </button>
-            </div>
           </div>
 
           <div className="space-y-4">
             {curriculum.length === 0 ? (
               <div className="bg-white p-8 rounded-2xl border border-gray-100 text-center text-gray-500 text-sm">
-                No curriculum assigned yet.
+                no courses assigned
               </div>
             ) : (
               curriculum.map((course) => (
@@ -544,7 +604,10 @@ export default function MyLearningDashboard() {
                   className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow"
                 >
                   {/* Video Thumbnail */}
-                  <div className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer">
+                  <Link
+                    href={`/courses/${course.id}`}
+                    className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer"
+                  >
                     <PlayCircle
                       className="text-white/70 group-hover:text-white transition-colors z-10"
                       size={40}
@@ -556,7 +619,7 @@ export default function MyLearningDashboard() {
                         {course.duration}
                       </span>
                     )}
-                  </div>
+                  </Link>
 
                   {/* Content & Progress */}
                   <div className="flex-1 w-full py-1">
@@ -565,9 +628,11 @@ export default function MyLearningDashboard() {
                         {course.module_label}
                       </p>
                     )}
-                    <h3 className="font-bold text-[#0f172a] text-[18px]">
-                      {course.title}
-                    </h3>
+                    <Link href={`/courses/${course.id}`}>
+                      <h3 className="font-bold text-[#0f172a] text-[18px] hover:text-[#174778] transition-colors">
+                        {course.title}
+                      </h3>
+                    </Link>
                     <p className="text-sm text-gray-500 mt-1.5 mb-5">
                       {course.description}
                     </p>
@@ -587,9 +652,11 @@ export default function MyLearningDashboard() {
 
                   {/* Resume Button */}
                   <div className="w-full sm:w-auto shrink-0 px-2">
-                    <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
-                      <PlayCircle size={18} />
-                    </Button>
+                    <Link href={`/courses/${course.id}`}>
+                      <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
+                        <PlayCircle size={18} />
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               ))

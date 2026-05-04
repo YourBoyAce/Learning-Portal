@@ -278,7 +278,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // 3. Link the scholars (Corrected Logic)
   // 3. Link the scholars to the batch
   if (assignedMembers.length > 0) {
     const junctionData = assignedMembers.map((memberEmail: string) => ({
@@ -296,6 +295,47 @@ export async function POST(request: Request) {
         { error: "Failed to link members" },
         { status: 500 },
       );
+    }
+    
+    // 4. Enroll the scholars in the assigned course
+    if (selectedCourseId) {
+      const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUsers = authUsersResult.data?.users ?? [];
+      
+      const userIdsToEnroll: string[] = [];
+      for (const email of assignedMembers) {
+        const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+        if (authUser) {
+          userIdsToEnroll.push(authUser.id);
+        }
+      }
+
+      if (userIdsToEnroll.length > 0) {
+        const { data: existing } = await authContext.supabaseAdmin
+          .from("course_enrollments")
+          .select("user_id")
+          .eq("course_id", selectedCourseId)
+          .in("user_id", userIdsToEnroll);
+          
+        const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
+        
+        const newEnrollments = userIdsToEnroll
+          .filter(id => !existingUserIds.has(id))
+          .map(id => ({
+            user_id: id,
+            course_id: selectedCourseId,
+          }));
+          
+        if (newEnrollments.length > 0) {
+          const { error: enrollError } = await authContext.supabaseAdmin
+            .from("course_enrollments")
+            .insert(newEnrollments);
+            
+          if (enrollError) {
+             console.error("Enrollment Error:", enrollError.message);
+          }
+        }
+      }
     }
   }
 
@@ -374,6 +414,47 @@ export async function PUT(request: Request) {
       .insert(memberRows);
     if (insertMembersError) {
       return NextResponse.json({ error: insertMembersError.message }, { status: 500 });
+    }
+    
+    // Enroll the scholars in the assigned course
+    if (selectedCourseId) {
+      const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUsers = authUsersResult.data?.users ?? [];
+      
+      const userIdsToEnroll: string[] = [];
+      for (const email of assignedMembers) {
+        const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+        if (authUser) {
+          userIdsToEnroll.push(authUser.id);
+        }
+      }
+
+      if (userIdsToEnroll.length > 0) {
+        const { data: existing } = await authContext.supabaseAdmin
+          .from("course_enrollments")
+          .select("user_id")
+          .eq("course_id", selectedCourseId)
+          .in("user_id", userIdsToEnroll);
+          
+        const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
+        
+        const newEnrollments = userIdsToEnroll
+          .filter(id => !existingUserIds.has(id))
+          .map(id => ({
+            user_id: id,
+            course_id: selectedCourseId,
+          }));
+          
+        if (newEnrollments.length > 0) {
+          const { error: enrollError } = await authContext.supabaseAdmin
+            .from("course_enrollments")
+            .insert(newEnrollments);
+            
+          if (enrollError) {
+             console.error("Enrollment Error:", enrollError.message);
+          }
+        }
+      }
     }
   }
 

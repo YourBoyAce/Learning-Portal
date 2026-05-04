@@ -108,7 +108,7 @@ export default function AdminUsers() {
     const result = await createUser(formData);
 
     if (result.success) {
-      setFormFeedback({ type: "success", message: "Scholar account created!" });
+      setFormFeedback({ type: "success", message: "User account created!" });
       setEmail("");
       setPassword("");
       setRole("User");
@@ -236,11 +236,7 @@ export default function AdminUsers() {
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all appearance-none"
                   >
-                    {AVAILABLE_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
+                    <option value="User">User</option>
                   </select>
                 </div>
 
@@ -257,7 +253,7 @@ export default function AdminUsers() {
                   disabled={isSubmitting}
                   className="w-full bg-[#174778] hover:bg-[#113a63] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm disabled:opacity-70 flex items-center justify-center mt-4"
                 >
-                  {isSubmitting ? "Processing..." : "Create Scholar Account"}
+                  {isSubmitting ? "Processing..." : "Create User"}
                 </button>
               </form>
             </div>

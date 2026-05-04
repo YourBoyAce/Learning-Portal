@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -23,7 +23,7 @@ type AuthContext =
   | {
       token: string;
       userId: string;
-      supabaseAdmin: SupabaseClient;
+      supabaseAdmin: SupabaseClient<any, "public", any>;
     };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
@@ -126,12 +126,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: insertError } = await authContext.supabaseAdmin
-    .from("maincourses")
-    .insert({
-      title,
-      description,
-    });
+  const { data: newCourse, error: insertError } =
+    await authContext.supabaseAdmin
+      .from("maincourses")
+      .insert({
+        title,
+        description,
+      })
+      .select("id")
+      .single();
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
