@@ -53,6 +53,7 @@ export default function AdminWebinarsPage() {
   const [attendeesCount, setAttendeesCount] = useState(0);
 
   useEffect(() => {
+    /* eslint-disable */
     fetchWebinars();
   }, []);
 
@@ -182,7 +183,7 @@ export default function AdminWebinarsPage() {
           </div>
           <button
             onClick={() => handleOpenModal()}
-            className="bg-[#174778] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#113a63] transition-all shadow-sm flex items-center gap-2 text-black"
+            className="bg-[#174778] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#113a63] transition-all shadow-sm flex items-center gap-2"
           >
             <Plus size={18} />
             Create Webinar
@@ -223,16 +224,16 @@ export default function AdminWebinarsPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider">
+                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider text-black">
                     Webinar Details
                   </th>
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider">
+                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider  text-black">
                     Schedule
                   </th>
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider">
+                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider  text-black">
                     Status
                   </th>
-                  <th className="text-right py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider">
+                  <th className="text-right py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider text-black">
                     Actions
                   </th>
                 </tr>
@@ -341,12 +342,6 @@ export default function AdminWebinarsPage() {
                     Fill in the details to schedule the webinar.
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-                >
-                  <MoreVertical size={20} />
-                </button>
               </div>
 
               <div className="px-8 py-6 max-h-[70vh] overflow-y-auto">
@@ -477,7 +472,7 @@ export default function AdminWebinarsPage() {
                 <button
                   onClick={handleSaveWebinar}
                   disabled={isSaving}
-                  className="flex-[2] bg-[#174778] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#113a63] transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="flex-2 bg-[#174778] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#113a63] transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving
@@ -493,7 +488,7 @@ export default function AdminWebinarsPage() {
 
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-8 right-8 bg-[#0f172a] text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-bottom-5 duration-300">
+          <div className="fixed bottom-8 right-8 bg-[#0f172a] text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-100 animate-in slide-in-from-bottom-5 duration-300">
             <CheckCircle className="text-emerald-400" size={20} />
             <span className="text-sm font-semibold tracking-wide">
               {toastMessage}

@@ -10,9 +10,7 @@ import {
 } from "@/app/actions/admin-courses";
 import {
   BookOpen,
-  Users,
   CheckCircle,
-  DollarSign,
   Plus,
   Search,
   Pencil,
