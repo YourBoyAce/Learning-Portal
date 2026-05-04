@@ -28,9 +28,6 @@ export default function UploadPage() {
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
-
-  const [selectedCurriculum, setSelectedCurriculum] =
-    useState(preselectedCourseId);
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -38,7 +35,6 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isModulesLoading, setIsModulesLoading] = useState(false);
-  const [isCoursesLoading, setIsCoursesLoading] = useState(true);
   const [showAllCourses, setShowAllCourses] = useState(false);
 
   const [error, setError] = useState("");

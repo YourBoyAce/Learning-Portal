@@ -276,12 +276,12 @@ export default function MyLearningDashboard() {
           )
         `,
         )
-        .eq("user_id", user.id);
+        .eq("user_id", session.user.id);
 
       const { data: progressData } = await supabase
         .from("user_video_progress")
         .select("course_id, completed")
-        .eq("user_id", user.id);
+        .eq("user_id", session.user.id);
 
       if (enrollmentsData && enrollmentsData.length > 0) {
         const validEnrollments = enrollmentsData.filter(
