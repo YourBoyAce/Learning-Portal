@@ -35,6 +35,7 @@ interface CurriculumCourse {
   progress: number;
   thumbnail_url?: string;
   duration?: string;
+  modules?: any[]; // Array of modules
 }
 
 interface Webinar {
@@ -168,7 +169,7 @@ export default function MyLearningDashboard() {
           if (enrollmentRows.length > 0) {
             setCurriculum(
               enrollmentRows.map((item, index) => ({
-                id: `${String(item.batchId)}-${String(item.courseId ?? index + 1)}`,
+                id: item.courseId || `fallback-${index}`,
                 title: item.courseTitle,
                 description:
                   item.courseDescription ||
@@ -265,7 +266,7 @@ export default function MyLearningDashboard() {
         pendingModules: pendingMods,
       }));
 
-      // 6. Fetch Enrolled Courses & Calculate Progress
+      // 6. Fetch Enrolled Courses, Modules & Calculate Progress
       const { data: enrollmentsData } = await supabase
         .from("course_enrollments")
         .select(
@@ -275,7 +276,8 @@ export default function MyLearningDashboard() {
             id,
             title,
             description,
-            category
+            category,
+            coursemodules (*)
           )
         `,
         )
@@ -283,7 +285,7 @@ export default function MyLearningDashboard() {
 
       const { data: progressData } = await supabase
         .from("user_video_progress")
-        .select("course_id, completed")
+        .select("course_id, video_id, completed")
         .eq("user_id", session.user.id);
 
       if (enrollmentsData && enrollmentsData.length > 0) {
@@ -292,15 +294,21 @@ export default function MyLearningDashboard() {
         );
         const mappedCurriculum = validEnrollments.map((e: any) => {
           const course = e.maincourses;
-          const courseVideos =
+          const modules = (course.coursemodules || []).sort((a: any, b: any) => 
+            (a.order_index ?? a.id) - (b.order_index ?? b.id)
+          );
+          
+          const courseProgress =
             progressData?.filter((p: any) => p.course_id === course.id) || [];
-          const totalVideos = courseVideos.length;
-          const completedVideos = courseVideos.filter(
-            (p: any) => p.completed,
+          
+          const totalModules = modules.length;
+          const completedModules = modules.filter((m: any) => 
+            courseProgress.some((p: any) => String(p.video_id) === String(m.id) && p.completed)
           ).length;
+
           const progress =
-            totalVideos > 0
-              ? Math.round((completedVideos / totalVideos) * 100)
+            totalModules > 0
+              ? Math.round((completedModules / totalModules) * 100)
               : 0;
 
           return {
@@ -312,12 +320,13 @@ export default function MyLearningDashboard() {
               ? course.category.toUpperCase()
               : "GENERAL",
             progress: progress,
+            modules: modules, // Add modules to state
             duration:
               progress === 0
                 ? "Ready to begin"
                 : progress === 100
                   ? "Completed"
-                  : "In Progress",
+                  : `${completedModules}/${totalModules} Modules`,
           };
         });
         setCurriculum(mappedCurriculum);
@@ -598,7 +607,7 @@ export default function MyLearningDashboard() {
                     {/* CTA */}
                     <Button
                       onClick={() =>
-                        router.push(`/course/${item.courseId}`)
+                        router.push(`/courses/${item.courseId}`)
                       }
                       className="w-full bg-[#174778] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90"
                     >
@@ -675,6 +684,27 @@ export default function MyLearningDashboard() {
                         {course.progress}%
                       </span>
                     </div>
+
+                    {/* Modules List Preview */}
+                    {course.modules && course.modules.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {course.modules.slice(0, 4).map((m: any) => (
+                          <Link key={m.id} href={`/courses/${course.id}?module=${m.id}`}>
+                            <span className="text-[10px] font-bold bg-gray-50 hover:bg-blue-50 hover:text-[#174778] px-2.5 py-1 rounded-lg text-gray-500 border border-gray-100 transition-colors flex items-center gap-1.5 group/mod">
+                              <PlayCircle size={12} className="text-gray-300 group-hover/mod:text-[#174778]" />
+                              {m.title}
+                            </span>
+                          </Link>
+                        ))}
+                        {course.modules.length > 4 && (
+                          <Link href={`/courses/${course.id}`}>
+                            <span className="text-[10px] font-bold text-gray-400 hover:text-[#174778] px-2 py-1">
+                              +{course.modules.length - 4} more
+                            </span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Resume Button */}

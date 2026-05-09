@@ -164,10 +164,13 @@ export default function UploadPage() {
     if (file) setSelectedFile(file);
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const handleUploadVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setUploadProgress(0);
 
     if (
       !selectedCurriculum ||
@@ -196,11 +199,60 @@ export default function UploadPage() {
         throw new Error("Please log in again to continue.");
       }
 
+      // 1. Get Direct Upload URL from Cloudflare
+      const directUploadResponse = await fetch("/api/cloudflare/stream/direct-upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({
+          title: videoTitle.trim(),
+          courseId: selectedCurriculum,
+          moduleId: selectedModuleId,
+        }),
+      });
+
+      const directUploadResult = await directUploadResponse.json();
+      if (!directUploadResponse.ok) {
+        throw new Error(directUploadResult.error || "Failed to initialize Cloudflare upload.");
+      }
+
+      const { uploadURL, uid } = directUploadResult;
+
+      // 2. Upload file directly to Cloudflare using XHR for progress tracking
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", uploadURL);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(percent);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.response);
+          } else {
+            reject(new Error("Failed to upload file to Cloudflare."));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during upload."));
+        
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        xhr.send(formData);
+      });
+
+      // 3. Update database with the Cloudflare UID
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
       payload.append("moduleId", selectedModuleId);
       payload.append("title", videoTitle.trim());
-      payload.append("file", selectedFile);
+      payload.append("cloudflareUid", uid);
 
       const response = await fetch("/api/admin/coursemodules", {
         method: "POST",
@@ -220,7 +272,8 @@ export default function UploadPage() {
 
       setVideoTitle("");
       setSelectedFile(null);
-      setSuccess("Video uploaded successfully to the selected module.");
+      setUploadProgress(100);
+      setSuccess("Video uploaded successfully to Cloudflare and linked to the module.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to upload video.");
     } finally {
@@ -400,13 +453,13 @@ export default function UploadPage() {
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isUploading}
-                  className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? "Uploading..." : "Upload Video Asset"}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={isUploading}
+                    className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isUploading ? `Uploading... ${uploadProgress}%` : "Upload Video Asset"}
+                  </button>
               </form>
             </div>
           </div>

@@ -93,47 +93,56 @@ export async function POST(request: Request) {
     typeof formData.get("title") === "string"
       ? String(formData.get("title")).trim()
       : "";
-  const file = formData.get("file");
+  const cloudflareUid =
+    typeof formData.get("cloudflareUid") === "string"
+      ? String(formData.get("cloudflareUid")).trim()
+      : "";
 
-  if (!maincourseId || !title || !(file instanceof File)) {
-    return NextResponse.json(
-      { error: "Course, video title, and file are required." },
-      { status: 400 },
-    );
-  }
+  let uid = cloudflareUid;
+  let videoUrl = uid ? `https://watch.cloudflarestream.com/${uid}` : "";
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  const uploadUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/stream`;
-  const cloudflareResponse = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${cloudflareApiToken}`,
-      "Content-Type": file.type || "application/octet-stream",
-    },
-    body: fileBuffer,
-  });
+  // If no cloudflareUid is provided, try to upload the file directly
+  if (!uid) {
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: "Video file or cloudflareUid is required." },
+        { status: 400 },
+      );
+    }
 
-  const cloudflareResult = await cloudflareResponse.json().catch(() => null);
-
-  if (!cloudflareResponse.ok || !cloudflareResult?.success) {
-    return NextResponse.json(
-      {
-        error: "Failed to upload video to Cloudflare.",
-        details: cloudflareResult?.errors ?? cloudflareResult,
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const uploadUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/stream`;
+    const cloudflareResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cloudflareApiToken}`,
+        "Content-Type": file.type || "application/octet-stream",
       },
-      { status: 502 },
-    );
-  }
+      body: fileBuffer,
+    });
 
-  const uid = cloudflareResult?.result?.uid;
-  if (!uid || typeof uid !== "string") {
-    return NextResponse.json(
-      { error: "Cloudflare upload succeeded but no video UID was returned." },
-      { status: 502 },
-    );
-  }
+    const cloudflareResult = await cloudflareResponse.json().catch(() => null);
 
-  const videoUrl = `https://watch.cloudflarestream.com/${uid}`;
+    if (!cloudflareResponse.ok || !cloudflareResult?.success) {
+      return NextResponse.json(
+        {
+          error: "Failed to upload video to Cloudflare.",
+          details: cloudflareResult?.errors ?? cloudflareResult,
+        },
+        { status: 502 },
+      );
+    }
+
+    uid = cloudflareResult?.result?.uid;
+    if (!uid || typeof uid !== "string") {
+      return NextResponse.json(
+        { error: "Cloudflare upload succeeded but no video UID was returned." },
+        { status: 502 },
+      );
+    }
+    videoUrl = `https://watch.cloudflarestream.com/${uid}`;
+  }
 
   const moduleId =
     typeof formData.get("moduleId") === "string"
@@ -143,7 +152,7 @@ export async function POST(request: Request) {
   const { data: moduleResult, error: dbError } = moduleId
     ? await authContext.supabaseAdmin
         .from("coursemodules")
-        .update({ video_cf_id: videoUrl })
+        .update({ video_cf_id: uid }) // Store UID directly for better integration
         .eq("id", moduleId)
         .select("*")
         .single()
@@ -152,7 +161,7 @@ export async function POST(request: Request) {
         .insert({
           maincourse_id: maincourseId,
           title,
-          video_cf_id: videoUrl,
+          video_cf_id: uid,
         })
         .select("*")
         .single();

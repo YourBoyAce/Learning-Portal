@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { 
   PlayCircle, 
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Stream } from "@cloudflare/stream-react";
 
 interface Course {
   id: number;
@@ -41,6 +42,9 @@ interface Progress {
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialModuleId = searchParams.get("module");
+
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
@@ -85,7 +89,13 @@ export default function CoursePlayerPage() {
       setModules(modulesData || []);
 
       if (modulesData && modulesData.length > 0) {
-        setActiveModuleId(modulesData[0].id);
+        // Set initial module from query param or first module
+        if (initialModuleId) {
+          const mod = modulesData.find(m => m.id === parseInt(initialModuleId));
+          setActiveModuleId(mod ? mod.id : modulesData[0].id);
+        } else {
+          setActiveModuleId(modulesData[0].id);
+        }
       }
 
       // 3. Fetch User Progress
@@ -124,7 +134,7 @@ export default function CoursePlayerPage() {
         .from("user_video_progress")
         .upsert({
           user_id: user.id,
-          course_id: parseInt(id as string),
+          course_id: id as string,
           video_id: moduleId.toString(),
           completed: true,
           completed_at: new Date().toISOString(),
@@ -220,13 +230,15 @@ export default function CoursePlayerPage() {
             {/* Video Player */}
             <div className="relative aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl group border-[8px] border-white ring-1 ring-gray-100">
               {activeModule?.video_cf_id ? (
-                <iframe
+                <Stream
+                  key={activeModuleId}
                   src={activeModule.video_cf_id.includes('watch.cloudflarestream.com') 
-                    ? `https://iframe.videodelivery.net/${activeModule.video_cf_id.split('/').pop()}`
+                    ? activeModule.video_cf_id.split('/').pop() || "" 
                     : activeModule.video_cf_id
                   }
                   className="w-full h-full"
-                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  controls
+                  preload="auto"
                 />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-gradient-to-br from-gray-900 to-[#0f172a]">
