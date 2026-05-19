@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
-import { Users, BookOpen, Search, Loader2 } from "lucide-react";
+import { Users, BookOpen, Search, Loader2, Clock, LogIn, Timer } from "lucide-react";
+
+interface LoginLog {
+  userId: string;
+  userName: string;
+  email: string;
+  loginTimes: string[];
+  loginCount: number;
+  totalSeconds: number;
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -13,6 +22,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,6 +60,46 @@ export default function AdminDashboard() {
           setTotalStudents(students.length);
           setUsers(students.slice(0, 5));
         }
+
+        // Fetch today's login logs
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const { data: logs } = await supabase
+          .from("user_login_logs")
+          .select("user_id, logged_in_at, session_duration_seconds")
+          .gte("logged_in_at", todayStart.toISOString())
+          .order("logged_in_at", { ascending: false });
+
+        if (logs && logs.length > 0 && profiles) {
+          const profileMap = new Map<string, any>();
+          (profiles as any[]).forEach((p) => profileMap.set(p.id, p));
+
+          const grouped = new Map<string, { times: string[]; totalSec: number }>();
+          for (const log of logs) {
+            const uid = log.user_id;
+            if (!grouped.has(uid)) {
+              grouped.set(uid, { times: [], totalSec: 0 });
+            }
+            const g = grouped.get(uid)!;
+            g.times.push(log.logged_in_at);
+            g.totalSec += log.session_duration_seconds || 0;
+          }
+
+          const mapped: LoginLog[] = [];
+          grouped.forEach((val, uid) => {
+            const p = profileMap.get(uid);
+            mapped.push({
+              userId: uid,
+              userName: p?.full_name || p?.email?.split("@")[0] || "Unknown",
+              email: p?.email || "—",
+              loginTimes: val.times,
+              loginCount: val.times.length,
+              totalSeconds: val.totalSec,
+            });
+          });
+          setLoginLogs(mapped);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -59,6 +109,14 @@ export default function AdminDashboard() {
 
     fetchData();
   }, []);
+
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(mins / 60);
+    if (hrs > 0) return `${hrs}h ${mins % 60}m`;
+    return `${mins}m`;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans">
@@ -81,7 +139,7 @@ export default function AdminDashboard() {
           {/* Total Students */}
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
             <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-              <Users className="w-7 h-7 text-[#174778]" />
+              <Users className="w-7 h-7 text-[#2283FF]" />
             </div>
             <div>
               <div className="text-3xl font-bold text-gray-900">
@@ -158,7 +216,7 @@ export default function AdminDashboard() {
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-[#174778] rounded-full flex items-center justify-center text-white text-sm font-semibold uppercase">
+                            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center text-white text-sm font-semibold uppercase">
                               {(user.full_name || user.email || "U")
                                 .charAt(0)}
                             </div>
@@ -195,7 +253,7 @@ export default function AdminDashboard() {
             {totalStudents > 5 && (
               <button
                 onClick={() => router.push("/admin/users")}
-                className="mt-6 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-100 hover:text-[#174778] transition-colors"
+                className="mt-6 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-100 hover:text-[#2283FF] transition-colors"
               >
                 View all {totalStudents} scholars
               </button>
@@ -210,7 +268,7 @@ export default function AdminDashboard() {
               </h2>
               <button
                 onClick={() => router.push("/admin/courses")}
-                className="text-sm text-[#174778] font-medium hover:underline"
+                className="text-sm text-[#2283FF] font-medium hover:underline"
               >
                 View Catalog
               </button>
@@ -232,16 +290,16 @@ export default function AdminDashboard() {
                   <div
                     key={course.id}
                     onClick={() => router.push("/admin/courses")}
-                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-[#174778] hover:shadow-md transition-all cursor-pointer group"
+                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-[#2283FF] hover:shadow-md transition-all cursor-pointer group"
                   >
-                    <div className="h-20 bg-gradient-to-br from-[#174778] to-[#2563eb] relative overflow-hidden">
+                    <div className="h-20 bg-gradient-to-br from-[#2283FF] to-[#2563eb] relative overflow-hidden">
                       <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:12px_12px]"></div>
                       <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <BookOpen className="w-8 h-8 text-white" />
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-[#174778] transition-colors">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-[#2283FF] transition-colors">
                         {course.title}
                       </h3>
                       <div className="flex items-center justify-between mt-2">
@@ -253,6 +311,92 @@ export default function AdminDashboard() {
                   </div>
                 ))}
             </div>
+          </div>
+        </div>
+
+        {/* Today's Login Analytics */}
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#2283FF]/10 rounded-lg flex items-center justify-center">
+                <LogIn className="w-5 h-5 text-[#2283FF]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Today&apos;s Login Analytics</h2>
+                <p className="text-xs text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-[#2283FF]">{loginLogs.length}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Users Today</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-600">{loginLogs.reduce((a, l) => a + l.loginCount, 0)}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Logins</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Scholar</th>
+                  <th className="text-left py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Login Times</th>
+                  <th className="text-center py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Times Logged In</th>
+                  <th className="text-center py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Time Spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr><td colSpan={4} className="py-8 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                )}
+                {!loading && loginLogs.length === 0 && (
+                  <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm">No login activity recorded today.</td></tr>
+                )}
+                {!loading && loginLogs.map((log) => (
+                  <tr key={log.userId} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#2283FF]/10 text-[#2283FF] flex items-center justify-center font-bold text-sm">
+                          {log.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{log.userName}</p>
+                          <p className="text-xs text-gray-500">{log.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {log.loginTimes.slice(0, 5).map((t, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-[#2283FF] text-[10px] font-bold rounded-md border border-blue-100">
+                            <Clock className="w-3 h-3" />
+                            {new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        ))}
+                        {log.loginTimes.length > 5 && (
+                          <span className="text-[10px] text-gray-400 font-semibold">+{log.loginTimes.length - 5} more</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-md border border-emerald-100">
+                        <LogIn className="w-3 h-3" />
+                        {log.loginCount}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-md border border-amber-100">
+                        <Timer className="w-3 h-3" />
+                        {formatDuration(log.totalSeconds)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

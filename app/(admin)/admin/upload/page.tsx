@@ -351,7 +351,7 @@ export default function UploadPage() {
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] cursor-pointer"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] cursor-pointer"
                   >
                     <option value="">Select curriculum...</option>
                     {courses.map((course) => (
@@ -370,7 +370,7 @@ export default function UploadPage() {
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
                     disabled={!selectedCurriculum || isModulesLoading}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {isModulesLoading
@@ -394,7 +394,7 @@ export default function UploadPage() {
                     placeholder="e.g. Intro to Variables"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778]"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF]"
                   />
                 </div>
 
@@ -405,7 +405,7 @@ export default function UploadPage() {
                   onDrop={handleDrop}
                   className={`border-2 rounded-xl p-8 text-center cursor-pointer transition-all ${
                     isDragging
-                      ? "border-[#174778] bg-blue-50"
+                      ? "border-[#2283FF] bg-blue-50"
                       : "border-dashed border-gray-300 hover:border-gray-400"
                   }`}
                   onClick={() => document.getElementById("file-input")?.click()}
@@ -456,7 +456,7 @@ export default function UploadPage() {
                   <button
                     type="submit"
                     disabled={isUploading}
-                    className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isUploading ? `Uploading... ${uploadProgress}%` : "Upload Video Asset"}
                   </button>
@@ -488,9 +488,9 @@ export default function UploadPage() {
                 {displayedCourses.map((course) => (
                   <div
                     key={course.id}
-                    className="border border-gray-200 rounded-xl overflow-hidden hover:border-[#174778] transition-colors"
+                    className="border border-gray-200 rounded-xl overflow-hidden hover:border-[#2283FF] transition-colors"
                   >
-                    <div className="h-32 bg-gradient-to-r from-[#174778] to-blue-800"></div>
+                    <div className="h-32 bg-gradient-to-r from-[#2283FF] to-blue-800"></div>
                     <div className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -514,9 +514,9 @@ export default function UploadPage() {
                 {!showAllCourses && courses.length > 4 && (
                   <div
                     onClick={() => setShowAllCourses(true)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#174778] hover:bg-gray-50 transition-all cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#2283FF] hover:bg-gray-50 transition-all cursor-pointer"
                   >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#174778]">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#2283FF]">
                       <svg
                         className="w-6 h-6"
                         fill="none"
@@ -542,9 +542,9 @@ export default function UploadPage() {
                 {showAllCourses && courses.length > 4 && (
                   <div
                     onClick={() => setShowAllCourses(false)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#174778] hover:bg-gray-50 transition-all cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#2283FF] hover:bg-gray-50 transition-all cursor-pointer"
                   >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#174778]">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#2283FF]">
                       <svg
                         className="w-6 h-6"
                         fill="none"

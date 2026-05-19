@@ -94,7 +94,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#F5F7FA] p-8 font-sans">
       <div className="max-w-[900px] mx-auto">
-        <h1 className="text-4xl font-extrabold text-[#174778] tracking-tight mb-2">
+        <h1 className="text-4xl font-extrabold text-[#2283FF] tracking-tight mb-2">
           My Profile
         </h1>
         <p className="text-[13px] text-gray-500 mb-8 max-w-xl leading-relaxed">
@@ -107,7 +107,7 @@ export default function ProfilePage() {
 
             {/* Profile Portrait */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 flex flex-col items-center">
-              <h3 className="w-full text-left font-bold text-[#174778] text-[16px] mb-6">Profile Portrait</h3>
+              <h3 className="w-full text-left font-bold text-[#2283FF] text-[16px] mb-6">Profile Portrait</h3>
               <div className="relative w-[140px] h-[140px] bg-[#F1F5F9] rounded-full flex items-center justify-center border-[5px] border-white shadow-[0_2px_10px_rgba(0,0,0,0.05)] mb-4">
                 <Image src={avatarUrl} alt="Avatar" fill className="rounded-full object-cover" />
                 <button
@@ -121,7 +121,7 @@ export default function ProfilePage() {
                 Recommended: High-resolution square image (JPEG/PNG). Max 5MB.
               </p>
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-              <button onClick={() => fileInputRef.current?.click()} className="w-full py-2 border border-gray-200 text-[#174778] text-[13px] font-semibold rounded-md hover:bg-gray-50 transition flex items-center justify-center gap-2">
+              <button onClick={() => fileInputRef.current?.click()} className="w-full py-2 border border-gray-200 text-[#2283FF] text-[13px] font-semibold rounded-md hover:bg-gray-50 transition flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                 Update Photo
               </button>
@@ -133,11 +133,11 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-gray-400 font-medium">Role</span>
-                  <span className="text-[13px] font-bold text-[#174778] capitalize">{role}</span>
+                  <span className="text-[13px] font-bold text-[#2283FF] capitalize">{role}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-gray-400 font-medium">Member since</span>
-                  <span className="text-[13px] font-bold text-[#174778]">{memberSince}</span>
+                  <span className="text-[13px] font-bold text-[#2283FF]">{memberSince}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-gray-400 font-medium">Verification</span>
@@ -158,11 +158,11 @@ export default function ProfilePage() {
 
             {/* Personal Identity */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
-              <h3 className="font-bold text-[#174778] text-[18px] mb-6">Personal Identity</h3>
+              <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">Personal Identity</h3>
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">FULL NAME</label>
-                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-[#174778]/30 focus:bg-white focus:outline-none transition-colors" placeholder="Alexander Hamilton" />
+                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-[#2283FF]/30 focus:bg-white focus:outline-none transition-colors" placeholder="Alexander Hamilton" />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">EMAIL ADDRESS</label>
@@ -173,14 +173,14 @@ export default function ProfilePage() {
 
             {/* Scholarly Bio */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
-              <h3 className="font-bold text-[#174778] text-[18px] mb-6">Scholarly Bio</h3>
+              <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">Scholarly Bio</h3>
               <div>
                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">INTELLECTUAL INTERESTS & GOALS</label>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   rows={4}
-                  className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-[#174778]/30 focus:bg-white focus:outline-none transition-colors resize-none"
+                  className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-[#2283FF]/30 focus:bg-white focus:outline-none transition-colors resize-none"
                   placeholder="Dedicated polymath currently exploring..."
                 />
                 <div className="text-right mt-2">
@@ -191,9 +191,9 @@ export default function ProfilePage() {
 
             {/* Digital Footprint */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
-              <h3 className="font-bold text-[#174778] text-[18px] mb-6">Digital Footprint</h3>
+              <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">Digital Footprint</h3>
 
-              <div className="flex items-center bg-[#F8FAFC] rounded-md px-4 py-3.5 border border-transparent focus-within:border-[#174778]/30 focus-within:bg-white transition-colors mb-12">
+              <div className="flex items-center bg-[#F8FAFC] rounded-md px-4 py-3.5 border border-transparent focus-within:border-[#2283FF]/30 focus-within:bg-white transition-colors mb-12">
                 <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                 <input type="text" value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} className="w-full bg-transparent border-none text-[13px] text-gray-800 font-medium outline-none" placeholder="https://portfolio.atelier.edu/a-hamilton" />
               </div>

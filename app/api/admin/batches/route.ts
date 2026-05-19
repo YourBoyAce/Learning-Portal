@@ -91,7 +91,7 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role !== "admin") {
+  if (profileError || profile?.role?.toLowerCase() !== "admin") {
     return {
       error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     };

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import { Logo } from "@/app/components/Logo";
 
 export default function MainLayout({
   children,
@@ -51,6 +52,44 @@ export default function MainLayout({
     };
   }, [router]);
 
+  // Session heartbeat: update login log every 60s to track time spent
+  useEffect(() => {
+    if (loading || !userEmail) return;
+
+    const sessionStart = Date.now();
+
+    const heartbeat = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const elapsedSeconds = Math.floor((Date.now() - sessionStart) / 1000);
+
+      // Get the most recent login log for this user today
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data: recentLog } = await supabase
+        .from("user_login_logs")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .gte("logged_in_at", todayStart.toISOString())
+        .order("logged_in_at", { ascending: false })
+        .limit(1);
+
+      if (recentLog && recentLog.length > 0) {
+        await supabase
+          .from("user_login_logs")
+          .update({
+            last_heartbeat_at: new Date().toISOString(),
+            session_duration_seconds: elapsedSeconds,
+          })
+          .eq("id", recentLog[0].id);
+      }
+    }, 60000); // every 60 seconds
+
+    return () => clearInterval(heartbeat);
+  }, [loading, userEmail]);
+
   if (loading) return null;
 
   const handleSignOut = async () => {
@@ -65,8 +104,7 @@ export default function MainLayout({
   const navItems = [
     { label: "Dashboard", href: "/dashboard", active: pathname === "/dashboard", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
     { label: "My Learning", href: "/courses", active: pathname === "/courses", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> },
-    { label: "Completed Courses", href: "/completed", active: pathname === "/completed", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
-    { label: "Calendar", href: "/calendar", active: pathname === "/calendar", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+    { label: "Quizzes & Artifacts", href: "/practice", active: pathname === "/practice", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg> },
     { label: "Profile", href: "/profile", active: pathname === "/profile", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
   ];
 
@@ -77,15 +115,7 @@ export default function MainLayout({
         <aside className="w-[260px] bg-[#F8FAFC] border-r border-gray-200 flex flex-col shrink-0">
           <div className="p-6">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-[#174778] rounded-[4px] flex items-center justify-center text-white shrink-0">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.09l-5.5-3.03L12 10l5.5 3.06L12 16.09zM5 13.62v3.07l7 3.89 7-3.89v-3.07l-7 3.89-7-3.89z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="font-bold text-[#174778] text-[15px] leading-tight">Automate Academy</h1>
-                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">INTELLECTUAL SANCTUARY</p>
-              </div>
+              <Logo width={180} height={60} />
             </div>
           </div>
 
@@ -95,11 +125,11 @@ export default function MainLayout({
                 key={item.label}
                 href={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${item.active
-                    ? "bg-[#F1F5F9] text-[#174778]"
-                    : "text-gray-500 hover:bg-[#F1F5F9] hover:text-[#174778]"
+                    ? "bg-[#F1F5F9] text-[#2283FF]"
+                    : "text-gray-500 hover:bg-[#F1F5F9] hover:text-[#2283FF]"
                   }`}
               >
-                <div className={`${item.active ? "text-[#174778]" : "text-gray-400"}`}>
+                <div className={`${item.active ? "text-[#2283FF]" : "text-gray-400"}`}>
                   {item.icon}
                 </div>
                 {item.label}
@@ -108,7 +138,7 @@ export default function MainLayout({
           </nav>
 
           <div className="p-6 space-y-4">
-            <button onClick={handleSignOut} className="w-full bg-[#174778] hover:bg-[#0f3a63] text-white py-2.5 rounded-md text-sm font-semibold transition-all duration-200 shadow-sm flex items-center justify-center gap-2 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]">
+            <button onClick={handleSignOut} className="w-full bg-[#2283FF] hover:bg-[#2283FF] text-white py-2.5 rounded-md text-sm font-semibold transition-all duration-200 shadow-sm flex items-center justify-center gap-2 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               Sign Out
             </button>
@@ -130,7 +160,7 @@ export default function MainLayout({
                 <p className="text-xs text-gray-400">{userEmail}</p>
               </div>
               <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                <span className="text-lg">👤</span>
+                <span className="text-lg">ðŸ‘¤</span>
               </div>
             </div>
           </header>
@@ -157,7 +187,7 @@ export default function MainLayout({
               </button>
               <button
                 onClick={confirmSignOut}
-                className="flex-1 px-4 py-2 bg-[#174778] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+                className="flex-1 px-4 py-2 bg-[#2283FF] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
               >
                 Sign Out
               </button>

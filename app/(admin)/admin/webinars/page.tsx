@@ -47,7 +47,7 @@ export default function AdminWebinarsPage() {
   const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
-  const [icon, setIcon] = useState("📋");
+  const [icon, setIcon] = useState("ðŸ“‹");
   const [status, setStatus] = useState("streaming");
   const [linkText, setLinkText] = useState("");
   const [attendeesCount, setAttendeesCount] = useState(0);
@@ -82,7 +82,7 @@ export default function AdminWebinarsPage() {
       setSubtitle(webinar.subtitle || "");
       setDescription(webinar.description || "");
       setEventDate(webinar.event_date || "");
-      setIcon(webinar.icon || "📋");
+      setIcon(webinar.icon || "ðŸ“‹");
       setStatus(webinar.status || "streaming");
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
@@ -93,7 +93,7 @@ export default function AdminWebinarsPage() {
       setSubtitle("");
       setDescription("");
       setEventDate("");
-      setIcon("📋");
+      setIcon("ðŸ“‹");
       setStatus("streaming");
       setLinkText("");
       setAttendeesCount(0);
@@ -183,7 +183,7 @@ export default function AdminWebinarsPage() {
           </div>
           <button
             onClick={() => handleOpenModal()}
-            className="bg-[#174778] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#113a63] transition-all shadow-sm flex items-center gap-2"
+            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2283FF] transition-all shadow-sm flex items-center gap-2"
           >
             <Plus size={18} />
             Create Webinar
@@ -202,11 +202,11 @@ export default function AdminWebinarsPage() {
               placeholder="Search webinars by title or instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all shadow-sm text-black"
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all shadow-sm text-black"
             />
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-sm">
-            <Video className="text-[#174778]" size={20} />
+            <Video className="text-[#2283FF]" size={20} />
             <div className="text-center">
               <span className="block text-lg font-bold text-gray-900 leading-none">
                 {webinars.length}
@@ -242,7 +242,7 @@ export default function AdminWebinarsPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={4} className="py-20 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#174778] mx-auto mb-2" />
+                      <Loader2 className="w-8 h-8 animate-spin text-[#2283FF] mx-auto mb-2" />
                       <p className="text-sm text-black-400 font-medium">
                         Loading webinars...
                       </p>
@@ -265,7 +265,7 @@ export default function AdminWebinarsPage() {
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-100">
-                            {webinar.icon || "📋"}
+                            {webinar.icon || "ðŸ“‹"}
                           </div>
                           <div>
                             <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1">
@@ -280,7 +280,7 @@ export default function AdminWebinarsPage() {
                       <td className="py-5 px-6">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                            <Calendar size={14} className="text-[#174778]" />
+                            <Calendar size={14} className="text-[#2283FF]" />
                             {webinar.event_date}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-gray-400">
@@ -307,7 +307,7 @@ export default function AdminWebinarsPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenModal(webinar)}
-                            className="p-2 text-gray-400 hover:text-[#174778] hover:bg-white rounded-lg transition-all"
+                            className="p-2 text-gray-400 hover:text-[#2283FF] hover:bg-white rounded-lg transition-all"
                             title="Edit"
                           >
                             <Edit size={18} />
@@ -356,7 +356,7 @@ export default function AdminWebinarsPage() {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Masterclass on Neural Networks"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -369,8 +369,8 @@ export default function AdminWebinarsPage() {
                       type="text"
                       value={subtitle}
                       onChange={(e) => setSubtitle(e.target.value)}
-                      placeholder="e.g. Prof. Ariadne · Seminar Room R12"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      placeholder="e.g. Prof. Ariadne Â· Seminar Room R12"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -383,8 +383,8 @@ export default function AdminWebinarsPage() {
                       type="text"
                       value={icon}
                       onChange={(e) => setIcon(e.target.value)}
-                      placeholder="📋, 🖥️, ▶, etc."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      placeholder="ðŸ“‹, ðŸ–¥ï¸, â–¶, etc."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -398,7 +398,7 @@ export default function AdminWebinarsPage() {
                       value={eventDate}
                       onChange={(e) => setEventDate(e.target.value)}
                       placeholder="e.g. TOMORROW, 10:00 AM"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -410,7 +410,7 @@ export default function AdminWebinarsPage() {
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all appearance-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all appearance-none text-black"
                     >
                       <option value="streaming">Streaming</option>
                       <option value="link">Link</option>
@@ -427,7 +427,7 @@ export default function AdminWebinarsPage() {
                       value={linkText}
                       onChange={(e) => setLinkText(e.target.value)}
                       placeholder="e.g. Register Now, Link Active Soon"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -442,7 +442,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) =>
                         setAttendeesCount(parseInt(e.target.value) || 0)
                       }
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
                     />
                   </div>
 
@@ -456,7 +456,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                       placeholder="Describe what will be covered in this webinar..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#174778] focus:ring-1 focus:ring-[#174778] outline-none transition-all resize-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all resize-none text-black"
                     />
                   </div>
                 </div>
@@ -472,7 +472,7 @@ export default function AdminWebinarsPage() {
                 <button
                   onClick={handleSaveWebinar}
                   disabled={isSaving}
-                  className="flex-2 bg-[#174778] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#113a63] transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="flex-2 bg-[#2283FF] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#2283FF] transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving

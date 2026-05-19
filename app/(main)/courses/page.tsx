@@ -13,7 +13,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { BookOpen, PlayCircle, CheckCircle2 } from "lucide-react";
+import { BookOpen, PlayCircle, CheckCircle2, Award, ExternalLink, X } from "lucide-react";
 
 // --- Types ---
 interface Insight {
@@ -36,6 +36,7 @@ interface CurriculumCourse {
   thumbnail_url?: string;
   duration?: string;
   modules?: any[]; // Array of modules
+  certificate_url?: string | null;
 }
 
 interface Webinar {
@@ -85,6 +86,11 @@ export default function MyLearningDashboard() {
   const [upcomingWebinars, setUpcomingWebinars] = useState<
     UpcomingWebinarCard[]
   >([]);
+
+  // Tab & Certificate states
+  const [activeTab, setActiveTab] = useState<"in_progress" | "completed">("in_progress");
+  const [selectedCertificateCourse, setSelectedCertificateCourse] = useState<CurriculumCourse | null>(null);
+  const [userProfileName, setUserProfileName] = useState<string>("Learner");
 
   // Data States
   const [stats, setStats] = useState<UserStats>({
@@ -148,7 +154,7 @@ export default function MyLearningDashboard() {
             subtitle:
               event.description?.trim() || "Scheduled from your calendar",
             date: formatWebinarDate(event.event_date, event.event_time),
-            icon: event.event_type === "webinar" ? "📋" : "▶",
+            icon: event.event_type === "webinar" ? "ðŸ“‹" : "â–¶",
             status: event.event_type === "webinar" ? "streaming" : "link",
             linkText:
               event.event_type === "webinar" ? undefined : "Scheduled Session",
@@ -174,7 +180,7 @@ export default function MyLearningDashboard() {
                 description:
                   item.courseDescription ||
                   `You are enrolled in ${item.batchName}.`,
-                module_label: `BATCH · ${item.batchName}`,
+                module_label: `BATCH Â· ${item.batchName}`,
                 progress: 0,
                 duration: item.startDate
                   ? new Date(item.startDate).toLocaleDateString("en-US", {
@@ -194,11 +200,12 @@ export default function MyLearningDashboard() {
       // 1. Fetch User Profile
       const { data: profile } = await supabase
         .from("profiles")
-        .select("current_insight_index")
+        .select("current_insight_index, full_name")
         .eq("id", session.user.id)
         .single();
 
       setCurrentInsightIndex(profile?.current_insight_index || 0);
+      setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
 
       // 2. Fetch Scholarly Insights
       const { data: insightsData } = await supabase
@@ -277,6 +284,7 @@ export default function MyLearningDashboard() {
             title,
             description,
             category,
+            thumbnail_url,
             coursemodules (*)
           )
         `,
@@ -286,6 +294,11 @@ export default function MyLearningDashboard() {
       const { data: progressData } = await supabase
         .from("user_video_progress")
         .select("course_id, video_id, completed")
+        .eq("user_id", session.user.id);
+
+      const { data: certsData } = await supabase
+        .from("certificates")
+        .select("course_id, certificate_url")
         .eq("user_id", session.user.id);
 
       if (enrollmentsData && enrollmentsData.length > 0) {
@@ -299,7 +312,7 @@ export default function MyLearningDashboard() {
           );
           
           const courseProgress =
-            progressData?.filter((p: any) => p.course_id === course.id) || [];
+              progressData?.filter((p: any) => p.course_id === course.id) || [];
           
           const totalModules = modules.length;
           const completedModules = modules.filter((m: any) => 
@@ -311,6 +324,8 @@ export default function MyLearningDashboard() {
               ? Math.round((completedModules / totalModules) * 100)
               : 0;
 
+          const cert = certsData?.find((c: any) => String(c.course_id) === String(course.id)) || null;
+
           return {
             id: course.id,
             title: course.title,
@@ -320,7 +335,9 @@ export default function MyLearningDashboard() {
               ? course.category.toUpperCase()
               : "GENERAL",
             progress: progress,
+            thumbnail_url: course.thumbnail_url,
             modules: modules, // Add modules to state
+            certificate_url: cert?.certificate_url || null,
             duration:
               progress === 0
                 ? "Ready to begin"
@@ -346,6 +363,30 @@ export default function MyLearningDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleGenerateCertificate = async (courseId: string | number) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const mockCertUrl = "CLAIMED";
+      const { error } = await supabase
+        .from("certificates")
+        .insert({
+          user_id: session.user.id,
+          course_id: courseId,
+          certificate_url: mockCertUrl,
+        });
+
+      if (error) {
+        console.error("Error creating certificate:", error);
+      }
+
+      await loadDashboardData();
+    } catch (e) {
+      console.error("Error in handleGenerateCertificate:", e);
+    }
+  };
+
   const handleMarkInsightAsRead = async () => {
     if (!userId || insights.length === 0) return;
     const nextIndex = (currentInsightIndex + 1) % insights.length;
@@ -360,7 +401,7 @@ export default function MyLearningDashboard() {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#174778] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-[#2283FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Loading your journey...</p>
         </div>
       </div>
@@ -377,25 +418,28 @@ export default function MyLearningDashboard() {
   const circleOffset =
     circleCircumference - (circleCircumference * weeklyProgressPct) / 100;
 
+  const activeCourses = curriculum.filter((course) => course.progress < 100);
+  const completedCourses = curriculum.filter((course) => course.progress === 100);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
-        {/* ─── TOP SECTION: Header + Weekly Progress ─── */}
+        {/* â”€â”€â”€ TOP SECTION: Header + Weekly Progress â”€â”€â”€ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Heading & Stats */}
           <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
-            <h1 className="text-4xl md:text-[44px] font-bold text-[#174778] mb-4 tracking-tight leading-tight">
+            <h1 className="text-4xl md:text-[44px] font-bold text-[#2283FF] mb-4 tracking-tight leading-tight">
               Continuing Your Journey
             </h1>
             <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
               Welcome back to{" "}
-              <span className="font-bold text-[#174778]">The Automate</span>.
+              <span className="font-bold text-[#2283FF]">The Automate</span>.
               You have{" "}
-              <span className="font-semibold text-[#174778] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-[#2283FF] underline decoration-dotted underline-offset-4">
                 {stats.liveSessions} upcoming webinars
               </span>{" "}
               and{" "}
-              <span className="font-semibold text-[#174778] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-[#2283FF] underline decoration-dotted underline-offset-4">
                 {stats.pendingModules} pending module
                 {stats.pendingModules !== 1 ? "s" : ""}
               </span>{" "}
@@ -405,13 +449,13 @@ export default function MyLearningDashboard() {
 
           {/* Right: Weekly Progress Widget */}
           <div className="lg:col-span-1">
-            <section className="bg-[#4A2B23] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
+            <section className="bg-[#2283FF] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
               <div className="relative z-10 flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-[#E8DCCA] mb-2">
+                  <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-blue-100 mb-2">
                     Weekly Progress
                   </h3>
-                  <p className="text-[13px] text-[#E8DCCA] leading-relaxed max-w-[140px]">
+                  <p className="text-[13px] text-blue-50 leading-relaxed max-w-[140px]">
                     {weeklyProgressPct >= 100
                       ? "Weekly goal reached!"
                       : "Complete more modules to reach your goal."}
@@ -425,7 +469,7 @@ export default function MyLearningDashboard() {
                       cx="48"
                       cy="48"
                       r={circleRadius}
-                      stroke="rgba(255,255,255,0.1)"
+                      stroke="rgba(255,255,255,0.2)"
                       strokeWidth="6"
                       fill="none"
                     />
@@ -433,7 +477,7 @@ export default function MyLearningDashboard() {
                       cx="48"
                       cy="48"
                       r={circleRadius}
-                      stroke="#E6A15C"
+                      stroke="#ffffff"
                       strokeWidth="6"
                       fill="none"
                       strokeDasharray={circleCircumference}
@@ -451,287 +495,309 @@ export default function MyLearningDashboard() {
               </div>
 
               {/* Decorative background */}
-              <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-[#E6A15C] opacity-5 rounded-full blur-3xl" />
+              <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl" />
             </section>
           </div>
         </div>
 
-        {/* ─── UPCOMING WEBINARS ─── */}
-        <section>
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
-              Upcoming Webinars
-            </h2>
-            <Link
-              href="/calendar"
-              className="text-sm font-semibold text-[#174778] hover:underline"
-            >
-              View Calendar
-            </Link>
-          </div>
-
-          <Carousel className="w-full">
-            <CarouselContent>
-              {upcomingWebinars.length === 0 ? (
-                <CarouselItem className="md:basis-1/2 lg:basis-1/3">
-                  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex items-center justify-center text-center">
-                    <p className="text-sm text-gray-500">
-                      No upcoming events in your calendar yet.
-                    </p>
-                  </div>
-                </CarouselItem>
-              ) : (
-                upcomingWebinars.map((webinar) => (
-                  <CarouselItem
-                    key={webinar.id}
-                    className="md:basis-1/2 lg:basis-1/3"
-                  >
-                    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 h-52 flex flex-col justify-between group hover:shadow-md transition-all">
-                      <div>
-                        {/* Date Badge */}
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider">
-                            {webinar.date}
-                          </span>
-                          <span className="text-gray-400 text-lg">
-                            {webinar.icon}
-                          </span>
-                        </div>
-
-                        {/* Title & Subtitle */}
-                        <h3 className="font-bold text-[#0f172a] text-[17px] leading-snug mb-1">
-                          {webinar.title}
-                        </h3>
-                        <p className="text-xs text-gray-500">
-                          {webinar.subtitle}
-                        </p>
-                      </div>
-
-                      {/* Bottom Row */}
-                      <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-2">
-                        <div className="flex items-center gap-1">
-                          {/* Attendee Avatars */}
-                          {Array.from({
-                            length: Math.min(webinar.attendees, 3),
-                          }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white -ml-1 first:ml-0 flex items-center justify-center"
-                            >
-                              <span className="text-[8px] text-gray-500">
-                                👤
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {webinar.status === "streaming" ? (
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Streaming
-                          </span>
-                        ) : webinar.linkText ? (
-                          <span className="text-[11px] font-semibold text-[#174778] underline cursor-pointer">
-                            {webinar.linkText}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </CarouselItem>
-                ))
-              )}
-            </CarouselContent>
-            <div className="hidden sm:block">
-              <CarouselPrevious className="-left-4 bg-white border-gray-200 shadow-sm" />
-              <CarouselNext className="-right-4 bg-white border-gray-200 shadow-sm" />
+        {/* â”€â”€â”€ MY ACTIVE COURSES â”€â”€â”€ */}
+        <section className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/60 pb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-[#0f172a] tracking-tight">
+                My Active Courses
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">
+                Access your core educational tracks and tracking metrics.
+              </p>
             </div>
-          </Carousel>
-        </section>
 
-        <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
-              Batch Enrollments
-            </h2>
-            <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-              {enrollments.length} Enrollment
-              {enrollments.length === 1 ? "" : "s"}
-            </span>
+            {/* Premium Pill Tabs */}
+            <div className="bg-gray-100/80 backdrop-blur-md p-1 rounded-2xl flex gap-1 self-start sm:self-auto border border-gray-200/40">
+              <button
+                onClick={() => setActiveTab("in_progress")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 ${
+                  activeTab === "in_progress"
+                    ? "bg-[#2283FF] text-white shadow-md shadow-[#2283FF]/15"
+                    : "text-gray-600 hover:text-[#0f172a]"
+                }`}
+              >
+                In Progress
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                    activeTab === "in_progress"
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {activeCourses.length}
+                </span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab("completed")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 ${
+                  activeTab === "completed"
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+                    : "text-gray-600 hover:text-[#0f172a]"
+                }`}
+              >
+                Completed
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                    activeTab === "completed"
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-200 text-emerald-700 font-bold"
+                  }`}
+                >
+                  {completedCourses.length}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {enrollments.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No batch enrollments found yet.
-            </p>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {enrollments.map((item) => (
-                <div
-                  key={`${item.batchId}-${item.courseId ?? "none"}`}
-                  className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between"
-                >
-                  {/* TOP */}
-                  <div>
-                    {/* Tag */}
-                    <span className="text-[10px] uppercase tracking-wide text-blue-500 font-semibold">
-                      Batch
-                    </span>
-
-                    {/* Course Title */}
-                    <h3 className="text-base font-semibold text-[#0f172a] mt-2">
-                      {item.courseTitle}
-                    </h3>
-
-                    {/* Batch Name */}
-                    <p className="text-sm text-gray-500 mt-1">
-                      {item.batchName}
-                    </p>
+          <div>
+            {activeTab === "in_progress" ? (
+              activeCourses.length === 0 ? (
+                <div className="bg-white p-12 rounded-3xl border border-gray-100 text-center shadow-sm max-w-xl mx-auto flex flex-col items-center justify-center gap-4">
+                  <div className="w-16 h-16 bg-blue-50 text-[#2283FF] rounded-2xl flex items-center justify-center border border-blue-100 shadow-inner">
+                    <BookOpen size={28} />
                   </div>
-
-                  {/* BOTTOM */}
-                  <div className="mt-4">
-                    {/* Date */}
-                    <p className="text-xs text-gray-400 mb-3">
-                      {item.startDate
-                        ? `Starts ${new Date(item.startDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          }
-                        )}`
-                        : "Start date not set"}
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-lg">All caught up!</h4>
+                    <p className="text-sm text-gray-500 mt-1">
+                      No active courses assigned or in progress. Start a new course to begin a track.
                     </p>
-
-                    {/* CTA */}
-                    <Button
-                      onClick={() =>
-                        router.push(`/courses/${item.courseId}`)
-                      }
-                      className="w-full bg-[#174778] text-white py-2 rounded-lg text-sm font-medium hover:opacity-90"
-                    >
-                      View Details →
-                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ─── CURATED VIDEO CURRICULUM ─── */}
-        <section>
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-bold text-[#0f172a] tracking-tight">
-              Curated Video Curriculum
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            {curriculum.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-gray-100 text-center text-gray-500 text-sm">
-                no courses assigned
-              </div>
-            ) : (
-              curriculum.map((course) => (
-                <div
-                  key={course.id}
-                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow"
-                >
-                  {/* Video Thumbnail */}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {activeCourses.map((course) => (
                   <Link
+                    key={course.id}
                     href={`/courses/${course.id}`}
-                    className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer"
+                    className="group bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#2283FF]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
                   >
-                    <PlayCircle
-                      className="text-white/70 group-hover:text-white transition-colors z-10"
-                      size={40}
-                      strokeWidth={1.5}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                    {course.duration && (
-                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-10">
-                        {course.duration}
-                      </span>
-                    )}
-                  </Link>
+                    {/* Large Thumbnail */}
+                    <div className="relative w-full h-56 sm:h-64 overflow-hidden">
+                      {course.thumbnail_url ? (
+                        <img
+                          src={course.thumbnail_url}
+                          alt={course.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-[#2283FF] via-[#1a6fdb] to-[#0f172a]" />
+                      )}
 
-                  {/* Content & Progress */}
-                  <div className="flex-1 w-full py-1">
-                    {course.module_label && (
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1.5">
-                        {course.module_label}
-                      </p>
-                    )}
-                    <Link href={`/courses/${course.id}`}>
-                      <h3 className="font-bold text-[#0f172a] text-[18px] hover:text-[#174778] transition-colors">
+                      {/* Gradient overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+                      {/* Play button overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/30 shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                          <PlayCircle className="text-white" size={32} strokeWidth={1.5} />
+                        </div>
+                      </div>
+
+                      {/* Category badge */}
+                      {course.module_label && (
+                        <span className="absolute top-4 left-4 bg-white/15 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/20">
+                          {course.module_label}
+                        </span>
+                      )}
+
+                      {/* Duration badge */}
+                      {course.duration && (
+                        <span className="absolute top-4 right-4 bg-black/50 backdrop-blur-xl text-white text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/10">
+                          {course.duration}
+                        </span>
+                      )}
+
+                      {/* Bottom-left progress indicator on thumbnail */}
+                      <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-full bg-white/15 backdrop-blur-xl border border-white/20 flex items-center justify-center">
+                          <span className="text-white text-[11px] font-black">{course.progress}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="flex-1 flex flex-col p-6 pt-5">
+                      <h3 className="text-xl font-bold text-[#0f172a] group-hover:text-[#2283FF] transition-colors leading-snug mb-2">
                         {course.title}
                       </h3>
-                    </Link>
-                    <p className="text-sm text-gray-500 mt-1.5 mb-5">
-                      {course.description}
-                    </p>
+                      <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mb-6">
+                        {course.description}
+                      </p>
 
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-[#174778] h-full rounded-full transition-all duration-500"
-                          style={{ width: `${course.progress}%` }}
+                      {/* Progress bar */}
+                      <div className="mt-auto">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Progress</span>
+                          <span className="text-xs font-black text-[#2283FF]">{course.progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-[#2283FF] to-[#5ca8ff] h-full rounded-full transition-all duration-700"
+                            style={{ width: `${course.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                </div>
+              )
+            ) : (
+              completedCourses.length === 0 ? (
+                <div className="bg-white p-12 rounded-3xl border border-gray-100 text-center shadow-sm max-w-xl mx-auto flex flex-col items-center justify-center gap-4">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100 shadow-inner">
+                    <CheckCircle2 size={28} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-lg">No completed courses yet</h4>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Your completed courses and downloadable academic credentials will be showcased here.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                completedCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center hover:shadow-md transition-shadow relative overflow-hidden group"
+                  >
+                    {/* Subtle Completed Banner Accent */}
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
+                    
+                    {/* Video Thumbnail */}
+                    <div
+                      onClick={() => {
+                        if (course.certificate_url) {
+                          setSelectedCertificateCourse(course);
+                        } else {
+                          handleGenerateCertificate(course.id);
+                        }
+                      }}
+                      className="w-full sm:w-56 h-32 bg-[#0f172a] rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden group cursor-pointer border border-gray-100 shadow-inner"
+                    >
+                      {course.thumbnail_url ? (
+                        <img
+                          src={course.thumbnail_url}
+                          alt={course.title}
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-[#0f172a] opacity-80" />
+                      )}
+                      
+                      <div className="absolute inset-0 bg-emerald-950/20 group-hover:bg-emerald-950/40 transition-colors flex items-center justify-center">
+                        <CheckCircle2
+                          className="text-white bg-emerald-500 rounded-full group-hover:scale-110 transition-transform z-10 p-0.5 shadow-md shadow-emerald-500/20"
+                          size={48}
+                          strokeWidth={2}
                         />
                       </div>
-                      <span className="text-xs font-bold text-gray-400">
-                        {course.progress}%
+
+                      <span className="absolute bottom-3 right-3 bg-emerald-600/90 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-lg z-10 border border-white/10 uppercase tracking-wider">
+                        Completed
                       </span>
                     </div>
 
-                    {/* Modules List Preview */}
-                    {course.modules && course.modules.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {course.modules.slice(0, 4).map((m: any) => (
-                          <Link key={m.id} href={`/courses/${course.id}?module=${m.id}`}>
-                            <span className="text-[10px] font-bold bg-gray-50 hover:bg-blue-50 hover:text-[#174778] px-2.5 py-1 rounded-lg text-gray-500 border border-gray-100 transition-colors flex items-center gap-1.5 group/mod">
-                              <PlayCircle size={12} className="text-gray-300 group-hover/mod:text-[#174778]" />
-                              {m.title}
-                            </span>
-                          </Link>
-                        ))}
-                        {course.modules.length > 4 && (
-                          <Link href={`/courses/${course.id}`}>
-                            <span className="text-[10px] font-bold text-gray-400 hover:text-[#174778] px-2 py-1">
-                              +{course.modules.length - 4} more
-                            </span>
-                          </Link>
+                    {/* Content & Progress */}
+                    <div className="flex-1 w-full py-1">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        {course.module_label && (
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
+                            {course.module_label}
+                          </p>
                         )}
+                        <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded uppercase">
+                          CREDENTIAL EARNED
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      <h3 
+                        onClick={() => {
+                          if (course.certificate_url) {
+                            setSelectedCertificateCourse(course);
+                          } else {
+                            handleGenerateCertificate(course.id);
+                          }
+                        }}
+                        className="font-bold text-[#0f172a] text-[18px] hover:text-emerald-600 transition-colors cursor-pointer"
+                      >
+                        {course.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1.5 mb-5">
+                        {course.description}
+                      </p>
 
-                  {/* Resume Button */}
-                  <div className="w-full sm:w-auto shrink-0 px-2">
-                    <Link href={`/courses/${course.id}`}>
-                      <Button className="w-full sm:w-auto bg-[#174778] hover:bg-[#113a63] text-white rounded-full flex items-center gap-2 px-6 py-5 shadow-sm">
-                        <PlayCircle size={18} />
-                      </Button>
-                    </Link>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                            style={{ width: "100%" }}
+                          />
+                        </div>
+                        <span className="text-xs font-black text-emerald-600">
+                          100%
+                        </span>
+                      </div>
+
+                      {/* Modules List Preview */}
+                      {course.modules && course.modules.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {course.modules.slice(0, 4).map((m: any) => (
+                            <Link key={m.id} href={`/courses/${course.id}?module=${m.id}`}>
+                              <span className="text-[10px] font-bold bg-emerald-50/50 hover:bg-emerald-50 hover:text-emerald-600 px-2.5 py-1 rounded-lg text-gray-500 border border-emerald-100/30 transition-colors flex items-center gap-1.5 group/mod">
+                                <CheckCircle2 size={12} className="text-emerald-400" />
+                                {m.title}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Certificate Action Button */}
+                    <div className="w-full sm:w-auto shrink-0 px-2">
+                      {course.certificate_url ? (
+                        <Button
+                          onClick={() => setSelectedCertificateCourse(course)}
+                          className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-full flex items-center justify-center gap-2 px-6 py-5 shadow-md shadow-amber-500/20 font-bold border border-amber-400/20 transition-all hover:scale-105"
+                        >
+                          <Award size={18} />
+                          View Certificate
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleGenerateCertificate(course.id)}
+                          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center gap-2 px-6 py-5 shadow-md shadow-emerald-600/20 font-bold transition-all hover:scale-105"
+                        >
+                          <Award size={18} />
+                          Claim Certificate
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))
+              )
             )}
           </div>
         </section>
 
-        {/* ─── THE AUTOMATE INSIGHT ─── */}
-        <section className="bg-[#FDFBF7] border-l-[6px] border-[#174778] p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-[#174778]/5">
+        {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
+        <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-[#2283FF]/5">
             <BookOpen size={80} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-[#174778] rounded-full flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-white" />
             </div>
-            <h3 className="font-bold text-[#174778] text-base">
+            <h3 className="font-bold text-[#2283FF] text-base">
               The Automate Insight
             </h3>
           </div>
@@ -744,7 +810,7 @@ export default function MyLearningDashboard() {
                 </p>
                 {currentInsight.author && (
                   <p className="text-[11px] text-gray-500 font-bold mt-4 tracking-wider uppercase">
-                    — {currentInsight.author}
+                    &mdash; {currentInsight.author}
                   </p>
                 )}
               </>
@@ -759,13 +825,83 @@ export default function MyLearningDashboard() {
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="bg-[#174778] hover:bg-[#113a63] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
+              className="bg-[#2283FF] hover:bg-[#2283FF] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
             >
               <CheckCircle2 size={16} /> Mark as Read
             </Button>
           </div>
         </section>
       </div>
+
+      {/* ─── CERTIFICATE MODAL ─── */}
+      {selectedCertificateCourse && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400">
+            <div className="bg-white rounded-[22px] p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setSelectedCertificateCourse(null)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+
+              {/* Classical Certificate Design */}
+              <div className="w-full flex flex-col items-center">
+                {/* Gold Seal / Badge */}
+                <div className="w-20 h-20 bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-6 border-4 border-white">
+                  <Award size={36} className="text-white" />
+                </div>
+
+                <span className="text-[10px] md:text-xs font-black tracking-[0.35em] text-amber-600 uppercase mb-4">
+                  Certificate of Achievement
+                </span>
+                
+                <h2 className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tight mb-6 font-serif">
+                  The Automate
+                </h2>
+
+                <p className="text-sm text-gray-500 font-medium max-w-md mb-8 leading-relaxed">
+                  This prestigious academic credential is proudly presented to
+                </p>
+
+                <p className="text-2xl md:text-4xl font-black text-[#2283FF] tracking-tight mb-4 border-b-2 border-[#2283FF]/10 pb-2 px-8 min-w-[280px]">
+                  {userProfileName}
+                </p>
+
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-6">
+                  For outstanding dedication and masterfully completing
+                </p>
+
+                <h3 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight max-w-xl mb-12">
+                  {selectedCertificateCourse.title}
+                </h3>
+
+                <div className="w-full grid grid-cols-2 gap-8 pt-8 border-t border-gray-100 max-w-lg">
+                  <div className="text-left">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Date of Issuance</p>
+                    <p className="text-sm font-bold text-slate-800 mt-1">
+                      {new Date().toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Authorized Signature</p>
+                    <p className="text-sm font-bold text-slate-800 mt-1 italic font-serif text-[#2283FF]">
+                      The Automate Curators
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

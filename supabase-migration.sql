@@ -268,7 +268,7 @@ CREATE POLICY "Only admins can insert courses" ON maincourses
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+      WHERE profiles.id = auth.uid() AND LOWER(profiles.role) = 'admin'
     )
   );
 
@@ -276,7 +276,7 @@ CREATE POLICY "Only admins can update courses" ON maincourses
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+      WHERE profiles.id = auth.uid() AND LOWER(profiles.role) = 'admin'
     )
   );
 
@@ -445,3 +445,59 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================
+-- 11. User Login Logs Table (for admin analytics)
+-- ============================================
+CREATE TABLE IF NOT EXISTS user_login_logs (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  logged_in_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_heartbeat_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  session_duration_seconds INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_login_logs_user_id ON user_login_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_login_logs_logged_in_at ON user_login_logs(logged_in_at DESC);
+
+ALTER TABLE user_login_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can insert own login logs" ON user_login_logs;
+DROP POLICY IF EXISTS "Users can update own login logs" ON user_login_logs;
+DROP POLICY IF EXISTS "Users can view own login logs" ON user_login_logs;
+DROP POLICY IF EXISTS "Admins can view all login logs" ON user_login_logs;
+
+CREATE POLICY "Users can insert own login logs" ON user_login_logs
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own login logs" ON user_login_logs
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own login logs" ON user_login_logs
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all login logs" ON user_login_logs
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid() AND LOWER(profiles.role) = 'admin'
+    )
+  );
+
+-- ============================================
+-- 12. Admin DELETE policy for maincourses
+-- ============================================
+DROP POLICY IF EXISTS "Only admins can delete courses" ON maincourses;
+
+CREATE POLICY "Only admins can delete courses" ON maincourses
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid() AND LOWER(profiles.role) = 'admin'
+    )
+  );
+
+-- ============================================
+-- 13. Normalize all role values to lowercase
+-- ============================================
+UPDATE profiles SET role = LOWER(role) WHERE role IS NOT NULL AND role != LOWER(role);

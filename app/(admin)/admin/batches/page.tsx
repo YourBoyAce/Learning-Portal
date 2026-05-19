@@ -76,6 +76,29 @@ export default function AdminBatches() {
   const [deletingBatch, setDeletingBatch] = useState<Batch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [totalStudents, setTotalStudents] = useState(0);
+
+  const fetchTotalStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("batch_members")
+        .select("email");
+      
+      if (error) {
+        console.error("Failed to fetch total students:", error.message);
+        return;
+      }
+
+      const uniqueEmails = new Set(
+        (data ?? [])
+          .map((row: { email: string | null }) => row.email)
+          .filter((email): email is string => Boolean(email))
+      );
+      setTotalStudents(uniqueEmails.size);
+    } catch (error) {
+      console.error("Failed to fetch total students:", error);
+    }
+  };
 
   const fetchBatches = async () => {
     try {
@@ -99,6 +122,8 @@ export default function AdminBatches() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBatches();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTotalStudents();
   }, []);
 
   const fetchUsers = async () => {
@@ -279,6 +304,7 @@ export default function AdminBatches() {
       }
 
       await fetchBatches();
+      await fetchTotalStudents();
       setShowModal(false);
       setBatchName("");
       setBatchDescription("");
@@ -339,6 +365,7 @@ export default function AdminBatches() {
       }
 
       await fetchBatches();
+      await fetchTotalStudents();
       setShowDeleteConfirm(false);
       setDeletingBatch(null);
     } catch (error) {
@@ -383,7 +410,7 @@ export default function AdminBatches() {
     },
     {
       label: "Total Students",
-      value: "—",
+      value: totalStudents.toString(),
       icon: Users,
       iconBg: "bg-blue-50",
       iconColor: "text-blue-600",
@@ -403,7 +430,7 @@ export default function AdminBatches() {
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#174778] tracking-tight">
+            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
               Manage Batches
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -414,7 +441,7 @@ export default function AdminBatches() {
             onClick={() => {
               setShowModal(true);
             }}
-            className="bg-[#174778] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors flex items-center gap-2 shadow-sm"
           >
             <Plus className="w-4 h-4" />
             New Batch
@@ -459,7 +486,7 @@ export default function AdminBatches() {
                 placeholder="Search batches..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174778] focus:border-transparent w-60 text-black"
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-60 text-black"
               />
             </div>
           </div>
@@ -467,7 +494,7 @@ export default function AdminBatches() {
           {/* Loading State */}
           {loading && (
             <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 text-[#174778] animate-spin mx-auto mb-3" />
+              <Loader2 className="w-8 h-8 text-[#2283FF] animate-spin mx-auto mb-3" />
               <p className="text-sm text-gray-500">Loading batches...</p>
             </div>
           )}
@@ -487,7 +514,7 @@ export default function AdminBatches() {
               {!searchTerm && (
                 <button
                   onClick={() => setShowModal(true)}
-                  className="bg-[#174778] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#113a63] transition-colors inline-flex items-center gap-2"
+                  className="bg-[#2283FF] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create Batch
@@ -519,8 +546,8 @@ export default function AdminBatches() {
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 bg-[#174778]/10 rounded-lg flex items-center justify-center shrink-0">
-                              <BookOpen className="w-4 h-4 text-[#174778]" />
+                            <div className="w-8 h-8 bg-[#2283FF]/10 rounded-lg flex items-center justify-center shrink-0">
+                              <BookOpen className="w-4 h-4 text-[#2283FF]" />
                             </div>
                             <p className="font-semibold text-gray-900 text-sm truncate">
                               {batch.name}
@@ -533,7 +560,7 @@ export default function AdminBatches() {
                         </div>
 
                         <p className="text-sm text-gray-500 line-clamp-2 min-h-[40px]">
-                          {batch.description || "—"}
+                          {batch.description || "â€”"}
                         </p>
 
                         <p className="text-xs text-gray-500 mt-3">
@@ -546,13 +573,13 @@ export default function AdminBatches() {
                                   year: "numeric",
                                 },
                               )
-                            : "—"}
+                            : "â€”"}
                         </p>
 
                         <div className="flex items-center justify-end gap-2 mt-4">
                           <button
                             onClick={() => handleEdit(batch)}
-                            className="p-2 text-gray-400 hover:text-[#174778] hover:bg-[#174778]/5 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-[#2283FF] hover:bg-[#2283FF]/5 rounded-lg transition-colors"
                             name="Edit"
                           >
                             <Pencil className="w-4 h-4" />
@@ -575,7 +602,7 @@ export default function AdminBatches() {
         </div>
       </div>
 
-      {/* ─── CREATE / EDIT MODAL ─── */}
+      {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
@@ -675,7 +702,7 @@ export default function AdminBatches() {
                   placeholder="e.g. Advanced Epistemology"
                   value={batchName}
                   onChange={(e) => setBatchName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all text-black"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all text-black"
                 />
               </div>
 
@@ -689,7 +716,7 @@ export default function AdminBatches() {
                   value={batchDescription}
                   onChange={(e) => setBatchDescription(e.target.value)}
                   rows={3}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all resize-y text-black"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all resize-y text-black"
                 />
               </div>
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -699,7 +726,7 @@ export default function AdminBatches() {
                 type="date"
                 value={created_at}
                 onChange={(e) => setCreated_At(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#174778] focus:ring-1 focus:ring-[#174778] transition-all text-black"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all text-black"
               />
 
               {/* Submit Button */}
@@ -716,7 +743,7 @@ export default function AdminBatches() {
               )}
               <button
                 onClick={handleSaveBatch}
-                className="w-full bg-[#174778] hover:bg-[#113a63] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
+                className="w-full bg-[#2283FF] hover:bg-[#2283FF] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
               >
                 {isSaving
                   ? "Saving..."
@@ -729,7 +756,7 @@ export default function AdminBatches() {
         </div>
       )}
 
-      {/* ─── DELETE CONFIRMATION MODAL ─── */}
+      {/* â”€â”€â”€ DELETE CONFIRMATION MODAL â”€â”€â”€ */}
       {showDeleteConfirm && deletingBatch && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -769,7 +796,7 @@ export default function AdminBatches() {
         </div>
       )}
 
-      {/* ─── TOAST NOTIFICATION ─── */}
+      {/* â”€â”€â”€ TOAST NOTIFICATION â”€â”€â”€ */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-[100] transform transition-all duration-300 translate-y-0 opacity-100">
           <CheckCircle className="w-5 h-5" />

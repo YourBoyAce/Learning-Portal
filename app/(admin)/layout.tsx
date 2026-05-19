@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import { Logo } from "@/app/components/Logo";
 
 export default function AdminLayout({
   children,
@@ -164,26 +165,6 @@ export default function AdminLayout({
       ),
     },
     {
-      label: "Calendar",
-      href: "/admin/calendar",
-      active: pathname === "/admin/calendar",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-    },
-    {
       label: "Manage Webinars",
       href: "/admin/webinars",
       active: pathname === "/admin/webinars",
@@ -203,6 +184,46 @@ export default function AdminLayout({
         </svg>
       ),
     },
+    {
+      label: "Quiz Management",
+      href: "/admin/quizzes",
+      active: pathname === "/admin/quizzes",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Artifacts Management",
+      href: "/admin/artifacts",
+      active: pathname === "/admin/artifacts",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+          />
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -210,19 +231,7 @@ export default function AdminLayout({
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#174778] rounded-lg flex items-center justify-center text-white">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zm0 13.09l-5.5-3.03L12 10l5.5 3.06L12 16.09zM5 13.62v3.07l7 3.89 7-3.89v-3.07l-7 3.89-7-3.89z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-semibold text-[#174778] text-sm">
-                The Automate
-              </h1>
-              <p className="text-[10px] text-gray-400">
-                INTELLECTUAL SANCTUARY
-              </p>
-            </div>
+            <Logo width={180} height={60} />
           </div>
         </div>
 
@@ -237,8 +246,8 @@ export default function AdminLayout({
                   href={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
                     item.active
-                      ? "bg-[#174778] text-white"
-                      : "text-gray-700 hover:bg-[#174778]/10 hover:text-[#174778]"
+                      ? "bg-[#2283FF] text-white"
+                      : "text-gray-700 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
                   }`}
                 >
                   {item.icon}
@@ -252,7 +261,7 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/profile">
             <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-              <div className="w-10 h-10 bg-[#174778] rounded-full flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
                 <span className="text-white text-lg font-semibold">
                   {userEmail?.[0]?.toUpperCase() || "U"}
                 </span>
@@ -269,7 +278,7 @@ export default function AdminLayout({
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full bg-[#174778] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2"
+            className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2"
           >
             <svg
               className="w-4 h-4"
@@ -307,7 +316,7 @@ export default function AdminLayout({
               </button>
               <button
                 onClick={confirmSignOut}
-                className="flex-1 px-4 py-2 bg-[#174778] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+                className="flex-1 px-4 py-2 bg-[#2283FF] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
               >
                 Sign Out
               </button>

@@ -71,7 +71,7 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role !== "admin") {
+  if (profileError || profile?.role?.toLowerCase() !== "admin") {
     return {
       error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     };
@@ -105,7 +105,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, courses: data ?? [] });
+  return NextResponse.json(
+    { success: true, courses: data ?? [] },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(request: Request) {
@@ -118,6 +121,8 @@ export async function POST(request: Request) {
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
     typeof body?.description === "string" ? body.description.trim() : "";
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
 
   if (!title || !description) {
     return NextResponse.json(
@@ -131,6 +136,7 @@ export async function POST(request: Request) {
     .insert({
       title,
       description,
+      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
     })
     .select("id")
     .single();
@@ -145,6 +151,7 @@ export async function POST(request: Request) {
       .map((m: any) => ({
         maincourse_id: newCourse.id,
         title: typeof m.title === "string" ? m.title.trim() : "",
+        description: typeof m.description === "string" ? m.description.trim() : "",
       }))
       .filter((m: any) => m.title !== "");
 
@@ -180,6 +187,8 @@ export async function PUT(request: Request) {
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
     typeof body?.description === "string" ? body.description.trim() : "";
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
 
   if (id === null || !title || !description) {
     return NextResponse.json(
@@ -190,7 +199,7 @@ export async function PUT(request: Request) {
 
   const { error: updateError } = await authContext.supabaseAdmin
     .from("maincourses")
-    .update({ title, description })
+    .update({ title, description, ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }) })
     .eq("id", id);
 
   if (updateError) {
