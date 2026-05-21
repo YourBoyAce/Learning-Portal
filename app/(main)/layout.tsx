@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
-
+import UserAvatar from "@/app/components/UserAvatar";
 export default function MainLayout({
   children,
 }: {
@@ -16,6 +16,7 @@ export default function MainLayout({
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [fullName, setFullName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +34,16 @@ export default function MainLayout({
 
       if (cancelled) return;
       setUserEmail(user.email ?? null);
+      const { data: profile } = await supabase
+  .from("profiles")
+  .select("full_name")
+  .eq("id", user.id)
+  .single();
+
+if (profile?.full_name) {
+  setFullName(profile.full_name);
+}
+      
       setLoading(false);
     };
 
@@ -159,9 +170,15 @@ export default function MainLayout({
                 </p>
                 <p className="text-xs text-gray-400">{userEmail}</p>
               </div>
-              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+              {/* <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
                 <span className="text-lg">ðŸ‘¤</span>
-              </div>
+              </div> */}
+              <UserAvatar
+  name={fullName}
+  email={userEmail}
+  size={40}
+  textSize="text-sm"
+/>
             </div>
           </header>
 

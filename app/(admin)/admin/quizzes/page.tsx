@@ -483,7 +483,7 @@ export default function AdminQuizzes() {
               placeholder="Search quizzes or courses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+              className="pl-9 pr-4 py-2.5 text-gray-500 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
           </div>
         </div>

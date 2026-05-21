@@ -10,6 +10,10 @@ export async function POST(request: Request) {
       process.env.CLOUDFLARE_STREAM_API_TOKEN ||
       process.env.CLOUDFLARE_API_TOKEN;
 
+      console.log("Account ID:", accountId);
+console.log("Token exists:", !!apiToken);
+console.log("Token length:", apiToken?.length);
+
     if (!accountId || !apiToken) {
       return NextResponse.json(
         {
@@ -40,6 +44,7 @@ export async function POST(request: Request) {
     );
 
     const json = await response.json();
+    console.log("Cloudflare response:", json);
     if (!response.ok || !json?.success || !json?.result?.uploadURL) {
       return NextResponse.json(
         { error: json?.errors?.[0]?.message || "Failed to create direct upload URL." },

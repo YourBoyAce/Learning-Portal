@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { BookOpen, CheckCircle2} from "lucide-react";
 
 type Profile = {
   full_name?: string | null;
@@ -28,6 +30,11 @@ type CalendarEvent = {
   event_time: string;
   event_type: "video" | "course" | "session" | "webinar";
 };
+interface Insight {
+  id: number;
+  content: string;
+  author: string;
+}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -40,6 +47,13 @@ export default function Dashboard() {
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+ 
+    const [userId, setUserId] = useState<string | null>(null);
+    const [userProfileName, setUserProfileName] = useState<string>("Learner");
+    // Insight states
+    const [insights, setInsights] = useState<Insight[]>([]);
+      const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +72,7 @@ export default function Dashboard() {
       if (cancelled) return;
 
       setUserEmail(user.email ?? null);
+      setUserId(user.id);
 
       const { data: fetchedProfile } = await supabase
         .from("profiles")
@@ -84,6 +99,22 @@ export default function Dashboard() {
             Authorization: `Bearer ${session.access_token}`,
           },
         });
+        // fetch profile
+        const { data: profile } = await supabase
+        .from("profiles")
+        .select("current_insight_index, full_name")
+        .eq("id", session.user.id)
+        .single();
+
+      setCurrentInsightIndex(profile?.current_insight_index || 0);
+      setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
+        //Fetch Scholarly insights
+        const { data: insightsData } = await supabase
+        .from("scholarly_insights")
+        .select("*")
+        .order("id", { ascending: true });
+
+      if (insightsData) setInsights(insightsData);
 
         const enrollmentsResult = await enrollmentsResponse
           .json()
@@ -158,6 +189,7 @@ export default function Dashboard() {
         }
       },
     );
+    
 
     return () => {
       cancelled = true;
@@ -176,6 +208,11 @@ export default function Dashboard() {
   if (loading) return null;
 
   const hasEnrollments = enrolledCourses.length > 0;
+  const currentInsight = insights[currentInsightIndex] || {
+  id: 0,
+  content: "Cultivating new insights...",
+  author: "",
+};
 
   const formatEventLabel = (eventDate: string, eventTime: string) => {
     const start = new Date(`${eventDate}T${eventTime}`);
@@ -204,10 +241,21 @@ export default function Dashboard() {
       router.push(`/courses/${nextCourse.id}?module=${nextModule.id}`);
     }
   };
+  // async function for handling insights
+  const handleMarkInsightAsRead = async () => {
+    if (!userId || insights.length === 0) return;
+    const nextIndex = (currentInsightIndex + 1) % insights.length;
+    setCurrentInsightIndex(nextIndex);
+    await supabase
+      .from("profiles")
+      .update({ current_insight_index: nextIndex })
+      .eq("id", userId);
+  };
 
   const handleOpenCourse = (courseId: number | string) => {
     router.push(`/courses/${courseId}`);
   };
+  
 
   return (
     <div className="p-6 lg:p-8">
@@ -536,12 +584,49 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Footer Insight */}
-        <div className="bg-[#8B4513] rounded-xl p-6 text-white shadow-sm">
-          <p className="text-sm leading-relaxed italic">
-            &ldquo;Knowledge is not static...&rdquo; â€” Theodore Geisel
-          </p>
-        </div>
+        <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-[#2283FF]/5">
+            <BookOpen size={80} />
+          </div>
+
+          <div className="flex items-center gap-3 mb-4 relative z-10">
+            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
+              <BookOpen size={18} className="text-white" />
+            </div>
+            <h3 className="font-bold text-[#2283FF] text-base">
+              The Automate Insight
+            </h3>
+          </div>
+
+          <div className="mb-6 relative z-10">
+            {insights.length > 0 ? (
+              <>
+                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
+                  &quot;{currentInsight.content}&quot;
+                </p>
+                {currentInsight.author && (
+                  <p className="text-[11px] text-gray-500 font-bold mt-4 tracking-wider uppercase">
+                    &mdash; {currentInsight.author}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Cultivating new insights...
+              </p>
+            )}
+          </div>
+
+          <div className="relative z-10 flex justify-end">
+            <Button
+              onClick={handleMarkInsightAsRead}
+              disabled={insights.length === 0}
+              className="bg-[#2283FF] hover:bg-[#2283FF] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
+            >
+              <CheckCircle2 size={16} /> Mark as Read
+            </Button>
+          </div>
+        </section>
       </div>
     </div>
   );
