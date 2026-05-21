@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { BookOpen, CheckCircle2} from "lucide-react";
+import { BookOpen, CheckCircle2 } from "lucide-react";
 
 type Profile = {
   full_name?: string | null;
@@ -47,12 +47,12 @@ export default function Dashboard() {
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
- 
-    const [userId, setUserId] = useState<string | null>(null);
-    const [userProfileName, setUserProfileName] = useState<string>("Learner");
-    // Insight states
-    const [insights, setInsights] = useState<Insight[]>([]);
-      const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userProfileName, setUserProfileName] = useState<string>("Learner");
+  // Insight states
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
 
   useEffect(() => {
@@ -101,20 +101,20 @@ export default function Dashboard() {
         });
         // fetch profile
         const { data: profile } = await supabase
-        .from("profiles")
-        .select("current_insight_index, full_name")
-        .eq("id", session.user.id)
-        .single();
+          .from("profiles")
+          .select("current_insight_index, full_name")
+          .eq("id", session.user.id)
+          .single();
 
-      setCurrentInsightIndex(profile?.current_insight_index || 0);
-      setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
+        setCurrentInsightIndex(profile?.current_insight_index || 0);
+        setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
         //Fetch Scholarly insights
         const { data: insightsData } = await supabase
-        .from("scholarly_insights")
-        .select("*")
-        .order("id", { ascending: true });
+          .from("scholarly_insights")
+          .select("*")
+          .order("id", { ascending: true });
 
-      if (insightsData) setInsights(insightsData);
+        if (insightsData) setInsights(insightsData);
 
         const enrollmentsResult = await enrollmentsResponse
           .json()
@@ -189,7 +189,7 @@ export default function Dashboard() {
         }
       },
     );
-    
+
 
     return () => {
       cancelled = true;
@@ -209,10 +209,10 @@ export default function Dashboard() {
 
   const hasEnrollments = enrolledCourses.length > 0;
   const currentInsight = insights[currentInsightIndex] || {
-  id: 0,
-  content: "Cultivating new insights...",
-  author: "",
-};
+    id: 0,
+    content: "Cultivating new insights...",
+    author: "",
+  };
 
   const formatEventLabel = (eventDate: string, eventTime: string) => {
     const start = new Date(`${eventDate}T${eventTime}`);
@@ -255,7 +255,7 @@ export default function Dashboard() {
   const handleOpenCourse = (courseId: number | string) => {
     router.push(`/courses/${courseId}`);
   };
-  
+
 
   return (
     <div className="p-6 lg:p-8">
@@ -291,12 +291,6 @@ export default function Dashboard() {
                   />
                 </svg>
               </button>
-              <button
-                onClick={() => router.push("/calendar")}
-                className="bg-transparent border border-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors"
-              >
-                View Calendar
-              </button>
             </div>
           )}
         </div>
@@ -323,9 +317,9 @@ export default function Dashboard() {
             {upcomingEvents.length === 0 ? (
               <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center shadow-sm">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                   <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                   </svg>
+                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                 </div>
                 <p className="text-gray-500 font-medium">No live sessions scheduled yet.</p>
                 <p className="text-xs text-gray-400 mt-1">Check back later or visit your calendar.</p>
@@ -357,7 +351,7 @@ export default function Dashboard() {
                         {event.event_type}
                       </span>
                     </div>
-                    
+
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors mb-2">
                         {event.title}
@@ -483,7 +477,7 @@ export default function Dashboard() {
                   className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[#2283FF]/5 rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-                  
+
                   <div className="flex items-center gap-4 mb-6 relative">
                     <div className="w-12 h-12 bg-[#2283FF] rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-[#2283FF]/20 group-hover:rotate-6 transition-transform">
                       {item.courseTitle.charAt(0)}
@@ -520,7 +514,7 @@ export default function Dashboard() {
               {enrolledCourses.length} Courses in Progress
             </span>
           </div>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {enrolledCourses.map((course) => (
               <div
@@ -539,9 +533,9 @@ export default function Dashboard() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
-                       <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                         <path d="M8 5v14l11-7z" />
-                       </svg>
+                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -560,7 +554,7 @@ export default function Dashboard() {
                       {course.description || "Master these concepts with our structured learning path."}
                     </p>
                   </div>
-                  
+
                   <div className="mt-8">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">

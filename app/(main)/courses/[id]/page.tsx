@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
+import { upsertUserProgress } from "@/app/actions/user-progress";
+import { generateCertificatePDF } from "@/app/lib/certificate";
 import { 
   PlayCircle, 
   CheckCircle2, 
@@ -28,7 +30,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface Course {
-  id: number;
+  id: string;
   title: string;
   description: string;
   category: string;
@@ -36,7 +38,7 @@ interface Course {
 }
 
 interface Module {
-  id: number;
+  id: string;
   title: string;
   description: string;
   video_cf_id: string;
@@ -45,7 +47,7 @@ interface Module {
 }
 
 interface Progress {
-  module_id: number;
+  module_id: string;
   completed: boolean;
 }
 
@@ -55,9 +57,13 @@ export default function CoursePlayerPage() {
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
-  const [userProgress, setUserProgress] = useState<Record<number, boolean>>({});
-  const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
+  const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [hasCertificate, setHasCertificate] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [studentName, setStudentName] = useState("Learner");
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
 
   // --- QUIZZES & ARTIFACTS INTEGRATION STATE ---
   const [activeTab, setActiveTab] = useState<"modules" | "quizzes" | "artifacts">("modules");
@@ -278,11 +284,33 @@ export default function CoursePlayerPage() {
 
       if (progressError) throw progressError;
 
-      const progressMap: Record<number, boolean> = {};
+      const progressMap: Record<string, boolean> = {};
       progressData?.forEach((p: any) => {
-        progressMap[parseInt(p.video_id)] = p.completed;
+        progressMap[p.video_id] = p.completed;
       });
       setUserProgress(progressMap);
+
+      // 4. Fetch User Profile for certificate naming
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.full_name) {
+        setStudentName(profile.full_name);
+      } else {
+        setStudentName(user.email?.split("@")[0] || "Learner");
+      }
+
+      // 5. Check if user already generated a certificate
+      const { data: certData } = await supabase
+        .from("certificates")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("course_id", id)
+        .maybeSingle();
+      
+      setHasCertificate(!!certData);
 
     } catch (error) {
       console.error("Error loading course:", error);
@@ -308,26 +336,13 @@ export default function CoursePlayerPage() {
     return `https://iframe.videodelivery.net/${cleanId}`;
   }, [activeModule]);
 
-  const handleMarkAsCompleted = async (moduleId: number) => {
+  const handleMarkAsCompleted = async (moduleId: string) => {
     try {
       setIsUpdatingProgress(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
-        .from("user_video_progress")
-        .upsert({
-          user_id: user.id,
-          course_id: parseInt(id as string),
-          video_id: moduleId.toString(),
-          completed: true,
-          completed_at: new Date().toISOString(),
-          progress_percentage: 100
-        }, {
-          onConflict: "user_id,course_id,video_id"
-        });
-
-      if (error) throw error;
+      await upsertUserProgress(user.id, id as string, moduleId, true);
 
       setUserProgress(prev => ({ ...prev, [moduleId]: true }));
     } catch (error) {
@@ -342,6 +357,45 @@ export default function CoursePlayerPage() {
     const completedCount = modules.filter(m => userProgress[m.id]).length;
     return Math.round((completedCount / modules.length) * 100);
   }, [modules, userProgress]);
+
+  useEffect(() => {
+    if (progressPercentage === 100 && !hasCertificate && !loading) {
+      setShowCertificateModal(true);
+    }
+  }, [progressPercentage, hasCertificate, loading]);
+
+  const handleGenerateCertificate = async () => {
+    try {
+      setIsGeneratingCertificate(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Insert the certificate in the Supabase database
+      const { error } = await supabase
+        .from("certificates")
+        .insert({
+          user_id: user.id,
+          course_id: id as string,
+          certificate_url: "CLAIMED",
+        });
+
+      if (error && error.code !== "23505") { // Ignore unique constraint violation if they already have one
+        throw error;
+      }
+
+      setHasCertificate(true);
+
+      // 2. Generate and trigger download of the PDF certificate client-side!
+      await generateCertificatePDF(studentName, course?.title || "Course Completed");
+
+      setShowCertificateModal(false);
+    } catch (e) {
+      console.error("Error generating certificate:", e);
+    } finally {
+      setIsGeneratingCertificate(false);
+    }
+  };
 
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
@@ -416,6 +470,28 @@ export default function CoursePlayerPage() {
                 <span className="text-xs font-bold text-[#174778]">{progressPercentage}%</span>
               </div>
             </div>
+
+            {/* DOWNLOAD CERTIFICATE BUTTON (Visible only after 100% progress) */}
+            {progressPercentage === 100 && (
+              <Button 
+                onClick={handleGenerateCertificate}
+                disabled={isGeneratingCertificate}
+                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow-md shadow-amber-500/25 flex items-center gap-1.5 border border-amber-400/25 transition-all duration-300 hover:scale-105"
+              >
+                {isGeneratingCertificate ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <DownloadCloud size={13} />
+                    Download Certificate
+                  </>
+                )}
+              </Button>
+            )}
+
             <Button variant="outline" className="text-xs font-bold border-gray-200 rounded-full">
               Get Support
             </Button>
@@ -1021,6 +1097,71 @@ export default function CoursePlayerPage() {
                 </div>
               )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONGRATULATIONS & CERTIFICATE MODAL */}
+      {showCertificateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white/90 border border-gray-100 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl p-8 max-w-lg w-full text-center relative overflow-hidden flex flex-col items-center justify-center gap-6 animate-in zoom-in-95 duration-500">
+            {/* Elegant Background Glows */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#174778]/10 rounded-full blur-3xl" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
+
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowCertificateModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+            >
+              <XIcon size={20} />
+            </button>
+
+            {/* Glowing Trophy / Badge */}
+            <div className="relative w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center border-4 border-white shadow-xl shadow-amber-500/25 animate-bounce">
+              <Award size={48} className="text-white" strokeWidth={1.5} />
+            </div>
+
+            {/* Congratulations Text */}
+            <div className="space-y-2 relative z-10">
+              <span className="text-[10px] font-black text-amber-600 tracking-[0.25em] uppercase block">Course Completed!</span>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-tight">
+                Outstanding Job!
+              </h2>
+              <p className="text-sm text-gray-500 max-w-sm leading-relaxed mx-auto">
+                Congratulations, <span className="font-bold text-gray-800">{studentName}</span>! You have fully completed all curriculum requirements for:
+              </p>
+              <p className="text-base font-bold text-[#174778] max-w-sm mx-auto mt-2 leading-snug">
+                {course?.title}
+              </p>
+            </div>
+
+            {/* Generate & Download Certificate Button */}
+            <div className="w-full space-y-3 relative z-10">
+              <Button
+                onClick={handleGenerateCertificate}
+                disabled={isGeneratingCertificate}
+                className="w-full py-6 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold tracking-wide shadow-lg shadow-amber-500/25 border border-amber-400/25 transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
+              >
+                {isGeneratingCertificate ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Generating Certificate...
+                  </>
+                ) : (
+                  <>
+                    <DownloadCloud size={20} />
+                    Generate & Download Certificate
+                  </>
+                )}
+              </Button>
+              <button 
+                onClick={() => setShowCertificateModal(false)}
+                className="text-xs font-bold text-gray-400 hover:text-[#174778] transition-colors tracking-wider uppercase block mx-auto"
+              >
+                Maybe Later
+              </button>
             </div>
           </div>
         </div>

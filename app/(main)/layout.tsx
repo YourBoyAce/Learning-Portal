@@ -17,6 +17,12 @@ export default function MainLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar on path change
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,13 +127,35 @@ if (profile?.full_name) {
 
   return (
     <div className="flex flex-col h-screen bg-[#F8FAFC]">
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Sidebar Backdrop Overlay */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-[260px] bg-[#F8FAFC] border-r border-gray-200 flex flex-col shrink-0">
-          <div className="p-6">
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#F8FAFC] border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Logo width={180} height={60} />
             </div>
+            {/* Mobile close button */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none lg:hidden transition-colors"
+              aria-label="Close sidebar"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           <nav className="flex-1 px-4 py-2 flex flex-col gap-1">
@@ -162,23 +190,34 @@ if (profile?.full_name) {
         </aside>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end">
+          <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between lg:justify-end">
+            {/* Mobile Hamburger & Logo */}
+            <div className="flex items-center gap-3 lg:hidden">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none transition-colors"
+                aria-label="Open sidebar"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <Logo width={120} height={40} />
+            </div>
+
             <div className="flex items-center gap-3">
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-700">
                   {userEmail?.split("@")[0]}
                 </p>
                 <p className="text-xs text-gray-400">{userEmail}</p>
               </div>
-              {/* <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                <span className="text-lg">ðŸ‘¤</span>
-              </div> */}
               <UserAvatar
-  name={fullName}
-  email={userEmail}
-  size={40}
-  textSize="text-sm"
-/>
+                name={fullName}
+                email={userEmail}
+                size={40}
+                textSize="text-sm"
+              />
             </div>
           </header>
 
