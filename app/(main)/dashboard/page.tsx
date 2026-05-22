@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { BookOpen, CheckCircle2 } from "lucide-react";
+import { getCourseProgress } from "@/app/actions/get-course-progress";
 
 type Profile = {
   full_name?: string | null;
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [courseProgress, setCourseProgress] = useState<Record<string, { progressPercentage: number; completedModules: number; totalModules: number }>>({});
   const [nextCourse, setNextCourse] = useState<any>(null);
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -158,6 +160,25 @@ export default function Dashboard() {
         );
         const mappedCourses = validEnrollments.map((e: any) => e.maincourses);
         setEnrolledCourses(mappedCourses);
+
+        // Fetch progress for each enrolled course
+        if (user.id && mappedCourses.length > 0) {
+          const progressMap: Record<string, { progressPercentage: number; completedModules: number; totalModules: number }> = {};
+          
+          for (const course of mappedCourses) {
+            try {
+              const progress = await getCourseProgress(user.id, course.id);
+              progressMap[String(course.id)] = progress;
+            } catch (error) {
+              console.error(`Error fetching progress for course ${course.id}:`, error);
+              progressMap[String(course.id)] = { progressPercentage: 0, completedModules: 0, totalModules: 0 };
+            }
+          }
+          
+          if (!cancelled) {
+            setCourseProgress(progressMap);
+          }
+        }
 
         if (mappedCourses.length > 0) {
           const mostRecentCourse = mappedCourses[0];
@@ -448,7 +469,14 @@ export default function Dashboard() {
               </h3>
               <div className="flex items-center justify-center mb-4">
                 <div className="w-24 h-24 rounded-full border-4 border-[#2283FF] flex items-center justify-center">
-                  <span className="text-2xl font-bold text-[#2283FF]">0%</span>
+                  <span className="text-2xl font-bold text-[#2283FF]">
+                    {enrolledCourses.length > 0 
+                      ? Math.round(
+                          enrolledCourses.reduce((sum, course) => sum + (courseProgress[String(course.id)]?.progressPercentage || 0), 0) / enrolledCourses.length
+                        )
+                      : 0
+                    }%
+                  </span>
                 </div>
               </div>
             </div>
@@ -461,9 +489,6 @@ export default function Dashboard() {
             <h2 className="text-xl font-bold text-gray-900">
               Batch Allocations
             </h2>
-            <button className="text-xs font-bold text-[#2283FF] hover:underline uppercase tracking-wider">
-              Management Portal
-            </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {enrollments.length === 0 ? (
@@ -563,12 +588,14 @@ export default function Dashboard() {
                         </svg>
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Momentum</span>
                       </div>
-                      <span className="text-xs font-black text-[#2283FF]">0%</span>
+                      <span className="text-xs font-black text-[#2283FF]">
+                        {courseProgress[String(course.id)]?.progressPercentage || 0}%
+                      </span>
                     </div>
                     <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
                       <div
                         className="bg-gradient-to-r from-[#2283FF] via-[#2c6cb0] to-[#2283FF] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
-                        style={{ width: "0%" }}
+                        style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
                       ></div>
                     </div>
                   </div>
