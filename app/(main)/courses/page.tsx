@@ -215,23 +215,7 @@ export default function MyLearningDashboard() {
 
       if (insightsData) setInsights(insightsData);
 
-      // 3. Logic for Weekly Progress
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const { data: recentProgress } = await supabase
-        .from("user_video_progress")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .gte("completed_at", sevenDaysAgo.toISOString());
-
-      const modulesCompletedThisWeek = recentProgress?.length || 0;
-      const targetModulesPerWeek = 5;
-      const progressCalculation = Math.min(
-        Math.round((modulesCompletedThisWeek / targetModulesPerWeek) * 100),
-        100,
-      );
-      setWeeklyProgressPct(progressCalculation);
+      // 3. Logic for Weekly Progress (calculated dynamically in step 6 from enrolled courses progress)
 
       // 4. Fetch Webinars
       const { data: webinarsData } = await supabase
@@ -253,25 +237,7 @@ export default function MyLearningDashboard() {
 
       setUpcomingWebinars(mappedWebinars);
 
-      // 5. Calculate Pending Modules
-      const { count: completedVideosCount } = await supabase
-        .from("user_video_progress")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", session.user.id);
-
-      const { count: totalVideosCount } = await supabase
-        .from("videos")
-        .select("*", { count: "exact", head: true });
-
-      const pendingMods = Math.max(
-        0,
-        (totalVideosCount || 0) - (completedVideosCount || 0),
-      );
-
-      setStats((prev) => ({
-        ...prev,
-        pendingModules: pendingMods,
-      }));
+      // 5. Pending modules are calculated in step 6 using actual coursemodules data
 
       // 6. Fetch Enrolled Courses, Modules & Calculate Progress
       const { data: enrollmentsData } = await supabase
@@ -347,8 +313,35 @@ export default function MyLearningDashboard() {
           };
         });
         setCurriculum(mappedCurriculum);
+
+        // Calculate average course progress (mirrors dashboard/page.tsx logic)
+        const avgProgress = mappedCurriculum.length > 0
+          ? Math.round(
+              mappedCurriculum.reduce((sum, c) => sum + c.progress, 0) / mappedCurriculum.length
+            )
+          : 0;
+        setWeeklyProgressPct(avgProgress);
+
+        // Calculate pending modules: sum of incomplete modules across all enrolled courses
+        const totalPendingModules = validEnrollments.reduce((sum: number, e: any) => {
+          const course = e.maincourses;
+          const modules = course.coursemodules || [];
+          const courseProgressData = progressData?.filter(
+            (p: any) => p.course_id === course.id
+          ) || [];
+          const completedCount = modules.filter((m: any) =>
+            courseProgressData.some(
+              (p: any) => String(p.video_id) === String(m.id) && p.completed
+            )
+          ).length;
+          return sum + Math.max(0, modules.length - completedCount);
+        }, 0);
+
+        setStats((prev) => ({ ...prev, pendingModules: totalPendingModules }));
       } else {
         setCurriculum([]);
+        setWeeklyProgressPct(0);
+        setStats((prev) => ({ ...prev, pendingModules: 0 }));
       }
     } catch (error) {
       console.error("Error loading dashboard:", error);
@@ -579,7 +572,7 @@ export default function MyLearningDashboard() {
                     className="group bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#2283FF]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
                   >
                     {/* Large Thumbnail */}
-                    <div className="relative w-full h-56 sm:h-64 overflow-hidden">
+                    <div className="relative w-full h-48 sm:h-64 overflow-hidden">
                       {course.thumbnail_url ? (
                         <img
                           src={course.thumbnail_url}
@@ -637,9 +630,9 @@ export default function MyLearningDashboard() {
                           <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Progress</span>
                           <span className="text-xs font-black text-[#2283FF]">{course.progress}%</span>
                         </div>
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
                           <div
-                            className="bg-gradient-to-r from-[#2283FF] to-[#5ca8ff] h-full rounded-full transition-all duration-700"
+                            className="bg-gradient-to-r from-[#2283FF] via-[#2c6cb0] to-[#2283FF] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
                             style={{ width: `${course.progress}%` }}
                           />
                         </div>
@@ -836,8 +829,8 @@ export default function MyLearningDashboard() {
       {/* ─── CERTIFICATE MODAL ─── */}
       {selectedCertificateCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400">
-            <div className="bg-white rounded-[22px] p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
+            <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
               
               {/* Close Button */}
               <button
@@ -878,8 +871,8 @@ export default function MyLearningDashboard() {
                   {selectedCertificateCourse.title}
                 </h3>
 
-                <div className="w-full grid grid-cols-2 gap-8 pt-8 border-t border-gray-100 max-w-lg">
-                  <div className="text-left">
+                <div className="w-full flex flex-col sm:grid sm:grid-cols-2 gap-6 sm:gap-8 pt-8 border-t border-gray-100 max-w-lg">
+                  <div className="text-center sm:text-left">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Date of Issuance</p>
                     <p className="text-sm font-bold text-slate-800 mt-1">
                       {new Date().toLocaleDateString("en-US", {
@@ -889,7 +882,7 @@ export default function MyLearningDashboard() {
                       })}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-center sm:text-right">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Authorized Signature</p>
                     <p className="text-sm font-bold text-slate-800 mt-1 italic font-serif text-[#2283FF]">
                       The Automate Curators

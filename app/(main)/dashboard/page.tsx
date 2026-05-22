@@ -279,11 +279,11 @@ export default function Dashboard() {
 
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Welcome Banner - Dark Blue */}
-        <div className="bg-[#2283FF] rounded-2xl p-8 text-white mb-8 shadow-sm">
-          <h1 className="text-3xl font-bold mb-2">
+        <div className="bg-[#2283FF] rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
             Welcome back to The Automate, {userName}.
           </h1>
           <p className="text-blue-200 text-sm mb-6 max-w-2xl">
@@ -350,7 +350,7 @@ export default function Dashboard() {
                 {upcomingEvents.map((event) => (
                   <div
                     key={event.id}
-                    className="min-w-[300px] md:min-w-[340px] bg-white border border-gray-100 rounded-[2rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-xl transition-all duration-300 relative group border-b-4 border-b-[#2283FF]/10 hover:border-b-[#2283FF]"
+                    className="min-w-[270px] sm:min-w-[300px] md:min-w-[340px] bg-white border border-gray-100 rounded-[2rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-xl transition-all duration-300 relative group border-b-4 border-b-[#2283FF]/10 hover:border-b-[#2283FF]"
                   >
                     <div className="flex items-start justify-between">
                       <div className="w-14 h-14 bg-[#2283FF]/5 rounded-2xl flex items-center justify-center shrink-0 border border-[#2283FF]/10 group-hover:scale-110 transition-transform duration-300">
@@ -421,7 +421,7 @@ export default function Dashboard() {
               {nextModule ? (
                 <div
                   onClick={handlePlayModule}
-                  className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:border-[#2283FF] transition-colors cursor-pointer group"
+                  className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-[#2283FF] transition-colors cursor-pointer group"
                 >
                   <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-blue-50 transition-colors overflow-hidden border border-gray-100">
                     <img
@@ -430,8 +430,8 @@ export default function Dashboard() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="flex-1 text-center sm:text-left">
-                    <h3 className="font-semibold text-gray-800 group-hover:text-[#2283FF] transition-colors">
+                  <div className="flex-1 text-left">
+                    <h3 className="font-semibold text-gray-800 group-hover:text-[#2283FF] transition-colors text-sm sm:text-base">
                       {nextModule.title}
                     </h3>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-1">
@@ -443,7 +443,7 @@ export default function Dashboard() {
                       e.stopPropagation();
                       handlePlayModule();
                     }}
-                    className="w-10 h-10 bg-[#2283FF] rounded-lg flex items-center justify-center text-white shrink-0 hover:bg-[#2283FF] transition-colors shadow-sm mt-2 sm:mt-0"
+                    className="w-10 h-10 bg-[#2283FF] rounded-lg flex items-center justify-center text-white shrink-0 hover:bg-[#2283FF] transition-colors shadow-sm"
                   >
                     <svg
                       className="w-5 h-5"
@@ -575,7 +575,7 @@ export default function Dashboard() {
                     <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight group-hover:text-[#2283FF] transition-colors">
                       {course.title}
                     </h3>
-                    <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 md:block hidden">
+                    <p className="text-xs sm:text-sm text-gray-500 leading-relaxed line-clamp-2 mt-2">
                       {course.description || "Master these concepts with our structured learning path."}
                     </p>
                   </div>

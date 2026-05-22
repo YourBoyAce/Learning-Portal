@@ -69,7 +69,7 @@ export default function CoursePlayerPage() {
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
 
   // --- QUIZZES & ARTIFACTS INTEGRATION STATE ---
-  const [activeTab, setActiveTab] = useState<"modules" | "quizzes" | "artifacts">("modules");
+  const [activeTab, setActiveTab] = useState<"overview" | "modules" | "quizzes" | "artifacts">("modules");
   const [courseQuizzes, setCourseQuizzes] = useState<any[]>([]);
   const [courseArtifacts, setCourseArtifacts] = useState<any[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
@@ -398,6 +398,264 @@ export default function CoursePlayerPage() {
     return `${mins}m Total`;
   }, [modules]);
 
+  const renderModuleOverview = () => {
+    return (
+      <div className="space-y-6 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+                Module {modules.findIndex(m => m.id === activeModuleId) + 1}
+              </span>
+              {userProgress[activeModuleId || 0] && (
+                <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Completed
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+              {activeModule?.title || "Module Selection"}
+            </h2>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Kept as a fallback / visual acknowledgement badge! */}
+            {activeModuleId && (
+              <Button 
+                onClick={() => handleMarkAsCompleted(activeModuleId)}
+                disabled={!isCurrentModulePlaybackFinished || isCurrentModuleComplete}
+                className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
+                  isCurrentModuleComplete
+                    ? "bg-emerald-600 text-white cursor-not-allowed"
+                    : isCurrentModulePlaybackFinished
+                    ? "bg-[#174778] hover:bg-[#113a63] text-white"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {isCurrentModuleComplete
+                  ? "Completed"
+                  : isCurrentModuleAcknowledged
+                  ? "Completed"
+                  : "Mark as Completed"}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="prose prose-slate max-w-none">
+          <p className="text-gray-600 leading-relaxed text-[15px] sm:text-[17px]">
+            {activeModule?.description || "In this module, we will explore the foundational principles and practical applications related to this subject matter. Our goal is to achieve a deep understanding through structured media and instructional assets."}
+          </p>
+        </div>
+
+        <div className="p-5 sm:p-8 bg-gray-50 rounded-xl sm:rounded-[2rem] border border-gray-100 space-y-4">
+          <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <BookOpen size={16} className="text-[#174778]" /> 
+            Instructional Context
+          </h4>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            As you progress through this curated video curriculum, ensure you take notes on key conceptual shifts. The material presented here is part of the core intellectual framework of <span className="font-bold text-[#174778]">{course?.title}</span>.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderModulesList = () => {
+    return (
+      <>
+        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Curriculum Outline</h3>
+          <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
+            <span className="flex items-center gap-1.5">
+              <BookOpen size={14} /> {modules.length} Modules
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock size={14} /> {totalDuration || "—"}
+            </span>
+          </div>
+        </div>
+
+        {modules.map((mod, index) => {
+          const isActive = mod.id === activeModuleId;
+          const isCompleted = userProgress[mod.id];
+
+          return (
+            <button
+              key={mod.id}
+              onClick={() => {
+                setActiveModuleId(mod.id);
+                if (typeof window !== "undefined") {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className={`w-full text-left p-5 transition-all flex items-start gap-4 group ${
+                isActive ? "bg-blue-50/50 border-r-4 border-[#174778]" : "hover:bg-gray-50"
+              }`}
+            >
+              <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                isCompleted
+                  ? "bg-emerald-500 border-emerald-500 text-white"
+                  : isActive
+                  ? "bg-[#174778] border-[#174778] text-white"
+                  : "bg-white border-gray-200 text-gray-400 group-hover:border-[#174778] group-hover:text-[#174778]"
+              }`}>
+                {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <h4 className={`text-sm font-bold mb-1 leading-snug transition-colors ${
+                  isActive ? "text-[#174778]" : "text-gray-900 group-hover:text-[#174778]"
+                }`}>
+                  {mod.title}
+                </h4>
+                {mod.description && (
+                  <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1.5">
+                    {mod.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                    <Clock size={10} /> {mod.duration || "—"}
+                  </span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+
+        {modules.length === 0 && (
+          <div className="p-10 text-center text-gray-400">
+            <Loader2 size={32} className="mx-auto mb-4 animate-spin opacity-20" />
+            <p className="text-xs font-bold uppercase tracking-widest">No modules available</p>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderQuizzesList = () => {
+    return (
+      <>
+        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Practice Quizzes</h3>
+          <p className="text-[11px] text-gray-400">Test your mastery of this course with curated interactive tests.</p>
+        </div>
+
+        {courseQuizzes.map((quiz) => {
+          const score = bestScores[quiz.id];
+          const hasAttempted = score !== undefined;
+          const isPassed = hasAttempted && score >= quiz.passingScore;
+
+          return (
+            <div 
+              key={quiz.id}
+              className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-blue-50 text-[#174778] group-hover:bg-[#174778] group-hover:text-white transition-all">
+                  <HelpCircle size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-[#174778] transition-colors leading-snug mb-1">
+                    {quiz.title}
+                  </h4>
+                  <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span>{quiz.questionsCount} Qs</span>
+                    <span>•</span>
+                    <span>Min {quiz.passingScore}% to pass</span>
+                  </div>
+                </div>
+              </div>
+
+              {hasAttempted && (
+                <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-100">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Best Score</span>
+                  <span className={`text-xs font-bold flex items-center gap-1 ${isPassed ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {isPassed ? <Award size={14} /> : <AlertCircle size={14} />}
+                    {score}%
+                  </span>
+                </div>
+              )}
+
+              <Button 
+                onClick={() => handleStartQuiz(quiz)}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${
+                  hasAttempted 
+                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-[#174778] hover:text-[#174778]" 
+                    : "bg-[#174778] text-white hover:bg-[#113a63]"
+                }`}
+              >
+                {hasAttempted ? "Retake Quiz" : "Start Quiz"}
+              </Button>
+            </div>
+          );
+        })}
+
+        {courseQuizzes.length === 0 && (
+          <div className="p-10 text-center text-gray-400">
+            <FileText size={32} className="mx-auto mb-4 opacity-20" />
+            <p className="text-xs font-bold uppercase tracking-widest">No Quizzes Available</p>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderArtifactsList = () => {
+    return (
+      <>
+        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Learning Artifacts</h3>
+          <p className="text-[11px] text-gray-400">Download supplementary materials, code snippets, and resources.</p>
+        </div>
+
+        {courseArtifacts.map((art) => (
+          <div 
+            key={art.id}
+            className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-all">
+                {art.type === 'Code Snippet' ? <FileCode size={16} /> : 
+                 art.type === 'Presentation' ? <Layers size={16} /> : 
+                 <FileArchive size={16} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition-colors leading-snug mb-1">
+                  {art.name}
+                </h4>
+                <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <span className="text-amber-600">{art.type}</span>
+                  <span>•</span>
+                  <span>{art.size}</span>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+              {art.description}
+            </p>
+
+            <Button 
+              onClick={() => handleDownloadArtifact(art)}
+              className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-amber-500 hover:text-amber-600 transition-all flex items-center justify-center gap-2"
+            >
+              <DownloadCloud size={14} /> Download File
+            </Button>
+          </div>
+        ))}
+
+        {courseArtifacts.length === 0 && (
+          <div className="p-10 text-center text-gray-400">
+            <Layers size={32} className="mx-auto mb-4 opacity-20" />
+            <p className="text-xs font-bold uppercase tracking-widest">No Artifacts Available</p>
+          </div>
+        )}
+      </>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
@@ -483,11 +741,11 @@ export default function CoursePlayerPage() {
       </header>
 
       <main className="max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-64px)]">
-        <div className="lg:col-span-9 p-6 lg:p-8 lg:border-r border-gray-100 bg-white/30">
-          <div className="max-w-5xl mx-auto space-y-8">
+        <div className="lg:col-span-9 p-4 sm:p-6 lg:p-8 lg:border-r border-gray-100 bg-white/30">
+          <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
             
             {/* INTEGRATED VIDEO PLAYER WITH AUTO-COMPLETION */}
-            <div className="relative aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl group border-[8px] border-white ring-1 ring-gray-100">
+            <div className="relative aspect-video bg-black rounded-xl sm:rounded-[2rem] overflow-hidden shadow-2xl group border-4 sm:border-[8px] border-white ring-1 ring-gray-100">
               {activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
                   userId={userId}
@@ -513,74 +771,93 @@ export default function CoursePlayerPage() {
               )}
             </div>
 
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider border border-blue-100">
-                      Module {modules.findIndex(m => m.id === activeModuleId) + 1}
+            {/* Mobile Tab Selector & Tab Content */}
+            <div className="lg:hidden">
+              <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-6">
+                <button
+                  onClick={() => setActiveTab("overview")}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                    activeTab === "overview"
+                      ? "border-[#174778] text-[#174778] bg-white"
+                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <BookOpen size={13} />
+                  Overview
+                </button>
+                <button
+                  onClick={() => setActiveTab("modules")}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                    activeTab === "modules"
+                      ? "border-[#174778] text-[#174778] bg-white"
+                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <Clock size={13} />
+                  Modules
+                </button>
+                <button
+                  onClick={() => setActiveTab("quizzes")}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
+                    activeTab === "quizzes"
+                      ? "border-[#174778] text-[#174778] bg-white"
+                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <HelpCircle size={13} />
+                  Quizzes
+                  {courseQuizzes.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#2283FF]"></span>
                     </span>
-                    {userProgress[activeModuleId || 0] && (
-                      <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Completed
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 tracking-tight leading-tight">
-                    {activeModule?.title || "Module Selection"}
-                  </h2>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  {/* Kept as a fallback / visual acknowledgement badge! */}
-                  {activeModuleId && (
-                    <Button 
-                      onClick={() => handleMarkAsCompleted(activeModuleId)}
-                      disabled={!isCurrentModulePlaybackFinished || isCurrentModuleComplete}
-                      className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
-                        isCurrentModuleComplete
-                          ? "bg-emerald-600 text-white cursor-not-allowed"
-                          : isCurrentModulePlaybackFinished
-                          ? "bg-[#174778] hover:bg-[#113a63] text-white"
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      }`}
-                    >
-                      {isCurrentModuleComplete
-                        ? "Completed"
-                        : isCurrentModuleAcknowledged
-                        ? "Completed"
-                        : "Mark as Completed"}
-                    </Button>
                   )}
-                </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab("artifacts")}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
+                    activeTab === "artifacts"
+                      ? "border-[#174778] text-[#174778] bg-white"
+                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <DownloadCloud size={13} />
+                  Artifacts
+                  {courseArtifacts.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  )}
+                </button>
               </div>
 
-              <div className="prose prose-slate max-w-none">
-                <p className="text-gray-600 leading-relaxed text-[17px]">
-                  {activeModule?.description || "In this module, we will explore the foundational principles and practical applications related to this subject matter. Our goal is to achieve a deep understanding through structured media and instructional assets."}
-                </p>
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
+                {activeTab === "overview" && (
+                  <div className="p-5 sm:p-6">
+                    {renderModuleOverview()}
+                  </div>
+                )}
+                {activeTab === "modules" && renderModulesList()}
+                {activeTab === "quizzes" && renderQuizzesList()}
+                {activeTab === "artifacts" && renderArtifactsList()}
               </div>
+            </div>
 
-              <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
-                <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                  <BookOpen size={16} className="text-[#174778]" /> 
-                  Instructional Context
-                </h4>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  As you progress through this curated video curriculum, ensure you take notes on key conceptual shifts. The material presented here is part of the core intellectual framework of <span className="font-bold text-[#174778]">{course?.title}</span>.
-                </p>
-              </div>
+            {/* Desktop Overview Block */}
+            <div className="hidden lg:block">
+              {renderModuleOverview()}
             </div>
           </div>
         </div>
 
-        {/* Right: Module Sidebar */}
-        <div className="lg:col-span-3 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] overflow-y-auto border-l border-gray-100 flex flex-col">
+        {/* Right: Module Sidebar (Desktop Only) */}
+        <div className="hidden lg:flex lg:col-span-3 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] overflow-y-auto border-l border-gray-100 flex-col">
           <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0">
             <button
               onClick={() => setActiveTab("modules")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === "modules"
+                (activeTab === "modules" || activeTab === "overview")
                   ? "border-[#174778] text-[#174778] bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
               }`}
@@ -625,189 +902,9 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {activeTab === "modules" && (
-              <>
-                <div className="p-6 border-b border-gray-50 bg-gray-50/10">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Curriculum Outline</h3>
-                  <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <BookOpen size={14} /> {modules.length} Modules
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Clock size={14} /> {totalDuration || "—"}
-                    </span>
-                  </div>
-                </div>
-
-                {modules.map((mod, index) => {
-                  const isActive = mod.id === activeModuleId;
-                  const isCompleted = userProgress[mod.id];
-
-                  return (
-                    <button
-                      key={mod.id}
-                      onClick={() => setActiveModuleId(mod.id)}
-                      className={`w-full text-left p-5 transition-all flex items-start gap-4 group ${
-                        isActive ? "bg-blue-50/50 border-r-4 border-[#174778]" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
-                        isCompleted
-                          ? "bg-emerald-500 border-emerald-500 text-white"
-                          : isActive
-                          ? "bg-[#174778] border-[#174778] text-white"
-                          : "bg-white border-gray-200 text-gray-400 group-hover:border-[#174778] group-hover:text-[#174778]"
-                      }`}>
-                        {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`text-sm font-bold mb-1 leading-snug transition-colors ${
-                          isActive ? "text-[#174778]" : "text-gray-900 group-hover:text-[#174778]"
-                        }`}>
-                          {mod.title}
-                        </h4>
-                        {mod.description && (
-                          <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1.5">
-                            {mod.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                            <Clock size={10} /> {mod.duration || "—"}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {modules.length === 0 && (
-                  <div className="p-10 text-center text-gray-400">
-                    <Loader2 size={32} className="mx-auto mb-4 animate-spin opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest">No modules available</p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeTab === "quizzes" && (
-              <>
-                <div className="p-6 border-b border-gray-50 bg-gray-50/10">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Practice Quizzes</h3>
-                  <p className="text-[11px] text-gray-400">Test your mastery of this course with curated interactive tests.</p>
-                </div>
-
-                {courseQuizzes.map((quiz) => {
-                  const score = bestScores[quiz.id];
-                  const hasAttempted = score !== undefined;
-                  const isPassed = hasAttempted && score >= quiz.passingScore;
-
-                  return (
-                    <div 
-                      key={quiz.id}
-                      className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-blue-50 text-[#174778] group-hover:bg-[#174778] group-hover:text-white transition-all">
-                          <HelpCircle size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold text-gray-900 group-hover:text-[#174778] transition-colors leading-snug mb-1">
-                            {quiz.title}
-                          </h4>
-                          <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            <span>{quiz.questionsCount} Qs</span>
-                            <span>•</span>
-                            <span>Min {quiz.passingScore}% to pass</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {hasAttempted && (
-                        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-100">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">Best Score</span>
-                          <span className={`text-xs font-bold flex items-center gap-1 ${isPassed ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {isPassed ? <Award size={14} /> : <AlertCircle size={14} />}
-                            {score}%
-                          </span>
-                        </div>
-                      )}
-
-                      <Button 
-                        onClick={() => handleStartQuiz(quiz)}
-                        className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${
-                          hasAttempted 
-                            ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-[#174778] hover:text-[#174778]" 
-                            : "bg-[#174778] text-white hover:bg-[#113a63]"
-                        }`}
-                      >
-                        {hasAttempted ? "Retake Quiz" : "Start Quiz"}
-                      </Button>
-                    </div>
-                  );
-                })}
-
-                {courseQuizzes.length === 0 && (
-                  <div className="p-10 text-center text-gray-400">
-                    <FileText size={32} className="mx-auto mb-4 opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest">No Quizzes Available</p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeTab === "artifacts" && (
-              <>
-                <div className="p-6 border-b border-gray-50 bg-gray-50/10">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Learning Artifacts</h3>
-                  <p className="text-[11px] text-gray-400">Download supplementary materials, code snippets, and resources.</p>
-                </div>
-
-                {courseArtifacts.map((art) => (
-                  <div 
-                    key={art.id}
-                    className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-all">
-                        {art.type === 'Code Snippet' ? <FileCode size={16} /> : 
-                         art.type === 'Presentation' ? <Layers size={16} /> : 
-                         <FileArchive size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition-colors leading-snug mb-1">
-                          {art.name}
-                        </h4>
-                        <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          <span className="text-amber-600">{art.type}</span>
-                          <span>•</span>
-                          <span>{art.size}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
-                      {art.description}
-                    </p>
-
-                    <Button 
-                      onClick={() => handleDownloadArtifact(art)}
-                      className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-amber-500 hover:text-amber-600 transition-all flex items-center justify-center gap-2"
-                    >
-                      <DownloadCloud size={14} /> Download File
-                    </Button>
-                  </div>
-                ))}
-
-                {courseArtifacts.length === 0 && (
-                  <div className="p-10 text-center text-gray-400">
-                    <Layers size={32} className="mx-auto mb-4 opacity-20" />
-                    <p className="text-xs font-bold uppercase tracking-widest">No Artifacts Available</p>
-                  </div>
-                )}
-              </>
-            )}
+            {(activeTab === "modules" || activeTab === "overview") && renderModulesList()}
+            {activeTab === "quizzes" && renderQuizzesList()}
+            {activeTab === "artifacts" && renderArtifactsList()}
           </div>
         </div>
       </main>
@@ -903,7 +1000,7 @@ export default function CoursePlayerPage() {
                           key={idx}
                           onClick={() => handleAnswerSelect(idx)}
                           disabled={isAnswerSubmitted}
-                          className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-4 ${optionClass}`}
+                          className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
                         >
                           <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
                             isAnswerSubmitted && isCorrectAnswer ? "bg-emerald-500 border-emerald-500 text-white" :

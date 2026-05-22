@@ -258,7 +258,7 @@ export default function StudentPracticeCenter() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
@@ -273,28 +273,28 @@ export default function StudentPracticeCenter() {
           </div>
 
           {/* Segmented control tabs */}
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0">
+          <div className="grid grid-cols-2 sm:flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab("quizzes")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+              className={`px-2 py-2 sm:px-5 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
                 activeTab === "quizzes"
                   ? "bg-[#2283FF] text-white shadow-sm"
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
               <HelpCircle className="w-4 h-4" />
-              Practice Quizzes ({quizzes.length})
+              Quizzes ({quizzes.length})
             </button>
             <button
               onClick={() => setActiveTab("artifacts")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+              className={`px-2 py-2 sm:px-5 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
                 activeTab === "artifacts"
                   ? "bg-[#2283FF] text-white shadow-sm"
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
               <DownloadCloud className="w-4 h-4" />
-              Study Materials ({artifacts.length})
+              Materials ({artifacts.length})
             </button>
           </div>
         </div>
@@ -454,7 +454,7 @@ export default function StudentPracticeCenter() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col border border-gray-100">
             
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-[#174778] flex items-center justify-center">
                   <HelpCircle size={20} />
@@ -475,7 +475,7 @@ export default function StudentPracticeCenter() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-8 overflow-y-auto flex-1 bg-white">
+            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-white">
               
               {/* STEP 1: INTRO */}
               {quizStep === "intro" && (
@@ -528,7 +528,7 @@ export default function StudentPracticeCenter() {
                   </div>
 
                   {/* Question Text */}
-                  <div className="p-6 bg-blue-50/30 rounded-2xl border border-blue-50/50">
+                  <div className="p-4 sm:p-6 bg-blue-50/30 rounded-2xl border border-blue-50/50">
                     <h4 className="text-base font-bold text-gray-900 leading-relaxed">
                       {activeQuiz.questions[currentQuestionIndex].text}
                     </h4>
@@ -559,22 +559,22 @@ export default function StudentPracticeCenter() {
                           key={oIdx}
                           onClick={() => handleAnswerSelect(oIdx)}
                           disabled={isAnswerSubmitted}
-                          className={`w-full text-left p-4 rounded-2xl border transition-all text-sm flex items-center justify-between ${optionStyle}`}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all text-sm flex items-start justify-between gap-3 ${optionStyle}`}
                         >
-                          <span className="flex items-center gap-3">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          <span className="flex items-start gap-3">
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                               isSelected ? "bg-[#174778] text-white" : "bg-gray-100 text-gray-500"
                             }`}>
                               {String.fromCharCode(65 + oIdx)}
                             </span>
-                            {option}
+                            <span className="mt-0.5 leading-snug">{option}</span>
                           </span>
                           
                           {isAnswerSubmitted && isCorrectAnswer && (
-                            <Check size={16} className="text-emerald-600 shrink-0" />
+                            <Check size={16} className="text-emerald-600 shrink-0 mt-1" />
                           )}
                           {isAnswerSubmitted && isSelected && !isCorrectAnswer && (
-                            <XIcon size={16} className="text-red-600 shrink-0" />
+                            <XIcon size={16} className="text-red-600 shrink-0 mt-1" />
                           )}
                         </button>
                       );
@@ -646,17 +646,17 @@ export default function StudentPracticeCenter() {
                         </div>
 
                         {/* Try Again / Close */}
-                        <div className="flex items-center justify-center gap-3 pt-2 max-w-sm mx-auto">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-2 max-w-sm mx-auto">
                           <Button
                             onClick={handleRestartQuiz}
                             variant="outline"
-                            className="flex-1 py-5 rounded-full border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold flex items-center justify-center gap-2"
+                            className="w-full sm:flex-1 py-5 rounded-full border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold flex items-center justify-center gap-2"
                           >
                             <RefreshCw size={14} /> Practice Again
                           </Button>
                           <Button
                             onClick={() => setShowQuizModal(false)}
-                            className="flex-1 py-5 rounded-full bg-[#174778] hover:bg-[#113a63] text-white text-xs font-bold"
+                            className="w-full sm:flex-1 py-5 rounded-full bg-[#174778] hover:bg-[#113a63] text-white text-xs font-bold"
                           >
                             Close Quiz
                           </Button>

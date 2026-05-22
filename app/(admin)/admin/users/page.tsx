@@ -301,26 +301,26 @@ export default function AdminUsers() {
             </div>
 
             {/* ACTIVE USERS WIDGET */}
-            <div className="bg-[#0f172a] rounded-2xl shadow-lg p-6 flex items-center justify-between text-white relative overflow-hidden">
+            <div className="bg-[#174778]/10 backdrop-blur-md border border-[#174778]/15 rounded-2xl shadow-sm p-6 flex items-center justify-between text-[#174778] relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500 opacity-10 rounded-full blur-2xl"></div>
 
               <div className="relative z-10">
                 <div className="flex items-center gap-2.5 mb-1.5">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#174778] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#174778]"></span>
                   </span>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Users logged in today
                   </p>
                 </div>
-                <p className="text-4xl font-bold mt-2 text-white">
+                <p className="text-4xl font-bold mt-2 text-[#174778]">
                   {loading ? "-" : activeUsersCount}
                 </p>
               </div>
 
               <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative z-10 shrink-0">
-                <Users className="text-emerald-400" size={24} />
+                <Users className="text[#174778]" size={24} />
               </div>
             </div>
           </div>

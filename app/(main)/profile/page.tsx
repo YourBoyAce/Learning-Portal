@@ -318,7 +318,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-8 font-sans">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-8 font-sans">
       <div className="max-w-[900px] mx-auto">
         <h1 className="text-4xl font-extrabold text-[#2283FF] tracking-tight mb-2">
           My Profile
@@ -407,7 +407,7 @@ export default function ProfilePage() {
           {/* RIGHT COLUMN */}
           <div className="lg:col-span-2 space-y-6">
             {/* PERSONAL IDENTITY */}
-            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
+            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
               <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">
                 Personal Identity
               </h3>
@@ -443,7 +443,7 @@ export default function ProfilePage() {
             </div>
 
             {/* SCHOLARLY BIO */}
-            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
+            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
               <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">
                 Scholarly Bio
               </h3>
@@ -471,7 +471,7 @@ export default function ProfilePage() {
             </div>
 
             {/* DIGITAL FOOTPRINT */}
-            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-8">
+            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
               <h3 className="font-bold text-[#2283FF] text-[18px] mb-6">
                 Digital Footprint
               </h3>
@@ -500,7 +500,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 sm:justify-between items-stretch sm:items-center">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 bg-[#00E5FF] rounded-full flex items-center justify-center">
                     <svg
