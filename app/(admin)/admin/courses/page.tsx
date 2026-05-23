@@ -37,7 +37,9 @@ export default function AdminCourses() {
   >(null);
   const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
-  const [modules, setModules] = useState([{ title: "", description: "" }]);
+  const [modules, setModules] = useState<
+    Array<{ id?: string | number; title: string; description: string }>
+  >([{ title: "", description: "" }]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -99,16 +101,40 @@ export default function AdminCourses() {
     setShowModal(true);
   };
 
-  const handleEdit = (course: Course) => {
+  const handleEdit = async (course: Course) => {
     setIsEditing(true);
     setEditingCourseId(course.id);
     setCourseTitle(course.title);
     setCourseDescription(course.description || "");
-    setModules([{ title: "", description: "" }]);
+    setModules([]);
     setThumbnailFile(null);
     setThumbnailPreview(course.thumbnail_url || "");
     setModalMessage(null);
     setShowModal(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("coursemodules")
+        .select("*")
+        .eq("maincourse_id", course.id)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setModules(
+          data.map((m) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description || "",
+          }))
+        );
+      } else {
+        setModules([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch modules:", err);
+      setModules([]);
+    }
   };
 
   const handleAddModule = () => {
@@ -130,9 +156,7 @@ export default function AdminCourses() {
   };
 
   const handleRemoveModule = (index: number) => {
-    if (modules.length > 1) {
-      setModules(modules.filter((_, i) => i !== index));
-    }
+    setModules(modules.filter((_, i) => i !== index));
   };
 
   const handleSaveCourse = async () => {
@@ -140,20 +164,16 @@ export default function AdminCourses() {
     const description = courseDescription.trim();
     const validModules = modules
       .filter((m) => m.title.trim())
-      .map((m) => ({ title: m.title.trim(), description: m.description.trim() }));
+      .map((m) => ({
+        ...(m.id && { id: m.id }),
+        title: m.title.trim(),
+        description: m.description.trim(),
+      }));
 
     if (!title || !description) {
       setModalMessage({
         type: "error",
         text: "Please add both course title and description.",
-      });
-      return;
-    }
-
-    if (!isEditing && validModules.length === 0) {
-      setModalMessage({
-        type: "error",
-        text: "Please add at least one module title.",
       });
       return;
     }
@@ -198,6 +218,7 @@ export default function AdminCourses() {
             title,
             description,
             ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+            modules: validModules,
           }),
         });
 
@@ -577,63 +598,56 @@ export default function AdminCourses() {
                 )}
               </div>
 
-              {!isEditing && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Modules <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAddModule}
-                      className="text-[#2283FF] hover:bg-[#2283FF]/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add Module
-                    </button>
-                  </div>
-
-                  {modules.map((module, index) => (
-                    <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <input
-                            type="text"
-                            placeholder={`Module ${index + 1} Title`}
-                            value={module.title}
-                            onChange={(e) =>
-                              handleModuleChange(index, "title", e.target.value)
-                            }
-                            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] bg-white"
-                          />
-                        </div>
-                        {modules.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveModule(index)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                            title="Remove Module"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      <textarea
-                        placeholder={`Description for Module ${index + 1} (optional)`}
-                        value={module.description}
-                        onChange={(e) =>
-                          handleModuleChange(index, "description", e.target.value)
-                        }
-                        rows={2}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] resize-none bg-white"
-                      />
-                    </div>
-                  ))}
-                  <p className="text-[11px] text-gray-500">
-                    At least one module is mandatory.
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Modules (Optional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddModule}
+                    className="text-[#2283FF] hover:bg-[#2283FF]/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Module
+                  </button>
                 </div>
-              )}
+
+                {modules.map((module, index) => (
+                  <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder={`Module ${index + 1} Title`}
+                          value={module.title}
+                          onChange={(e) =>
+                            handleModuleChange(index, "title", e.target.value)
+                          }
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] bg-white"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveModule(index)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                        title="Remove Module"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <textarea
+                      placeholder={`Description for Module ${index + 1} (optional)`}
+                      value={module.description}
+                      onChange={(e) =>
+                        handleModuleChange(index, "description", e.target.value)
+                      }
+                      rows={2}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] resize-none bg-white"
+                    />
+                  </div>
+                ))}
+              </div>
 
               {modalMessage && (
                 <p

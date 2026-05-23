@@ -206,6 +206,87 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  const modules = body?.modules;
+  if (Array.isArray(modules)) {
+    const validModules = modules.filter(
+      (m: any) => m && typeof m.title === "string" && m.title.trim() !== ""
+    );
+
+    const modulesToUpdate = validModules.filter((m: any) => m.id);
+    const modulesToInsert = validModules.filter((m: any) => !m.id);
+
+    const keepIds = modulesToUpdate.map((m: any) => m.id);
+
+    // Fetch all current module IDs for the course
+    const { data: currentModules, error: fetchError } = await authContext.supabaseAdmin
+      .from("coursemodules")
+      .select("id")
+      .eq("maincourse_id", id);
+
+    if (fetchError) {
+      return NextResponse.json(
+        { error: "Course updated but failed to check existing modules: " + fetchError.message },
+        { status: 500 },
+      );
+    }
+
+    const currentIds = currentModules?.map((m: any) => m.id) ?? [];
+    const deleteIds = currentIds.filter((cid: string) => !keepIds.includes(cid));
+
+    if (deleteIds.length > 0) {
+      const { error: deleteModulesError } = await authContext.supabaseAdmin
+        .from("coursemodules")
+        .delete()
+        .in("id", deleteIds);
+
+      if (deleteModulesError) {
+        return NextResponse.json(
+          { error: "Course updated but failed to remove modules: " + deleteModulesError.message },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Update existing modules
+    for (const mod of modulesToUpdate) {
+      const { error: modUpdateError } = await authContext.supabaseAdmin
+        .from("coursemodules")
+        .update({
+          title: mod.title.trim(),
+          description: (mod.description || "").trim(),
+        })
+        .eq("id", mod.id)
+        .eq("maincourse_id", id);
+
+      if (modUpdateError) {
+        return NextResponse.json(
+          { error: "Course updated but failed to update modules: " + modUpdateError.message },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Insert new modules
+    if (modulesToInsert.length > 0) {
+      const insertData = modulesToInsert.map((mod: any) => ({
+        maincourse_id: id,
+        title: mod.title.trim(),
+        description: (mod.description || "").trim(),
+      }));
+
+      const { error: insertModulesError } = await authContext.supabaseAdmin
+        .from("coursemodules")
+        .insert(insertData);
+
+      if (insertModulesError) {
+        return NextResponse.json(
+          { error: "Course updated but failed to insert new modules: " + insertModulesError.message },
+          { status: 500 },
+        );
+      }
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
