@@ -27,52 +27,50 @@ export async function upsertUserProgress(
     }
   );
 
-  // 1. Ensure video exists in videos table (to satisfy foreign key constraints)
-  const { data: existingVideo } = await supabaseAdmin
-    .from("videos")
+  const payload = {
+    user_id: userId,
+    course_id: courseId,
+    video_id: moduleId,
+    completed,
+    completed_at: completed ? new Date().toISOString() : null,
+    progress_percentage: progressPercentage,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existingRow, error: existingRowError } = await supabaseAdmin
+    .from("user_video_progress")
     .select("id")
-    .eq("id", moduleId)
-    .single();
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .eq("video_id", moduleId)
+    .maybeSingle();
 
-  if (!existingVideo) {
-    const { error: videoInsertError } = await supabaseAdmin
-      .from("videos")
-      .insert({
-        id: moduleId,
-        course_id: courseId,
-      });
-
-    if (videoInsertError) {
-      console.error(videoInsertError);
-      throw new Error(
-        "Failed to register video: " + videoInsertError.message
-      );
-    }
+  if (existingRowError) {
+    console.error("Error checking existing progress row:", existingRowError);
+    throw new Error(
+      "Failed to check existing video progress: " + existingRowError.message,
+    );
   }
 
-  // 2. Upsert progress with the continuous tracking percentage
-  const { error: progressError } = await supabaseAdmin
-    .from("user_video_progress")
-    .upsert(
-      {
-        user_id: userId,
-        course_id: courseId,
-        video_id: moduleId,
-        completed,
-        completed_at: completed ? new Date().toISOString() : null,
-        progress_percentage: progressPercentage, // Now uses the dynamic value
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "user_id,video_id", 
-      }
-    );
+  if (existingRow?.id) {
+    const { error: updateError } = await supabaseAdmin
+      .from("user_video_progress")
+      .update(payload)
+      .eq("id", existingRow.id);
 
-  if (progressError) {
-    console.error("Error updating progress:", progressError);
-    throw new Error(
-      "Failed to update video progress: " + progressError.message
-    );
+    if (updateError) {
+      console.error("Error updating progress:", updateError);
+      throw new Error("Failed to update video progress: " + updateError.message);
+    }
+  } else {
+    const { error: insertError } = await supabaseAdmin
+      .from("user_video_progress")
+      .insert(payload);
+
+    if (insertError) {
+      console.error("Error inserting progress:", insertError);
+      throw new Error("Failed to insert video progress: " + insertError.message);
+    }
   }
 
   return { success: true };

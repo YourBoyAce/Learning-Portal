@@ -97,8 +97,27 @@ export async function POST(request: Request) {
     typeof formData.get("cloudflareUid") === "string"
       ? String(formData.get("cloudflareUid")).trim()
       : "";
+  const cloudflareUidsRaw =
+    typeof formData.get("cloudflareUids") === "string"
+      ? String(formData.get("cloudflareUids")).trim()
+      : "";
+  const cloudflareUids = cloudflareUidsRaw
+    ? (() => {
+        try {
+          const parsed = JSON.parse(cloudflareUidsRaw);
+          return Array.isArray(parsed)
+            ? parsed.filter(
+                (value): value is string =>
+                  typeof value === "string" && value.trim().length > 0,
+              )
+            : [];
+        } catch {
+          return [];
+        }
+      })()
+    : [];
 
-  let uid = cloudflareUid;
+  let uid = cloudflareUid || cloudflareUids[0] || "";
   let videoUrl = uid ? `https://watch.cloudflarestream.com/${uid}` : "";
 
   // If no cloudflareUid is provided, try to upload the file directly

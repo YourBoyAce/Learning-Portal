@@ -15,9 +15,35 @@ type Course = {
 type Module = {
   id: string | number;
   title: string;
+  created_at?: string | null;
 };
 
 export default function UploadPage() {
+  const moduleTitleComparator = (a: Module, b: Module) => {
+    const titleA = a.title?.trim() ?? "";
+    const titleB = b.title?.trim() ?? "";
+
+    const numA = titleA.match(/\d+/)?.[0];
+    const numB = titleB.match(/\d+/)?.[0];
+
+    if (numA && numB) {
+      const parsedA = Number(numA);
+      const parsedB = Number(numB);
+      if (
+        !Number.isNaN(parsedA) &&
+        !Number.isNaN(parsedB) &&
+        parsedA !== parsedB
+      ) {
+        return parsedA - parsedB;
+      }
+    }
+
+    return titleA.localeCompare(titleB, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  };
+
   const textPrimary = "#0f172a";
   const textSecondary = "#334155";
   const inputBorder = "#cbd5e1";
@@ -127,13 +153,19 @@ export default function UploadPage() {
       try {
         const { data, error } = await supabase
           .from("coursemodules")
-          .select("id, title")
-          .eq("maincourse_id", selectedCurriculum);
+          .select("id, title, created_at")
+          .eq("maincourse_id", selectedCurriculum)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
 
         if (error) throw error;
-        setModules(data || []);
+
+        const sortedModules = [...(data || [])].sort(moduleTitleComparator);
+        setModules(sortedModules);
       } catch (err) {
         console.error("Failed to fetch modules", err);
+        setModules([]);
+        setError("Failed to load modules for this curriculum.");
       } finally {
         setIsModulesLoading(false);
       }
@@ -153,24 +185,31 @@ export default function UploadPage() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) setSelectedFile(file);
     if (file) {
+      setError("");
+      setSelectedFile(file);
       setVideoFile(file);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
+    if (file) {
+      setError("");
+      setSelectedFile(file);
+      setVideoFile(file);
+    }
   };
 
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
 
   const handleUploadVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     setUploadProgress(0);
+    setUploadStatus("");
 
     if (
       !selectedCurriculum ||
@@ -199,60 +238,123 @@ export default function UploadPage() {
         throw new Error("Please log in again to continue.");
       }
 
-      // 1. Get Direct Upload URL from Cloudflare
-      const directUploadResponse = await fetch("/api/cloudflare/stream/direct-upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-        body: JSON.stringify({
-          title: videoTitle.trim(),
-          courseId: selectedCurriculum,
-          moduleId: selectedModuleId,
-        }),
-      });
+      const fileSize = selectedFile.size;
+      const chunkSize = 190 * 1024 * 1024; // 190MB chunks (safe margin below 200MB limit)
+      const numChunks = Math.ceil(fileSize / chunkSize);
+      const uploadedUIDs: string[] = [];
 
-      const directUploadResult = await directUploadResponse.json();
-      if (!directUploadResponse.ok) {
-        throw new Error(directUploadResult.error || "Failed to initialize Cloudflare upload.");
+      // Upload file in chunks
+      for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, fileSize);
+        const chunk = selectedFile.slice(start, end);
+
+        setUploadStatus(
+          numChunks > 1
+            ? `Uploading part ${chunkIndex + 1} of ${numChunks}...`
+            : "",
+        );
+
+        // 1. Get Direct Upload URL from Cloudflare for this chunk
+        const directUploadResponse = await fetch(
+          "/api/cloudflare/stream/direct-upload",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sessionData.session.access_token}`,
+            },
+            body: JSON.stringify({
+              title:
+                numChunks > 1
+                  ? `${videoTitle.trim()} (Part ${chunkIndex + 1}/${numChunks})`
+                  : videoTitle.trim(),
+              courseId: selectedCurriculum,
+              moduleId: selectedModuleId,
+            }),
+          },
+        );
+
+        const directUploadResult = await directUploadResponse.json();
+        if (!directUploadResponse.ok) {
+          throw new Error(
+            directUploadResult.error ||
+              "Failed to initialize Cloudflare upload.",
+          );
+        }
+
+        const { uploadURL, uid } = directUploadResult;
+        uploadedUIDs.push(uid);
+
+        // 2. Upload chunk to Cloudflare with retry
+        const uploadChunkWithRetry = async (maxRetries = 3) => {
+          let lastError: Error | null = null;
+
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open("POST", uploadURL);
+
+                xhr.upload.onprogress = (event) => {
+                  if (event.lengthComputable) {
+                    const chunkProgress = Math.round(
+                      (event.loaded / (end - start)) * 100,
+                    );
+                    const overallProgress = Math.round(
+                      ((start + event.loaded) / fileSize) * 100,
+                    );
+                    setUploadProgress(overallProgress);
+                  }
+                };
+
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                  } else {
+                    reject(
+                      new Error(
+                        `Upload failed with status ${xhr.status}: ${xhr.statusText}`,
+                      ),
+                    );
+                  }
+                };
+
+                xhr.onerror = () =>
+                  reject(new Error("Network error during upload."));
+                xhr.onabort = () => reject(new Error("Upload was aborted."));
+
+                const formData = new FormData();
+                formData.append("file", chunk);
+                xhr.send(formData);
+              });
+              return; // Success, exit retry loop
+            } catch (err) {
+              lastError = err instanceof Error ? err : new Error(String(err));
+              console.warn(
+                `Upload attempt ${attempt + 1} failed:`,
+                lastError.message,
+              );
+
+              if (attempt < maxRetries - 1) {
+                const delayMs = Math.pow(2, attempt) * 1000;
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              }
+            }
+          }
+
+          throw lastError || new Error("Upload failed after multiple attempts");
+        };
+
+        await uploadChunkWithRetry();
       }
 
-      const { uploadURL, uid } = directUploadResult;
-
-      // 2. Upload file directly to Cloudflare using XHR for progress tracking
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", uploadURL);
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percent = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(percent);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else {
-            reject(new Error("Failed to upload file to Cloudflare."));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error("Network error during upload."));
-        
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        xhr.send(formData);
-      });
-
-      // 3. Update database with the Cloudflare UID
+      // 3. Update database with all Cloudflare UIDs
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
       payload.append("moduleId", selectedModuleId);
       payload.append("title", videoTitle.trim());
-      payload.append("cloudflareUid", uid);
+      payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
 
       const response = await fetch("/api/admin/coursemodules", {
         method: "POST",
@@ -273,7 +375,12 @@ export default function UploadPage() {
       setVideoTitle("");
       setSelectedFile(null);
       setUploadProgress(100);
-      setSuccess("Video uploaded successfully to Cloudflare and linked to the module.");
+      setUploadStatus("");
+      setSuccess(
+        numChunks > 1
+          ? `Video uploaded successfully in ${numChunks} parts and linked to the module.`
+          : "Video uploaded successfully to Cloudflare and linked to the module.",
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to upload video.");
     } finally {
@@ -447,19 +554,21 @@ export default function UploadPage() {
                         Drop asset or click to browse
                       </p>
                       <p className="text-xs text-gray-500">
-                        MP4, MOV up to 2GB
+                        MP4, MOV (large files are uploaded in chunks)
                       </p>
                     </>
                   )}
                 </div>
 
-                  <button
-                    type="submit"
-                    disabled={isUploading}
-                    className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isUploading ? `Uploading... ${uploadProgress}%` : "Upload Video Asset"}
-                  </button>
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isUploading
+                    ? `Uploading... ${uploadProgress}%`
+                    : "Upload Video Asset"}
+                </button>
               </form>
             </div>
           </div>

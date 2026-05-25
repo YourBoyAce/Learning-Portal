@@ -5,12 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import { generateCertificatePDF } from "@/app/lib/certificate";
-import { 
-  PlayCircle, 
-  CheckCircle2, 
-  ChevronLeft, 
-  Clock, 
-  BookOpen, 
+import {
+  PlayCircle,
+  CheckCircle2,
+  ChevronLeft,
+  Clock,
+  BookOpen,
   Lock,
   Loader2,
   AlertCircle,
@@ -24,7 +24,7 @@ import {
   FileCode,
   BarChart3,
   Layers,
-  DownloadCloud
+  DownloadCloud,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -49,40 +49,81 @@ interface Module {
   order_index: number;
 }
 
+const moduleTitleComparator = (
+  a: Pick<Module, "title">,
+  b: Pick<Module, "title">,
+) => {
+  const titleA = a.title?.trim() ?? "";
+  const titleB = b.title?.trim() ?? "";
+
+  const numA = titleA.match(/\d+/)?.[0];
+  const numB = titleB.match(/\d+/)?.[0];
+
+  if (numA && numB) {
+    const parsedA = Number(numA);
+    const parsedB = Number(numB);
+    if (
+      !Number.isNaN(parsedA) &&
+      !Number.isNaN(parsedB) &&
+      parsedA !== parsedB
+    ) {
+      return parsedA - parsedB;
+    }
+  }
+
+  return titleA.localeCompare(titleB, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+};
+
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
-  
+
   // Added userId to state so we can pass it down to the video player
   const [userId, setUserId] = useState<string | null>(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
-  const [modulePlaybackFinished, setModulePlaybackFinished] = useState<Record<string, boolean>>({});
-  const [completionAcknowledged, setCompletionAcknowledged] = useState<Record<string, boolean>>({});
+  const [modulePlaybackFinished, setModulePlaybackFinished] = useState<
+    Record<string, boolean>
+  >({});
+  const [completionAcknowledged, setCompletionAcknowledged] = useState<
+    Record<string, boolean>
+  >({});
+  const [isMarkingCompleted, setIsMarkingCompleted] = useState(false);
+  const [completionError, setCompletionError] = useState("");
   const [hasCertificate, setHasCertificate] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [studentName, setStudentName] = useState("Learner");
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
 
   // --- QUIZZES & ARTIFACTS INTEGRATION STATE ---
-  const [activeTab, setActiveTab] = useState<"overview" | "modules" | "quizzes" | "artifacts">("modules");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "modules" | "quizzes" | "artifacts"
+  >("modules");
   const [courseQuizzes, setCourseQuizzes] = useState<any[]>([]);
   const [courseArtifacts, setCourseArtifacts] = useState<any[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
-  
+
   // Interactive Quiz Player State
   const [showQuizModal, setShowQuizModal] = useState(false);
-  const [quizStep, setQuizStep] = useState<"intro" | "questions" | "results">("intro");
+  const [quizStep, setQuizStep] = useState<"intro" | "questions" | "results">(
+    "intro",
+  );
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [quizScore, setQuizScore] = useState(0);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
+
+  const getProgressStorageKey = (uid: string, courseId: string) =>
+    `course_progress_${uid}_${courseId}`;
 
   useEffect(() => {
     if (id) {
@@ -102,12 +143,13 @@ export default function CoursePlayerPage() {
           console.error("Failed to parse quizzes:", e);
         }
       }
-      
+
       // 2. Filter quizzes for this course
-      const filteredQuizzes = allQuizzes.filter((q: any) => 
-        q.status === "Active" &&
-        (String(q.courseId) === String(id) || 
-         q.courseName.toLowerCase() === course.title.toLowerCase())
+      const filteredQuizzes = allQuizzes.filter(
+        (q: any) =>
+          q.status === "Active" &&
+          (String(q.courseId) === String(id) ||
+            q.courseName.toLowerCase() === course.title.toLowerCase()),
       );
       setCourseQuizzes(filteredQuizzes);
 
@@ -123,10 +165,11 @@ export default function CoursePlayerPage() {
       }
 
       // 4. Filter artifacts for this course
-      const filteredArtifacts = allArtifacts.filter((art: any) =>
-        art.status === "Published" &&
-        (String(art.courseId) === String(id) ||
-         art.courseName.toLowerCase() === course.title.toLowerCase())
+      const filteredArtifacts = allArtifacts.filter(
+        (art: any) =>
+          art.status === "Published" &&
+          (String(art.courseId) === String(id) ||
+            art.courseName.toLowerCase() === course.title.toLowerCase()),
       );
       setCourseArtifacts(filteredArtifacts);
 
@@ -143,18 +186,27 @@ export default function CoursePlayerPage() {
   }, [course, id]);
 
   const handleDownloadArtifact = (art: any) => {
-    setCourseArtifacts(prev =>
-      prev.map(a => (a.id === art.id ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 } : a))
+    setCourseArtifacts((prev) =>
+      prev.map((a) =>
+        a.id === art.id
+          ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 }
+          : a,
+      ),
     );
 
     const saved = localStorage.getItem("automate_portal_artifacts");
     if (saved) {
       try {
         const allArtifacts = JSON.parse(saved);
-        const updated = allArtifacts.map((a: any) => 
-          a.id === art.id ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 } : a
+        const updated = allArtifacts.map((a: any) =>
+          a.id === art.id
+            ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 }
+            : a,
         );
-        localStorage.setItem("automate_portal_artifacts", JSON.stringify(updated));
+        localStorage.setItem(
+          "automate_portal_artifacts",
+          JSON.stringify(updated),
+        );
       } catch (e) {
         console.error(e);
       }
@@ -189,45 +241,48 @@ export default function CoursePlayerPage() {
 
   const handleVerifyAnswer = () => {
     if (selectedAnswer === null || isAnswerSubmitted) return;
-    
+
     const currentQuestion = activeQuiz.questions[currentQuestionIndex];
     const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
-    
+
     if (isCorrect) {
-      setQuizScore(prev => prev + 1);
+      setQuizScore((prev) => prev + 1);
     }
-    
-    setUserAnswers(prev => ({
+
+    setUserAnswers((prev) => ({
       ...prev,
-      [currentQuestionIndex]: selectedAnswer
+      [currentQuestionIndex]: selectedAnswer,
     }));
-    
+
     setIsAnswerSubmitted(true);
   };
 
   const handleNextQuestion = () => {
     setSelectedAnswer(null);
     setIsAnswerSubmitted(false);
-    setCurrentQuestionIndex(prev => prev + 1);
+    setCurrentQuestionIndex((prev) => prev + 1);
   };
 
   const handleViewResults = () => {
     if (!activeQuiz) return;
     const totalQuestions = activeQuiz.questions.length;
     const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
-    
+
     const currentBest = bestScores[activeQuiz.id] || 0;
     if (scorePercentage > currentBest) {
       const updatedBest = {
         ...bestScores,
-        [activeQuiz.id]: scorePercentage
+        [activeQuiz.id]: scorePercentage,
       };
       setBestScores(updatedBest);
       if (course) {
-        localStorage.setItem(`best_scores_${course.id}`, JSON.stringify(updatedBest));
+        localStorage.setItem(
+          `best_scores_${course.id}`,
+          JSON.stringify(updatedBest),
+        );
       }
     }
-    
+
     setQuizStep("results");
   };
 
@@ -243,13 +298,15 @@ export default function CoursePlayerPage() {
   const loadCourseData = async () => {
     try {
       setLoading(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
         return;
       }
-      
+
       // Store user ID for the video player component
       setUserId(user.id);
 
@@ -259,20 +316,23 @@ export default function CoursePlayerPage() {
         .eq("id", id)
         .single();
 
-      if (courseError || !courseData) throw courseError || new Error("Course not found");
+      if (courseError || !courseData)
+        throw courseError || new Error("Course not found");
       setCourse(courseData);
 
       const { data: modulesData, error: modulesError } = await supabase
         .from("coursemodules")
         .select("*")
-        .eq("maincourse_id", id)
-        .order("id", { ascending: true }); 
+        .eq("maincourse_id", id);
 
       if (modulesError) throw modulesError;
-      setModules(modulesData || []);
+      const sortedModules = [...(modulesData || [])].sort(
+        moduleTitleComparator,
+      );
+      setModules(sortedModules);
 
-      if (modulesData && modulesData.length > 0) {
-        setActiveModuleId(modulesData[0].id);
+      if (sortedModules.length > 0) {
+        setActiveModuleId(sortedModules[0].id);
       }
 
       const { data: progressData, error: progressError } = await supabase
@@ -285,8 +345,43 @@ export default function CoursePlayerPage() {
 
       const progressMap: Record<string, boolean> = {};
       progressData?.forEach((p: any) => {
-        progressMap[p.video_id] = p.completed;
+        const directModule = sortedModules.find(
+          (m) => String(m.id) === String(p.video_id),
+        );
+        if (directModule) {
+          progressMap[String(directModule.id)] = p.completed;
+          return;
+        }
+
+        const byCloudflareId = sortedModules.find(
+          (m) => String(m.video_cf_id || "").trim() === String(p.video_id).trim(),
+        );
+        if (byCloudflareId) {
+          progressMap[String(byCloudflareId.id)] = p.completed;
+        }
       });
+
+      // Merge locally persisted progress as a fallback when DB writes fail.
+      try {
+        const localProgressRaw = localStorage.getItem(
+          getProgressStorageKey(user.id, String(id)),
+        );
+        if (localProgressRaw) {
+          const localProgress = JSON.parse(localProgressRaw) as Record<
+            string,
+            boolean
+          >;
+          Object.entries(localProgress).forEach(([videoId, completed]) => {
+            if (completed) progressMap[String(videoId)] = true;
+          });
+        }
+      } catch (localProgressError) {
+        console.warn(
+          "Failed to read local progress fallback:",
+          localProgressError,
+        );
+      }
+
       setUserProgress(progressMap);
 
       const { data: profile } = await supabase
@@ -294,7 +389,7 @@ export default function CoursePlayerPage() {
         .select("full_name")
         .eq("id", user.id)
         .maybeSingle();
-      
+
       if (profile?.full_name) {
         setStudentName(profile.full_name);
       } else {
@@ -307,9 +402,8 @@ export default function CoursePlayerPage() {
         .eq("user_id", user.id)
         .eq("course_id", id)
         .maybeSingle();
-      
-      setHasCertificate(!!certData);
 
+      setHasCertificate(!!certData);
     } catch (error) {
       console.error("Error loading course:", error);
     } finally {
@@ -317,35 +411,96 @@ export default function CoursePlayerPage() {
     }
   };
 
-  const activeModule = useMemo(() => 
-    modules.find(m => m.id === activeModuleId) || null,
-  [modules, activeModuleId]);
+  const activeModule = useMemo(
+    () => modules.find((m) => m.id === activeModuleId) || null,
+    [modules, activeModuleId],
+  );
 
   const videoEmbedUrl = useMemo(() => {
     if (!activeModule?.video_cf_id) return null;
     const rawId = activeModule.video_cf_id.trim();
     if (!rawId) return null;
-    
+
     if (rawId.startsWith("https://iframe.videodelivery.net/")) {
       return rawId;
     }
-    
-    const cleanId = rawId.split('?')[0].split('/').pop() || "";
+
+    const cleanId = rawId.split("?")[0].split("/").pop() || "";
     return `https://iframe.videodelivery.net/${cleanId}`;
   }, [activeModule]);
 
   // Updated to pass the required "100" progress percentage variable
-  const handleMarkAsCompleted = (moduleId: string) => {
-    setCompletionAcknowledged((prev) => ({ ...prev, [moduleId]: true }));
+  const handleMarkAsCompleted = async (moduleId: string) => {
+    if (!userId || !id) return;
+
+    const moduleKey = String(moduleId);
+    const nextCompletedState = !Boolean(userProgress[moduleKey]);
+    const module = modules.find((m) => String(m.id) === moduleKey);
+    const persistenceVideoId = String(module?.video_cf_id || moduleKey).trim();
+    try {
+      setIsMarkingCompleted(true);
+      setCompletionError("");
+      // Optimistic UI update so progress bar reflects completion immediately.
+      setUserProgress((prev) => ({ ...prev, [moduleKey]: nextCompletedState }));
+      setModulePlaybackFinished((prev) => ({
+        ...prev,
+        [moduleKey]: nextCompletedState,
+      }));
+      setCompletionAcknowledged((prev) => ({
+        ...prev,
+        [moduleKey]: nextCompletedState,
+      }));
+
+      // Persist local fallback so refresh still reflects completion.
+      try {
+        const key = getProgressStorageKey(userId, String(id));
+        const existing = localStorage.getItem(key);
+        const parsed = existing
+          ? (JSON.parse(existing) as Record<string, boolean>)
+          : {};
+        parsed[moduleKey] = nextCompletedState;
+        localStorage.setItem(key, JSON.stringify(parsed));
+      } catch (localProgressError) {
+        console.warn(
+          "Failed to save local progress fallback:",
+          localProgressError,
+        );
+      }
+
+      await upsertUserProgress(
+        userId,
+        String(id),
+        persistenceVideoId,
+        nextCompletedState ? 100 : 0,
+        nextCompletedState,
+      );
+    } catch (error) {
+      console.error("Failed to mark module as completed:", error);
+      const details =
+        error instanceof Error && error.message
+          ? ` (${error.message})`
+          : "";
+      setCompletionError(`Unable to save completion right now. Please try again.${details}`);
+    } finally {
+      setIsMarkingCompleted(false);
+    }
   };
 
-  const isCurrentModuleComplete = activeModuleId ? !!userProgress[activeModuleId] : false;
-  const isCurrentModulePlaybackFinished = activeModuleId ? !!modulePlaybackFinished[activeModuleId] : false;
-  const isCurrentModuleAcknowledged = activeModuleId ? !!completionAcknowledged[activeModuleId] : false;
+  const isCurrentModuleComplete = activeModuleId
+    ? !!userProgress[String(activeModuleId)]
+    : false;
+  const isCurrentModulePlaybackFinished = activeModuleId
+    ? !!modulePlaybackFinished[String(activeModuleId)]
+    : false;
+  const isCurrentModuleAcknowledged = activeModuleId
+    ? !!completionAcknowledged[String(activeModuleId)]
+    : false;
 
   const progressPercentage = useMemo(() => {
     if (modules.length === 0) return 0;
-    const completedCount = modules.filter(m => userProgress[m.id]).length;
+    const completedCount = modules.filter(
+      (m) => userProgress[String(m.id)],
+    ).length;
     return Math.round((completedCount / modules.length) * 100);
   }, [modules, userProgress]);
 
@@ -360,20 +515,21 @@ export default function CoursePlayerPage() {
       setIsGeneratingCertificate(true);
       if (!userId) return;
 
-      const { error } = await supabase
-        .from("certificates")
-        .insert({
-          user_id: userId,
-          course_id: id as string,
-          certificate_url: "CLAIMED",
-        });
+      const { error } = await supabase.from("certificates").insert({
+        user_id: userId,
+        course_id: id as string,
+        certificate_url: "CLAIMED",
+      });
 
       if (error && error.code !== "23505") {
         throw error;
       }
 
       setHasCertificate(true);
-      await generateCertificatePDF(studentName, course?.title || "Course Completed");
+      await generateCertificatePDF(
+        studentName,
+        course?.title || "Course Completed",
+      );
       setShowCertificateModal(false);
     } catch (e) {
       console.error("Error generating certificate:", e);
@@ -384,10 +540,11 @@ export default function CoursePlayerPage() {
 
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
-    modules.forEach(mod => {
+    modules.forEach((mod) => {
       if (mod.duration) {
         const parts = mod.duration.split(":").map(Number);
-        if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+        if (parts.length === 3)
+          totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
         else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
       }
     });
@@ -405,9 +562,9 @@ export default function CoursePlayerPage() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider border border-blue-100">
-                Module {modules.findIndex(m => m.id === activeModuleId) + 1}
+                Module {modules.findIndex((m) => m.id === activeModuleId) + 1}
               </span>
-              {userProgress[activeModuleId || 0] && (
+              {userProgress[String(activeModuleId || "")] && (
                 <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-1">
                   <CheckCircle2 size={12} /> Completed
                 </span>
@@ -417,44 +574,56 @@ export default function CoursePlayerPage() {
               {activeModule?.title || "Module Selection"}
             </h2>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* Kept as a fallback / visual acknowledgement badge! */}
             {activeModuleId && (
-              <Button 
+              <Button
                 onClick={() => handleMarkAsCompleted(activeModuleId)}
-                disabled={!isCurrentModulePlaybackFinished || isCurrentModuleComplete}
+                disabled={isMarkingCompleted}
                 className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
                   isCurrentModuleComplete
-                    ? "bg-emerald-600 text-white cursor-not-allowed"
-                    : isCurrentModulePlaybackFinished
-                    ? "bg-[#174778] hover:bg-[#113a63] text-white"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : !isMarkingCompleted
+                      ? "bg-[#174778] hover:bg-[#113a63] text-white"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                {isCurrentModuleComplete
-                  ? "Completed"
-                  : isCurrentModuleAcknowledged
-                  ? "Completed"
-                  : "Mark as Completed"}
+                {isMarkingCompleted
+                  ? "Saving..."
+                  : isCurrentModuleComplete
+                    ? "Mark as Incomplete(Revert)"
+                    : isCurrentModuleAcknowledged
+                      ? "Mark as Complete"
+                      : "Mark as Complete"}
               </Button>
             )}
           </div>
         </div>
 
+        {completionError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {completionError}
+          </div>
+        )}
+
         <div className="prose prose-slate max-w-none">
           <p className="text-gray-600 leading-relaxed text-[15px] sm:text-[17px]">
-            {activeModule?.description || "In this module, we will explore the foundational principles and practical applications related to this subject matter. Our goal is to achieve a deep understanding through structured media and instructional assets."}
+            {activeModule?.description ||
+              "In this module, we will explore the foundational principles and practical applications related to this subject matter. Our goal is to achieve a deep understanding through structured media and instructional assets."}
           </p>
         </div>
 
         <div className="p-5 sm:p-8 bg-gray-50 rounded-xl sm:rounded-[2rem] border border-gray-100 space-y-4">
           <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <BookOpen size={16} className="text-[#174778]" /> 
+            <BookOpen size={16} className="text-[#174778]" />
             Instructional Context
           </h4>
           <p className="text-sm text-gray-500 leading-relaxed">
-            As you progress through this curated video curriculum, ensure you take notes on key conceptual shifts. The material presented here is part of the core intellectual framework of <span className="font-bold text-[#174778]">{course?.title}</span>.
+            As you progress through this curated video curriculum, ensure you
+            take notes on key conceptual shifts. The material presented here is
+            part of the core intellectual framework of{" "}
+            <span className="font-bold text-[#174778]">{course?.title}</span>.
           </p>
         </div>
       </div>
@@ -465,7 +634,9 @@ export default function CoursePlayerPage() {
     return (
       <>
         <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Curriculum Outline</h3>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+            Curriculum Outline
+          </h3>
           <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
             <span className="flex items-center gap-1.5">
               <BookOpen size={14} /> {modules.length} Modules
@@ -486,27 +657,35 @@ export default function CoursePlayerPage() {
               onClick={() => {
                 setActiveModuleId(mod.id);
                 if (typeof window !== "undefined") {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
               className={`w-full text-left p-5 transition-all flex items-start gap-4 group ${
-                isActive ? "bg-blue-50/50 border-r-4 border-[#174778]" : "hover:bg-gray-50"
+                isActive
+                  ? "bg-blue-50/50 border-r-4 border-[#174778]"
+                  : "hover:bg-gray-50"
               }`}
             >
-              <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
-                isCompleted
-                  ? "bg-emerald-500 border-emerald-500 text-white"
-                  : isActive
-                  ? "bg-[#174778] border-[#174778] text-white"
-                  : "bg-white border-gray-200 text-gray-400 group-hover:border-[#174778] group-hover:text-[#174778]"
-              }`}>
+              <div
+                className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                  isCompleted
+                    ? "bg-emerald-500 border-emerald-500 text-white"
+                    : isActive
+                      ? "bg-[#174778] border-[#174778] text-white"
+                      : "bg-white border-gray-200 text-gray-400 group-hover:border-[#174778] group-hover:text-[#174778]"
+                }`}
+              >
                 {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
               </div>
-              
+
               <div className="flex-1 min-w-0">
-                <h4 className={`text-sm font-bold mb-1 leading-snug transition-colors ${
-                  isActive ? "text-[#174778]" : "text-gray-900 group-hover:text-[#174778]"
-                }`}>
+                <h4
+                  className={`text-sm font-bold mb-1 leading-snug transition-colors ${
+                    isActive
+                      ? "text-[#174778]"
+                      : "text-gray-900 group-hover:text-[#174778]"
+                  }`}
+                >
                   {mod.title}
                 </h4>
                 {mod.description && (
@@ -526,8 +705,13 @@ export default function CoursePlayerPage() {
 
         {modules.length === 0 && (
           <div className="p-10 text-center text-gray-400">
-            <Loader2 size={32} className="mx-auto mb-4 animate-spin opacity-20" />
-            <p className="text-xs font-bold uppercase tracking-widest">No modules available</p>
+            <Loader2
+              size={32}
+              className="mx-auto mb-4 animate-spin opacity-20"
+            />
+            <p className="text-xs font-bold uppercase tracking-widest">
+              No modules available
+            </p>
           </div>
         )}
       </>
@@ -538,8 +722,12 @@ export default function CoursePlayerPage() {
     return (
       <>
         <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Practice Quizzes</h3>
-          <p className="text-[11px] text-gray-400">Test your mastery of this course with curated interactive tests.</p>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+            Practice Quizzes
+          </h3>
+          <p className="text-[11px] text-gray-400">
+            Test your mastery of this course with curated interactive tests.
+          </p>
         </div>
 
         {courseQuizzes.map((quiz) => {
@@ -548,7 +736,7 @@ export default function CoursePlayerPage() {
           const isPassed = hasAttempted && score >= quiz.passingScore;
 
           return (
-            <div 
+            <div
               key={quiz.id}
               className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
             >
@@ -570,19 +758,23 @@ export default function CoursePlayerPage() {
 
               {hasAttempted && (
                 <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-100">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Best Score</span>
-                  <span className={`text-xs font-bold flex items-center gap-1 ${isPassed ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">
+                    Best Score
+                  </span>
+                  <span
+                    className={`text-xs font-bold flex items-center gap-1 ${isPassed ? "text-emerald-600" : "text-amber-600"}`}
+                  >
                     {isPassed ? <Award size={14} /> : <AlertCircle size={14} />}
                     {score}%
                   </span>
                 </div>
               )}
 
-              <Button 
+              <Button
                 onClick={() => handleStartQuiz(quiz)}
                 className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${
-                  hasAttempted 
-                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-[#174778] hover:text-[#174778]" 
+                  hasAttempted
+                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-[#174778] hover:text-[#174778]"
                     : "bg-[#174778] text-white hover:bg-[#113a63]"
                 }`}
               >
@@ -595,7 +787,9 @@ export default function CoursePlayerPage() {
         {courseQuizzes.length === 0 && (
           <div className="p-10 text-center text-gray-400">
             <FileText size={32} className="mx-auto mb-4 opacity-20" />
-            <p className="text-xs font-bold uppercase tracking-widest">No Quizzes Available</p>
+            <p className="text-xs font-bold uppercase tracking-widest">
+              No Quizzes Available
+            </p>
           </div>
         )}
       </>
@@ -606,20 +800,28 @@ export default function CoursePlayerPage() {
     return (
       <>
         <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Learning Artifacts</h3>
-          <p className="text-[11px] text-gray-400">Download supplementary materials, code snippets, and resources.</p>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+            Learning Artifacts
+          </h3>
+          <p className="text-[11px] text-gray-400">
+            Download supplementary materials, code snippets, and resources.
+          </p>
         </div>
 
         {courseArtifacts.map((art) => (
-          <div 
+          <div
             key={art.id}
             className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
           >
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-all">
-                {art.type === 'Code Snippet' ? <FileCode size={16} /> : 
-                 art.type === 'Presentation' ? <Layers size={16} /> : 
-                 <FileArchive size={16} />}
+                {art.type === "Code Snippet" ? (
+                  <FileCode size={16} />
+                ) : art.type === "Presentation" ? (
+                  <Layers size={16} />
+                ) : (
+                  <FileArchive size={16} />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition-colors leading-snug mb-1">
@@ -632,12 +834,12 @@ export default function CoursePlayerPage() {
                 </div>
               </div>
             </div>
-            
+
             <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
               {art.description}
             </p>
 
-            <Button 
+            <Button
               onClick={() => handleDownloadArtifact(art)}
               className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-amber-500 hover:text-amber-600 transition-all flex items-center justify-center gap-2"
             >
@@ -649,7 +851,9 @@ export default function CoursePlayerPage() {
         {courseArtifacts.length === 0 && (
           <div className="p-10 text-center text-gray-400">
             <Layers size={32} className="mx-auto mb-4 opacity-20" />
-            <p className="text-xs font-bold uppercase tracking-widest">No Artifacts Available</p>
+            <p className="text-xs font-bold uppercase tracking-widest">
+              No Artifacts Available
+            </p>
           </div>
         )}
       </>
@@ -661,7 +865,9 @@ export default function CoursePlayerPage() {
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-[#174778] mx-auto mb-4" />
-          <p className="text-gray-600 font-medium tracking-tight">Preparing your session...</p>
+          <p className="text-gray-600 font-medium tracking-tight">
+            Preparing your session...
+          </p>
         </div>
       </div>
     );
@@ -672,9 +878,17 @@ export default function CoursePlayerPage() {
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
         <div className="text-center bg-white p-10 rounded-3xl shadow-sm border border-gray-100 max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Course Unavailable</h2>
-          <p className="text-gray-500 mb-6">We couldn't find the course you're looking for. It may have been moved or removed.</p>
-          <Button onClick={() => router.push("/courses")} className="bg-[#174778] hover:bg-[#113a63]">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Course Unavailable
+          </h2>
+          <p className="text-gray-500 mb-6">
+            We couldn't find the course you're looking for. It may have been
+            moved or removed.
+          </p>
+          <Button
+            onClick={() => router.push("/courses")}
+            className="bg-[#174778] hover:bg-[#113a63]"
+          >
             Return to Curriculum
           </Button>
         </div>
@@ -687,55 +901,39 @@ export default function CoursePlayerPage() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => router.push("/courses")}
               className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-[#174778]"
             >
               <ChevronLeft size={20} />
             </button>
             <div className="hidden sm:block">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">Currently Studying</span>
-              <h1 className="text-sm font-bold text-gray-900 truncate max-w-[300px]">{course.title}</h1>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">
+                Currently Studying
+              </span>
+              <h1 className="text-sm font-bold text-gray-900 truncate max-w-[300px]">
+                {course.title}
+              </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
             <div className="hidden md:flex flex-col items-end">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Your Progress</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                Your Progress
+              </span>
               <div className="flex items-center gap-3">
                 <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-[#174778] transition-all duration-700 ease-out" 
+                  <div
+                    className="h-full bg-[#174778] transition-all duration-700 ease-out"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
-                <span className="text-xs font-bold text-[#174778]">{progressPercentage}%</span>
+                <span className="text-xs font-bold text-[#174778]">
+                  {progressPercentage}%
+                </span>
               </div>
             </div>
-
-            {progressPercentage === 100 && (
-              <Button 
-                onClick={handleGenerateCertificate}
-                disabled={isGeneratingCertificate}
-                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow-md shadow-amber-500/25 flex items-center gap-1.5 border border-amber-400/25 transition-all duration-300 hover:scale-105"
-              >
-                {isGeneratingCertificate ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <DownloadCloud size={13} />
-                    Download Certificate
-                  </>
-                )}
-              </Button>
-            )}
-
-            <Button variant="outline" className="text-xs font-bold border-gray-200 rounded-full">
-              Get Support
-            </Button>
           </div>
         </div>
       </header>
@@ -743,28 +941,56 @@ export default function CoursePlayerPage() {
       <main className="max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-64px)]">
         <div className="lg:col-span-9 p-4 sm:p-6 lg:p-8 lg:border-r border-gray-100 bg-white/30">
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
-            
             {/* INTEGRATED VIDEO PLAYER WITH AUTO-COMPLETION */}
             <div className="relative aspect-video bg-black rounded-xl sm:rounded-[2rem] overflow-hidden shadow-2xl group border-4 sm:border-[8px] border-white ring-1 ring-gray-100">
               {activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
                   userId={userId}
                   courseId={id as string}
-                  moduleId={activeModule.id}
+                  moduleId={String(activeModule.video_cf_id || activeModule.id)}
                   videoUrl={videoEmbedUrl}
                   onCompleted={() => {
-                    setUserProgress((prev) => ({ ...prev, [activeModule.id]: true }));
-                    setModulePlaybackFinished((prev) => ({ ...prev, [activeModule.id]: true }));
+                    const moduleKey = String(activeModule.id);
+                    setUserProgress((prev) => ({ ...prev, [moduleKey]: true }));
+                    setModulePlaybackFinished((prev) => ({
+                      ...prev,
+                      [moduleKey]: true,
+                    }));
+                    if (userId && id) {
+                      try {
+                        const key = getProgressStorageKey(userId, String(id));
+                        const existing = localStorage.getItem(key);
+                        const parsed = existing
+                          ? (JSON.parse(existing) as Record<string, boolean>)
+                          : {};
+                        parsed[moduleKey] = true;
+                        localStorage.setItem(key, JSON.stringify(parsed));
+                      } catch (localProgressError) {
+                        console.warn(
+                          "Failed to save local progress fallback:",
+                          localProgressError,
+                        );
+                      }
+                    }
                   }}
                 />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-gradient-to-br from-gray-900 to-[#0f172a]">
                   <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-6 backdrop-blur-md border border-white/10">
-                    <PlayCircle size={40} className="text-white opacity-80" strokeWidth={1} />
+                    <PlayCircle
+                      size={40}
+                      className="text-white opacity-80"
+                      strokeWidth={1}
+                    />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">{activeModule?.title || "Select a module"}</h3>
-                  <p className="text-gray-400 text-sm max-w-sm">Instructional media for this module is being processed or will be available soon.</p>
-                  
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    {activeModule?.title || "Select a module"}
+                  </h3>
+                  <p className="text-gray-400 text-sm max-w-sm">
+                    Instructional media for this module is being processed or
+                    will be available soon.
+                  </p>
+
                   <div className="absolute top-10 left-10 w-32 h-32 bg-[#174778] rounded-full blur-[100px] opacity-20" />
                   <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-500 rounded-full blur-[100px] opacity-10" />
                 </div>
@@ -834,9 +1060,7 @@ export default function CoursePlayerPage() {
 
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
                 {activeTab === "overview" && (
-                  <div className="p-5 sm:p-6">
-                    {renderModuleOverview()}
-                  </div>
+                  <div className="p-5 sm:p-6">{renderModuleOverview()}</div>
                 )}
                 {activeTab === "modules" && renderModulesList()}
                 {activeTab === "quizzes" && renderQuizzesList()}
@@ -845,9 +1069,7 @@ export default function CoursePlayerPage() {
             </div>
 
             {/* Desktop Overview Block */}
-            <div className="hidden lg:block">
-              {renderModuleOverview()}
-            </div>
+            <div className="hidden lg:block">{renderModuleOverview()}</div>
           </div>
         </div>
 
@@ -857,7 +1079,7 @@ export default function CoursePlayerPage() {
             <button
               onClick={() => setActiveTab("modules")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                (activeTab === "modules" || activeTab === "overview")
+                activeTab === "modules" || activeTab === "overview"
                   ? "border-[#174778] text-[#174778] bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
               }`}
@@ -902,7 +1124,8 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {(activeTab === "modules" || activeTab === "overview") && renderModulesList()}
+            {(activeTab === "modules" || activeTab === "overview") &&
+              renderModulesList()}
             {activeTab === "quizzes" && renderQuizzesList()}
             {activeTab === "artifacts" && renderArtifactsList()}
           </div>
@@ -912,20 +1135,25 @@ export default function CoursePlayerPage() {
       {/* QUIZ MODAL */}
       {showQuizModal && activeQuiz && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowQuizModal(false)} />
-          
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setShowQuizModal(false)}
+          />
+
           <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="h-2 w-full bg-gray-100 relative">
               {quizStep === "questions" && (
-                <div 
+                <div
                   className="absolute top-0 left-0 h-full bg-[#174778] transition-all duration-500"
-                  style={{ width: `${((currentQuestionIndex) / activeQuiz.questions.length) * 100}%` }}
+                  style={{
+                    width: `${(currentQuestionIndex / activeQuiz.questions.length) * 100}%`,
+                  }}
                 />
               )}
             </div>
 
             <div className="p-6 sm:p-10 overflow-y-auto flex-1">
-              <button 
+              <button
                 onClick={() => setShowQuizModal(false)}
                 className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
               >
@@ -937,22 +1165,34 @@ export default function CoursePlayerPage() {
                   <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#174778]">
                     <HelpCircle size={40} />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3">{activeQuiz.title}</h2>
-                  <p className="text-gray-500 mb-8 max-w-md mx-auto">{activeQuiz.description}</p>
-                  
+                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                    {activeQuiz.title}
+                  </h2>
+                  <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                    {activeQuiz.description}
+                  </p>
+
                   <div className="flex items-center justify-center gap-8 mb-10">
                     <div className="text-center">
-                      <span className="block text-2xl font-bold text-[#174778]">{activeQuiz.questionsCount}</span>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Questions</span>
+                      <span className="block text-2xl font-bold text-[#174778]">
+                        {activeQuiz.questionsCount}
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        Questions
+                      </span>
                     </div>
                     <div className="w-px h-10 bg-gray-200"></div>
                     <div className="text-center">
-                      <span className="block text-2xl font-bold text-[#174778]">{activeQuiz.passingScore}%</span>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">To Pass</span>
+                      <span className="block text-2xl font-bold text-[#174778]">
+                        {activeQuiz.passingScore}%
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        To Pass
+                      </span>
                     </div>
                   </div>
 
-                  <Button 
+                  <Button
                     onClick={() => setQuizStep("questions")}
                     className="w-full sm:w-auto px-10 py-6 rounded-full bg-[#174778] hover:bg-[#113a63] text-white font-bold tracking-wide shadow-lg shadow-blue-900/20"
                   >
@@ -961,148 +1201,209 @@ export default function CoursePlayerPage() {
                 </div>
               )}
 
-              {quizStep === "questions" && activeQuiz.questions[currentQuestionIndex] && (
-                <div className="py-4">
-                  <div className="flex items-center justify-between mb-8">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Question {currentQuestionIndex + 1} of {activeQuiz.questions.length}
-                    </span>
-                    <span className="px-3 py-1 rounded-full bg-blue-50 text-[#174778] text-[10px] font-bold">
-                      {activeQuiz.questions[currentQuestionIndex].type || "Multiple Choice"}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug mb-8">
-                    {activeQuiz.questions[currentQuestionIndex].text}
-                  </h3>
-
-                  <div className="space-y-3">
-                    {activeQuiz.questions[currentQuestionIndex].options.map((option: string, idx: number) => {
-                      const isSelected = selectedAnswer === idx;
-                      const isCorrectAnswer = activeQuiz.questions[currentQuestionIndex].correctAnswer === idx;
-                      
-                      let optionClass = "border-gray-200 hover:border-[#174778] hover:bg-blue-50/50";
-                      
-                      if (isAnswerSubmitted) {
-                        if (isCorrectAnswer) {
-                          optionClass = "border-emerald-500 bg-emerald-50 text-emerald-900";
-                        } else if (isSelected && !isCorrectAnswer) {
-                          optionClass = "border-red-500 bg-red-50 text-red-900";
-                        } else {
-                          optionClass = "border-gray-200 opacity-50";
-                        }
-                      } else if (isSelected) {
-                        optionClass = "border-[#174778] bg-blue-50 ring-1 ring-[#174778]";
-                      }
-
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleAnswerSelect(idx)}
-                          disabled={isAnswerSubmitted}
-                          className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
-                        >
-                          <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
-                            isAnswerSubmitted && isCorrectAnswer ? "bg-emerald-500 border-emerald-500 text-white" :
-                            isAnswerSubmitted && isSelected && !isCorrectAnswer ? "bg-red-500 border-red-500 text-white" :
-                            isSelected ? "border-[#174778] bg-[#174778] text-white" : "border-gray-300"
-                          }`}>
-                            {isAnswerSubmitted && isCorrectAnswer ? <Check size={14} /> :
-                             isAnswerSubmitted && isSelected && !isCorrectAnswer ? <XIcon size={14} /> :
-                             isSelected ? <div className="w-2 h-2 rounded-full bg-white" /> : null}
-                          </div>
-                          <span className="font-medium flex-1 text-sm sm:text-base">{option}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {isAnswerSubmitted && activeQuiz.questions[currentQuestionIndex].explanation && (
-                    <div className="mt-6 p-5 rounded-2xl bg-gray-50 border border-gray-100 flex items-start gap-3">
-                      <HelpCircle size={20} className="text-[#174778] shrink-0 mt-0.5" />
-                      <div>
-                        <span className="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wider">Explanation</span>
-                        <p className="text-sm text-gray-600 leading-relaxed">
-                          {activeQuiz.questions[currentQuestionIndex].explanation}
-                        </p>
-                      </div>
+              {quizStep === "questions" &&
+                activeQuiz.questions[currentQuestionIndex] && (
+                  <div className="py-4">
+                    <div className="flex items-center justify-between mb-8">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        Question {currentQuestionIndex + 1} of{" "}
+                        {activeQuiz.questions.length}
+                      </span>
+                      <span className="px-3 py-1 rounded-full bg-blue-50 text-[#174778] text-[10px] font-bold">
+                        {activeQuiz.questions[currentQuestionIndex].type ||
+                          "Multiple Choice"}
+                      </span>
                     </div>
-                  )}
 
-                  <div className="mt-10 flex justify-end">
-                    {!isAnswerSubmitted ? (
-                      <Button 
-                        onClick={handleVerifyAnswer}
-                        disabled={selectedAnswer === null}
-                        className="px-8 py-6 rounded-xl bg-[#174778] hover:bg-[#113a63] text-white font-bold"
-                      >
-                        Submit Answer
-                      </Button>
-                    ) : currentQuestionIndex < activeQuiz.questions.length - 1 ? (
-                      <Button 
-                        onClick={handleNextQuestion}
-                        className="px-8 py-6 rounded-xl bg-gray-900 hover:bg-black text-white font-bold"
-                      >
-                        Next Question
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={handleViewResults}
-                        className="px-8 py-6 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20"
-                      >
-                        View Results
-                      </Button>
-                    )}
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug mb-8">
+                      {activeQuiz.questions[currentQuestionIndex].text}
+                    </h3>
+
+                    <div className="space-y-3">
+                      {activeQuiz.questions[currentQuestionIndex].options.map(
+                        (option: string, idx: number) => {
+                          const isSelected = selectedAnswer === idx;
+                          const isCorrectAnswer =
+                            activeQuiz.questions[currentQuestionIndex]
+                              .correctAnswer === idx;
+
+                          let optionClass =
+                            "border-gray-200 hover:border-[#174778] hover:bg-blue-50/50";
+
+                          if (isAnswerSubmitted) {
+                            if (isCorrectAnswer) {
+                              optionClass =
+                                "border-emerald-500 bg-emerald-50 text-emerald-900";
+                            } else if (isSelected && !isCorrectAnswer) {
+                              optionClass =
+                                "border-red-500 bg-red-50 text-red-900";
+                            } else {
+                              optionClass = "border-gray-200 opacity-50";
+                            }
+                          } else if (isSelected) {
+                            optionClass =
+                              "border-[#174778] bg-blue-50 ring-1 ring-[#174778]";
+                          }
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => handleAnswerSelect(idx)}
+                              disabled={isAnswerSubmitted}
+                              className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
+                            >
+                              <div
+                                className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+                                  isAnswerSubmitted && isCorrectAnswer
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : isAnswerSubmitted &&
+                                        isSelected &&
+                                        !isCorrectAnswer
+                                      ? "bg-red-500 border-red-500 text-white"
+                                      : isSelected
+                                        ? "border-[#174778] bg-[#174778] text-white"
+                                        : "border-gray-300"
+                                }`}
+                              >
+                                {isAnswerSubmitted && isCorrectAnswer ? (
+                                  <Check size={14} />
+                                ) : isAnswerSubmitted &&
+                                  isSelected &&
+                                  !isCorrectAnswer ? (
+                                  <XIcon size={14} />
+                                ) : isSelected ? (
+                                  <div className="w-2 h-2 rounded-full bg-white" />
+                                ) : null}
+                              </div>
+                              <span className="font-medium flex-1 text-sm sm:text-base">
+                                {option}
+                              </span>
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+
+                    {isAnswerSubmitted &&
+                      activeQuiz.questions[currentQuestionIndex]
+                        .explanation && (
+                        <div className="mt-6 p-5 rounded-2xl bg-gray-50 border border-gray-100 flex items-start gap-3">
+                          <HelpCircle
+                            size={20}
+                            className="text-[#174778] shrink-0 mt-0.5"
+                          />
+                          <div>
+                            <span className="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wider">
+                              Explanation
+                            </span>
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                              {
+                                activeQuiz.questions[currentQuestionIndex]
+                                  .explanation
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                    <div className="mt-10 flex justify-end">
+                      {!isAnswerSubmitted ? (
+                        <Button
+                          onClick={handleVerifyAnswer}
+                          disabled={selectedAnswer === null}
+                          className="px-8 py-6 rounded-xl bg-[#174778] hover:bg-[#113a63] text-white font-bold"
+                        >
+                          Submit Answer
+                        </Button>
+                      ) : currentQuestionIndex <
+                        activeQuiz.questions.length - 1 ? (
+                        <Button
+                          onClick={handleNextQuestion}
+                          className="px-8 py-6 rounded-xl bg-gray-900 hover:bg-black text-white font-bold"
+                        >
+                          Next Question
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleViewResults}
+                          className="px-8 py-6 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold shadow-lg shadow-emerald-500/20"
+                        >
+                          View Results
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {quizStep === "results" && (
                 <div className="text-center py-8">
                   {(() => {
                     const totalQuestions = activeQuiz.questions.length;
-                    const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
+                    const scorePercentage = Math.round(
+                      (quizScore / totalQuestions) * 100,
+                    );
                     const isPassed = scorePercentage >= activeQuiz.passingScore;
 
                     return (
                       <>
                         <div className="relative inline-block mb-6">
                           <svg className="w-32 h-32 transform -rotate-90">
-                            <circle className="text-gray-100" strokeWidth="8" stroke="currentColor" fill="transparent" r="58" cx="64" cy="64" />
-                            <circle 
-                              className={isPassed ? "text-emerald-500" : "text-amber-500"} 
-                              strokeWidth="8" 
-                              strokeDasharray={364.4} 
-                              strokeDashoffset={364.4 - (364.4 * scorePercentage) / 100} 
-                              strokeLinecap="round" 
-                              stroke="currentColor" 
-                              fill="transparent" 
-                              r="58" cx="64" cy="64" 
-                              style={{ transition: "stroke-dashoffset 1.5s ease-in-out" }}
+                            <circle
+                              className="text-gray-100"
+                              strokeWidth="8"
+                              stroke="currentColor"
+                              fill="transparent"
+                              r="58"
+                              cx="64"
+                              cy="64"
+                            />
+                            <circle
+                              className={
+                                isPassed ? "text-emerald-500" : "text-amber-500"
+                              }
+                              strokeWidth="8"
+                              strokeDasharray={364.4}
+                              strokeDashoffset={
+                                364.4 - (364.4 * scorePercentage) / 100
+                              }
+                              strokeLinecap="round"
+                              stroke="currentColor"
+                              fill="transparent"
+                              r="58"
+                              cx="64"
+                              cy="64"
+                              style={{
+                                transition:
+                                  "stroke-dashoffset 1.5s ease-in-out",
+                              }}
                             />
                           </svg>
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-3xl font-bold text-gray-900">{scorePercentage}%</span>
+                            <span className="text-3xl font-bold text-gray-900">
+                              {scorePercentage}%
+                            </span>
                           </div>
                         </div>
 
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                          {isPassed ? "Assessment Passed!" : "Needs Improvement"}
+                          {isPassed
+                            ? "Assessment Passed!"
+                            : "Needs Improvement"}
                         </h2>
                         <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                          {isPassed 
-                            ? "Great job! You have demonstrated a strong understanding of the material covered in this quiz." 
+                          {isPassed
+                            ? "Great job! You have demonstrated a strong understanding of the material covered in this quiz."
                             : `You scored ${scorePercentage}%. You need ${activeQuiz.passingScore}% to pass. Review the material and try again.`}
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                          <Button 
+                          <Button
                             onClick={handleRestartQuiz}
                             className="w-full sm:w-auto px-8 py-6 rounded-xl bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 font-bold flex items-center justify-center gap-2"
                           >
                             <RefreshCw size={18} /> Retake Quiz
                           </Button>
-                          <Button 
+                          <Button
                             onClick={() => setShowQuizModal(false)}
                             className="w-full sm:w-auto px-8 py-6 rounded-xl bg-[#174778] hover:bg-[#113a63] text-white font-bold"
                           >
@@ -1123,21 +1424,26 @@ export default function CoursePlayerPage() {
       {showCertificateModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-          
+
           <div className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-8 flex flex-col items-center text-center transform animate-in zoom-in-95 duration-300">
             <div className="absolute -top-12 w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-xl shadow-amber-500/30 border-4 border-white">
               <Award size={40} className="text-white" />
             </div>
 
             <div className="mt-12 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Congratulations!</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Congratulations!
+              </h2>
               <p className="text-sm text-gray-500 leading-relaxed">
-                You have successfully completed 100% of the course material. Your certificate of completion is ready to be generated.
+                You have successfully completed 100% of the course material.
+                Your certificate of completion is ready to be generated.
               </p>
             </div>
 
             <div className="w-full bg-gray-50 rounded-2xl p-4 mb-8 border border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Course</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                Course
+              </p>
               <p className="text-sm font-bold text-[#174778] max-w-sm mx-auto mt-2 leading-snug">
                 {course?.title}
               </p>
@@ -1161,7 +1467,7 @@ export default function CoursePlayerPage() {
                   </>
                 )}
               </Button>
-              <button 
+              <button
                 onClick={() => setShowCertificateModal(false)}
                 className="text-xs font-bold text-gray-400 hover:text-[#174778] transition-colors tracking-wider uppercase block mx-auto"
               >
