@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
 import UserAvatar from "@/app/components/UserAvatar";
+
 export default function MainLayout({
   children,
 }: {
@@ -13,11 +14,12 @@ export default function MainLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
+  
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Close sidebar on path change
   useEffect(() => {
@@ -40,15 +42,16 @@ export default function MainLayout({
 
       if (cancelled) return;
       setUserEmail(user.email ?? null);
+      
       const { data: profile } = await supabase
-  .from("profiles")
-  .select("full_name")
-  .eq("id", user.id)
-  .single();
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
 
-if (profile?.full_name) {
-  setFullName(profile.full_name);
-}
+      if (profile?.full_name) {
+        setFullName(profile.full_name);
+      }
       
       setLoading(false);
     };
@@ -69,7 +72,7 @@ if (profile?.full_name) {
     };
   }, [router]);
 
-  // Session heartbeat: update login log every 60s to track time spent
+  // Session heartbeat
   useEffect(() => {
     if (loading || !userEmail) return;
 
@@ -81,7 +84,6 @@ if (profile?.full_name) {
 
       const elapsedSeconds = Math.floor((Date.now() - sessionStart) / 1000);
 
-      // Get the most recent login log for this user today
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
@@ -102,14 +104,14 @@ if (profile?.full_name) {
           })
           .eq("id", recentLog[0].id);
       }
-    }, 60000); // every 60 seconds
+    }, 60000);
 
     return () => clearInterval(heartbeat);
   }, [loading, userEmail]);
 
   if (loading) return null;
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setShowSignOutDialog(true);
   };
 
@@ -128,7 +130,7 @@ if (profile?.full_name) {
   return (
     <div className="flex flex-col h-screen bg-[#F8FAFC]">
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile Sidebar Backdrop Overlay */}
+        
         {isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
@@ -136,7 +138,6 @@ if (profile?.full_name) {
           />
         )}
 
-        {/* Sidebar */}
         <aside
           className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#F8FAFC] border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -146,11 +147,9 @@ if (profile?.full_name) {
             <div className="flex items-center gap-3">
               <Logo width={180} height={60} />
             </div>
-            {/* Mobile close button */}
             <button
               onClick={() => setIsSidebarOpen(false)}
               className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none lg:hidden transition-colors"
-              aria-label="Close sidebar"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -177,7 +176,7 @@ if (profile?.full_name) {
           </nav>
 
           <div className="p-6 space-y-4">
-            <button onClick={handleSignOut} className="w-full bg-[#2283FF] hover:bg-[#2283FF] text-white py-2.5 rounded-md text-sm font-semibold transition-all duration-200 shadow-sm flex items-center justify-center gap-2 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]">
+            <button onClick={handleSignOut} className="w-full bg-[#2283FF] hover:bg-blue-600 text-white py-2.5 rounded-md text-sm font-semibold transition-all duration-200 shadow-sm flex items-center justify-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               Sign Out
             </button>
@@ -191,12 +190,10 @@ if (profile?.full_name) {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between lg:justify-end">
-            {/* Mobile Hamburger & Logo */}
             <div className="flex items-center gap-3 lg:hidden">
               <button
                 onClick={() => setIsSidebarOpen(true)}
                 className="p-1.5 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none transition-colors"
-                aria-label="Open sidebar"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
 import {
   FileText,
@@ -21,7 +22,13 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default function StudentPracticeCenter() {
+  const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setGlobalLoading(loading);
+    return () => setGlobalLoading(false);
+  }, [loading, setGlobalLoading]);
   const [activeTab, setActiveTab] = useState<"quizzes" | "artifacts">("quizzes");
   
   // Enrolled Courses & Data State
@@ -248,14 +255,7 @@ export default function StudentPracticeCenter() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-gray-50/50">
-        <Loader2 className="w-8 h-8 text-[#2283FF] animate-spin" />
-        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-4">Loading resources...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">

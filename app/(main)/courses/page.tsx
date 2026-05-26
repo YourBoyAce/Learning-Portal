@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLoading } from "@/app/context/LoadingContext";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { getMyLearningData } from "@/app/actions/my-learning";
@@ -80,7 +81,13 @@ interface UpcomingWebinarCard {
 }
 
 export default function MyLearningDashboard() {
+  const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setGlobalLoading(loading);
+    return () => setGlobalLoading(false);
+  }, [loading, setGlobalLoading]);
   const [userId, setUserId] = useState<string | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingWebinars, setUpcomingWebinars] = useState<
@@ -390,15 +397,7 @@ export default function MyLearningDashboard() {
       .eq("id", userId);
   };
 
-  if (loading)
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#2283FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading your journey...</p>
-        </div>
-      </div>
-    );
+
 
   const currentInsight = insights[currentInsightIndex] || {
     content: "Loading insight...",
@@ -569,7 +568,7 @@ export default function MyLearningDashboard() {
                   <Link
                     key={course.id}
                     href={`/courses/${course.id}`}
-                    className="group bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#2283FF]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
+                    className="group bg-white rounded-[1rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#2283FF]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
                   >
                     {/* Large Thumbnail */}
                     <div className="relative w-full h-48 sm:h-64 overflow-hidden">

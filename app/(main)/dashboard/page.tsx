@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,13 @@ interface Insight {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setGlobalLoading(loading);
+    return () => setGlobalLoading(false);
+  }, [loading, setGlobalLoading]);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -55,6 +62,11 @@ export default function Dashboard() {
   // Insight states
   const [insights, setInsights] = useState<Insight[]>([]);
   const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
+  const [totalTime, setTotalTime] = useState<string>("00:00:00");
+  const [allCourseModules, setAllCourseModules] = useState<any[]>([]);
+
+  //for progress
+  const [completedVideoIds, setCompletedVideoIds] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -164,7 +176,7 @@ export default function Dashboard() {
         // Fetch progress for each enrolled course
         if (user.id && mappedCourses.length > 0) {
           const progressMap: Record<string, { progressPercentage: number; completedModules: number; totalModules: number }> = {};
-          
+
           for (const course of mappedCourses) {
             try {
               const progress = await getCourseProgress(user.id, course.id);
@@ -174,7 +186,7 @@ export default function Dashboard() {
               progressMap[String(course.id)] = { progressPercentage: 0, completedModules: 0, totalModules: 0 };
             }
           }
-          
+
           if (!cancelled) {
             setCourseProgress(progressMap);
           }
@@ -184,22 +196,108 @@ export default function Dashboard() {
           const mostRecentCourse = mappedCourses[0];
           setNextCourse(mostRecentCourse);
 
-          // Fetch the first module for the most recent course
+          // Fetch ALL modules for the most recent course
           const { data: modulesData } = await supabase
             .from("coursemodules")
             .select("*")
             .eq("maincourse_id", mostRecentCourse.id)
-            .order("id", { ascending: true })
-            .limit(1);
+            .order("id", { ascending: true });
 
           if (!cancelled && modulesData && modulesData.length > 0) {
             setNextModule(modulesData[0]);
+            setAllCourseModules(modulesData);
+
+            //for progress calculation
+            const fetchCompletedVideos = async () => {
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+
+              if (!user) return;
+
+              const { data, error } = await supabase
+                .from("user_video_progress")
+                .select("video_id")
+                .eq("user_id", user.id)
+                .eq("completed", true);
+
+              if (error) {
+                console.error("Progress fetch error:", error);
+                return;
+              }
+
+              setCompletedVideoIds(
+                data.map((item) =>
+                  item.video_id.replaceAll("-", "")
+                )
+              );
+
+            };
+            fetchCompletedVideos();
+
+
+
+            // Fetch user_video_progress for this course to check completion
+            const { data: progressData } = await supabase
+              .from("user_video_progress")
+              .select("video_id, completed")
+              .eq("user_id", user.id)
+              .eq("course_id", mostRecentCourse.id);
+
+            // Build a set of completed module IDs
+            const completedSet = new Set<string>();
+            if (progressData) {
+              for (const p of progressData) {
+                if (p.completed) {
+                  completedSet.add(String(p.video_id));
+                }
+              }
+            }
+
+            // Find the first incomplete module as the "next" module
+            const firstIncomplete = modulesData.find(
+              (m: any) => !completedSet.has(String(m.id)) && !completedSet.has(String(m.video_cf_id))
+            );
+            if (firstIncomplete) {
+              setNextModule(firstIncomplete);
+            }
+
+            // Sum durations of all incomplete modules
+            let totalSeconds = 0;
+            for (const mod of modulesData) {
+              const isCompleted = completedSet.has(String(mod.id)) || completedSet.has(String(mod.video_cf_id));
+              if (!isCompleted && mod.duration) {
+                const parts = mod.duration.split(":").map(Number);
+                if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+                else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
+              }
+            }
+
+            // If no durations found on modules, sum all module durations as total
+            if (totalSeconds === 0) {
+              for (const mod of modulesData) {
+                if (mod.duration) {
+                  const parts = mod.duration.split(":").map(Number);
+                  if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+                  else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
+                }
+              }
+            }
+
+            const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+            const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+            const secs = String(totalSeconds % 60).padStart(2, "0");
+            if (!cancelled) {
+              setTotalTime(`${hrs}:${mins}:${secs}`);
+            }
           }
         }
       }
 
+
       setLoading(false);
     };
+
 
     load();
 
@@ -226,7 +324,7 @@ export default function Dashboard() {
     );
   }, [profile?.full_name, userEmail]);
 
-  if (loading) return null;
+
 
   const hasEnrollments = enrolledCourses.length > 0;
   const currentInsight = insights[currentInsightIndex] || {
@@ -276,6 +374,19 @@ export default function Dashboard() {
   const handleOpenCourse = (courseId: number | string) => {
     router.push(`/courses/${courseId}`);
   };
+  const totalModules = allCourseModules.length;
+
+  const completedModules = allCourseModules.filter(
+    (module: any) =>
+      completedVideoIds.includes(module.video_cf_id)
+  ).length;
+
+  const progressPercentage =
+    totalModules > 0
+      ? Math.round(
+        (completedModules / totalModules) * 100
+      )
+      : 0;
 
 
   return (
@@ -286,9 +397,9 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">
             Welcome back to The Automate, {userName}.
           </h1>
-          <p className="text-blue-200 text-sm mb-6 max-w-2xl">
+          <p className="text-blue-200 text-base mb-6 max-w-2xl">
             {hasEnrollments
-              ? "Your intellectual journey continues. Pick up where you left off below."
+              ? "Your intellectual journey continues. You have modules to complete this week to stay on track for your fellowship."
               : "Welcome to your dashboard. Your curriculum allocations will appear here once assigned by your administrator."}
           </p>
           {hasEnrollments && (
@@ -402,51 +513,87 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Active Course & Progress */}
+        {/* Active Course & Progress — "Up Next" Section */}
         {hasEnrollments && (
-          <div className="grid lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-semibold text-orange-500 uppercase tracking-wide">
-                  In Next
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+
+            {/* LEFT SIDE - UP NEXT */}
+            <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 sm:p-8 shadow-sm">
+
+              {/* Header row */}
+              <div className="flex items-start justify-between mb-5">
+                <span className="text-[10px] font-black text-white bg-[#542112] px-3 py-1.5 rounded-md uppercase tracking-widest">
+                  Up Next
                 </span>
+
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    Total Time
+                  </p>
+
+                  <p className="text-2xl sm:text-3xl font-black text-[#2283FF] tracking-tight font-mono">
+                    {totalTime}
+                  </p>
+                </div>
               </div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-1">
+
+              {/* Course title */}
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 leading-tight max-w-xl">
                 {nextCourse?.title || "Your next course"}
               </h2>
-              <p className="text-xs text-gray-500 mb-4">
-                Your next module is ready
-              </p>
 
+              {/* Module card */}
               {nextModule ? (
                 <div
                   onClick={handlePlayModule}
-                  className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-[#2283FF] transition-colors cursor-pointer group"
+                  className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-[#2283FF]/30 transition-all cursor-pointer group"
                 >
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-blue-50 transition-colors overflow-hidden border border-gray-100">
+                  {/* Instructor image */}
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-[#2283FF]/30 transition-colors">
                     <img
-                      src={nextCourse?.thumbnail_url || PLACEHOLDER_IMAGE}
-                      alt={nextCourse?.title}
+                      src="/images/instructor.png"
+                      alt="Instructor"
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="flex-1 text-left">
-                    <h3 className="font-semibold text-gray-800 group-hover:text-[#2283FF] transition-colors text-sm sm:text-base">
+
+                  {/* Module info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors text-sm sm:text-base leading-snug">
                       {nextModule.title}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">
-                      {nextCourse?.description || "Module in progress..."}
+
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                      Hosted by{" "}
+                      <span className="font-semibold text-gray-700">
+                        The Automate
+                      </span>
+
+                      {nextModule.duration && <> • {nextModule.duration}</>}
                     </p>
+
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <div className="flex -space-x-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white" />
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white" />
+                      </div>
+
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        +{Math.max(allCourseModules.length, 5)} Joining soon…
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Play button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handlePlayModule();
                     }}
-                    className="w-10 h-10 bg-[#2283FF] rounded-lg flex items-center justify-center text-white shrink-0 hover:bg-[#2283FF] transition-colors shadow-sm"
+                    className="w-12 h-12 bg-[#2283FF] rounded-full flex items-center justify-center text-white shrink-0 hover:bg-[#113a63] hover:scale-110 transition-all shadow-lg shadow-[#174778]/20"
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-5 h-5 ml-0.5"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                     >
@@ -455,27 +602,57 @@ export default function Dashboard() {
                   </button>
                 </div>
               ) : (
-                <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                  <p className="text-sm font-semibold text-gray-800">
+                <div className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                  <p className="text-sm font-semibold text-gray-500">
                     No modules available
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">
-                Progress Summary
-              </h3>
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-24 h-24 rounded-full border-4 border-[#2283FF] flex items-center justify-center">
-                  <span className="text-2xl font-bold text-[#2283FF]">
-                    {enrolledCourses.length > 0 
-                      ? Math.round(
-                          enrolledCourses.reduce((sum, course) => sum + (courseProgress[String(course.id)]?.progressPercentage || 0), 0) / enrolledCourses.length
-                        )
-                      : 0
-                    }%
+            {/* RIGHT SIDE - LEARNING PROGRESS */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col">
+
+              <h2 className="text-2xl font-bold text-[#2283FF] mb-8">
+                Learning Progress
+              </h2>
+
+              {/* Circle */}
+              <div className="flex justify-center">
+                <div className="relative w-44 h-44 rounded-full border-[6px] border-[#2283FF] flex items-center justify-center">
+
+                  <div className="text-center">
+                    <h1 className="text-5xl font-black text-[#2283FF]">
+                      {progressPercentage}%
+                    </h1>
+
+                    <p className="text-xs tracking-[0.3em] text-gray-400 mt-2 font-semibold">
+                      MASTERY
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="mt-10 space-y-5">
+
+                <div className="flex items-center justify-between border-b pb-4">
+                  <span className="text-sm text-gray-500">
+                    Modules Completed
+                  </span>
+
+                  <span className="text-lg font-bold text-[#2283FF]">
+                    {completedModules}/{totalModules}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">
+                    Courses Assigned
+                  </span>
+
+                  <span className="text-lg font-bold text-[#2283FF]">
+                    {enrollments.length}
                   </span>
                 </div>
               </div>
@@ -652,3 +829,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

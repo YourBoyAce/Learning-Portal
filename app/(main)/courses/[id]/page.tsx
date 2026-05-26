@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useLoading } from "@/app/context/LoadingContext";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
@@ -80,11 +81,17 @@ const moduleTitleComparator = (
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { setLoading: setGlobalLoading } = useLoading();
 
   // Added userId to state so we can pass it down to the video player
   const [userId, setUserId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setGlobalLoading(loading);
+    return () => setGlobalLoading(false);
+  }, [loading, setGlobalLoading]);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
@@ -860,18 +867,7 @@ export default function CoursePlayerPage() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-[#174778] mx-auto mb-4" />
-          <p className="text-gray-600 font-medium tracking-tight">
-            Preparing your session...
-          </p>
-        </div>
-      </div>
-    );
-  }
+
 
   if (!course) {
     return (
