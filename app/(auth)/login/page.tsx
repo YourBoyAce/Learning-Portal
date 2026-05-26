@@ -45,7 +45,7 @@ export default function LoginPage() {
     }
 
     if (profile.role?.toLowerCase() === "admin") {
-      router.push("/admin/courses");
+      router.push("/admin");
     } else {
       router.push("/dashboard");
     }

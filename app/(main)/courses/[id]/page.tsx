@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import { generateCertificatePDF } from "@/app/lib/certificate";
@@ -46,41 +46,16 @@ interface Module {
   title: string;
   description: string;
   video_cf_id: string;
+  thumbnail_url?: string | null;
+  created_at?: string | null;
   duration: string;
   order_index: number;
 }
 
-const moduleTitleComparator = (
-  a: Pick<Module, "title">,
-  b: Pick<Module, "title">,
-) => {
-  const titleA = a.title?.trim() ?? "";
-  const titleB = b.title?.trim() ?? "";
-
-  const numA = titleA.match(/\d+/)?.[0];
-  const numB = titleB.match(/\d+/)?.[0];
-
-  if (numA && numB) {
-    const parsedA = Number(numA);
-    const parsedB = Number(numB);
-    if (
-      !Number.isNaN(parsedA) &&
-      !Number.isNaN(parsedB) &&
-      parsedA !== parsedB
-    ) {
-      return parsedA - parsedB;
-    }
-  }
-
-  return titleA.localeCompare(titleB, undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-};
-
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setLoading: setGlobalLoading } = useLoading();
 
   // Added userId to state so we can pass it down to the video player
@@ -136,7 +111,7 @@ export default function CoursePlayerPage() {
     if (id) {
       loadCourseData();
     }
-  }, [id]);
+  }, [id, searchParams]);
 
   useEffect(() => {
     if (course) {
@@ -330,16 +305,24 @@ export default function CoursePlayerPage() {
       const { data: modulesData, error: modulesError } = await supabase
         .from("coursemodules")
         .select("*")
-        .eq("maincourse_id", id);
+        .eq("maincourse_id", id)
+        .order("order_index", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
 
       if (modulesError) throw modulesError;
-      const sortedModules = [...(modulesData || [])].sort(
-        moduleTitleComparator,
-      );
-      setModules(sortedModules);
+      const orderedModules = modulesData || [];
+      setModules(orderedModules);
 
-      if (sortedModules.length > 0) {
-        setActiveModuleId(sortedModules[0].id);
+      if (orderedModules.length > 0) {
+        const requestedModuleId = searchParams.get("module");
+        const requestedModule = requestedModuleId
+          ? orderedModules.find(
+              (m) => String(m.id) === String(requestedModuleId),
+            ) || null
+          : null;
+
+        setActiveModuleId(String(requestedModule?.id ?? orderedModules[0].id));
       }
 
       const { data: progressData, error: progressError } = await supabase
@@ -352,7 +335,7 @@ export default function CoursePlayerPage() {
 
       const progressMap: Record<string, boolean> = {};
       progressData?.forEach((p: any) => {
-        const directModule = sortedModules.find(
+        const directModule = orderedModules.find(
           (m) => String(m.id) === String(p.video_id),
         );
         if (directModule) {
@@ -360,8 +343,9 @@ export default function CoursePlayerPage() {
           return;
         }
 
-        const byCloudflareId = sortedModules.find(
-          (m) => String(m.video_cf_id || "").trim() === String(p.video_id).trim(),
+        const byCloudflareId = orderedModules.find(
+          (m) =>
+            String(m.video_cf_id || "").trim() === String(p.video_id).trim(),
         );
         if (byCloudflareId) {
           progressMap[String(byCloudflareId.id)] = p.completed;
@@ -436,6 +420,17 @@ export default function CoursePlayerPage() {
     return `https://iframe.videodelivery.net/${cleanId}`;
   }, [activeModule]);
 
+  const playerThumbnailUrl = useMemo(() => {
+    const explicitThumbnail = String(activeModule?.thumbnail_url || "").trim();
+    if (explicitThumbnail) return explicitThumbnail;
+
+    const rawId = String(activeModule?.video_cf_id || "").trim();
+    if (!rawId) return null;
+    const cleanId = rawId.split("?")[0].split("/").pop() || "";
+    if (!cleanId) return null;
+    return `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s`;
+  }, [activeModule]);
+
   // Updated to pass the required "100" progress percentage variable
   const handleMarkAsCompleted = async (moduleId: string) => {
     if (!userId || !id) return;
@@ -484,13 +479,27 @@ export default function CoursePlayerPage() {
     } catch (error) {
       console.error("Failed to mark module as completed:", error);
       const details =
-        error instanceof Error && error.message
-          ? ` (${error.message})`
-          : "";
-      setCompletionError(`Unable to save completion right now. Please try again.${details}`);
+        error instanceof Error && error.message ? ` (${error.message})` : "";
+      setCompletionError(
+        `Unable to save completion right now. Please try again.${details}`,
+      );
     } finally {
       setIsMarkingCompleted(false);
     }
+  };
+
+  const applyAutoCompletionState = (moduleId: string) => {
+    const moduleKey = String(moduleId);
+    setCompletionError("");
+    setUserProgress((prev) => ({ ...prev, [moduleKey]: true }));
+    setModulePlaybackFinished((prev) => ({
+      ...prev,
+      [moduleKey]: true,
+    }));
+    setCompletionAcknowledged((prev) => ({
+      ...prev,
+      [moduleKey]: true,
+    }));
   };
 
   const isCurrentModuleComplete = activeModuleId
@@ -867,8 +876,6 @@ export default function CoursePlayerPage() {
     );
   };
 
-
-
   if (!course) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
@@ -945,13 +952,10 @@ export default function CoursePlayerPage() {
                   courseId={id as string}
                   moduleId={String(activeModule.video_cf_id || activeModule.id)}
                   videoUrl={videoEmbedUrl}
+                  thumbnailUrl={playerThumbnailUrl}
                   onCompleted={() => {
                     const moduleKey = String(activeModule.id);
-                    setUserProgress((prev) => ({ ...prev, [moduleKey]: true }));
-                    setModulePlaybackFinished((prev) => ({
-                      ...prev,
-                      [moduleKey]: true,
-                    }));
+                    applyAutoCompletionState(moduleKey);
                     if (userId && id) {
                       try {
                         const key = getProgressStorageKey(userId, String(id));

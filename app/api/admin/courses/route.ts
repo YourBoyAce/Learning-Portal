@@ -148,10 +148,11 @@ export async function POST(request: Request) {
   const modules = Array.isArray(body?.modules) ? body.modules : [];
   if (modules.length > 0) {
     const modulesToInsert = modules
-      .map((m: any) => ({
+      .map((m: any, index: number) => ({
         maincourse_id: newCourse.id,
         title: typeof m.title === "string" ? m.title.trim() : "",
         description: typeof m.description === "string" ? m.description.trim() : "",
+        order_index: index + 1,
       }))
       .filter((m: any) => m.title !== "");
 
@@ -187,8 +188,11 @@ export async function PUT(request: Request) {
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
     typeof body?.description === "string" ? body.description.trim() : "";
+  
+  // Check if thumbnail_url field was explicitly provided (including null)
+  const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
-    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : (hasThumbnailField ? null : undefined);
 
   if (id === null || !title || !description) {
     return NextResponse.json(
@@ -199,7 +203,7 @@ export async function PUT(request: Request) {
 
   const { error: updateError } = await authContext.supabaseAdmin
     .from("maincourses")
-    .update({ title, description, ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }) })
+    .update({ title, description, ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }) })
     .eq("id", id);
 
   if (updateError) {
@@ -214,6 +218,10 @@ export async function PUT(request: Request) {
 
     const modulesToUpdate = validModules.filter((m: any) => m.id);
     const modulesToInsert = validModules.filter((m: any) => !m.id);
+    const moduleOrderMap = new Map<any, number>();
+    validModules.forEach((m: any, index: number) => {
+      if (m.id) moduleOrderMap.set(m.id, index + 1);
+    });
 
     const keepIds = modulesToUpdate.map((m: any) => m.id);
 
@@ -254,6 +262,7 @@ export async function PUT(request: Request) {
         .update({
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
+          order_index: moduleOrderMap.get(mod.id) ?? null,
         })
         .eq("id", mod.id)
         .eq("maincourse_id", id);
@@ -268,11 +277,16 @@ export async function PUT(request: Request) {
 
     // Insert new modules
     if (modulesToInsert.length > 0) {
-      const insertData = modulesToInsert.map((mod: any) => ({
+      const insertData = modulesToInsert.map((mod: any) => {
+        const orderIndex =
+          validModules.findIndex((m: any) => m === mod) + 1;
+        return {
         maincourse_id: id,
         title: mod.title.trim(),
         description: (mod.description || "").trim(),
-      }));
+        order_index: orderIndex > 0 ? orderIndex : null,
+      };
+      });
 
       const { error: insertModulesError } = await authContext.supabaseAdmin
         .from("coursemodules")

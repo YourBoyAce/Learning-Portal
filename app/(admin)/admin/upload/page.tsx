@@ -9,41 +9,18 @@ type Course = {
   id: string | number;
   title: string;
   description: string | null;
+  thumbnail_url?: string | null;
   created_at?: string | null;
 };
 
 type Module = {
   id: string | number;
   title: string;
+  thumbnail_url?: string | null;
   created_at?: string | null;
 };
 
 export default function UploadPage() {
-  const moduleTitleComparator = (a: Module, b: Module) => {
-    const titleA = a.title?.trim() ?? "";
-    const titleB = b.title?.trim() ?? "";
-
-    const numA = titleA.match(/\d+/)?.[0];
-    const numB = titleB.match(/\d+/)?.[0];
-
-    if (numA && numB) {
-      const parsedA = Number(numA);
-      const parsedB = Number(numB);
-      if (
-        !Number.isNaN(parsedA) &&
-        !Number.isNaN(parsedB) &&
-        parsedA !== parsedB
-      ) {
-        return parsedA - parsedB;
-      }
-    }
-
-    return titleA.localeCompare(titleB, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
-  };
-
   const textPrimary = "#0f172a";
   const textSecondary = "#334155";
   const inputBorder = "#cbd5e1";
@@ -57,6 +34,10 @@ export default function UploadPage() {
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(
+    null,
+  );
+  const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState("");
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -155,13 +136,13 @@ export default function UploadPage() {
           .from("coursemodules")
           .select("id, title, created_at")
           .eq("maincourse_id", selectedCurriculum)
+          .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
 
         if (error) throw error;
 
-        const sortedModules = [...(data || [])].sort(moduleTitleComparator);
-        setModules(sortedModules);
+        setModules(data || []);
       } catch (err) {
         console.error("Failed to fetch modules", err);
         setModules([]);
@@ -356,6 +337,27 @@ export default function UploadPage() {
       payload.append("title", videoTitle.trim());
       payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
 
+      if (moduleThumbnailFile) {
+        const fileExt = moduleThumbnailFile.name.split(".").pop();
+        const fileName = `module-thumbnails/${selectedModuleId}/${Date.now()}.${fileExt}`;
+        const { error: thumbnailUploadError } = await supabase.storage
+          .from("course-thumbnails")
+          .upload(fileName, moduleThumbnailFile);
+
+        if (thumbnailUploadError) {
+          throw new Error(
+            `Failed to upload module thumbnail: ${thumbnailUploadError.message}`,
+          );
+        }
+
+        const { data: thumbnailUrlData } = supabase.storage
+          .from("course-thumbnails")
+          .getPublicUrl(fileName);
+        if (thumbnailUrlData?.publicUrl) {
+          payload.append("thumbnail_url", thumbnailUrlData.publicUrl);
+        }
+      }
+
       const response = await fetch("/api/admin/coursemodules", {
         method: "POST",
         headers: {
@@ -374,6 +376,8 @@ export default function UploadPage() {
 
       setVideoTitle("");
       setSelectedFile(null);
+      setModuleThumbnailFile(null);
+      setModuleThumbnailPreview("");
       setUploadProgress(100);
       setUploadStatus("");
       setSuccess(
@@ -505,6 +509,33 @@ export default function UploadPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Module Thumbnail (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setModuleThumbnailFile(file);
+                      setModuleThumbnailPreview(
+                        file ? URL.createObjectURL(file) : "",
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-blue-50 file:text-[#174778] file:font-semibold hover:file:bg-blue-100"
+                  />
+                  {moduleThumbnailPreview && (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={moduleThumbnailPreview}
+                        alt="Module thumbnail preview"
+                        className="w-full h-28 object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* Upload Area */}
                 <div
                   onDragOver={handleDragOver}
@@ -599,7 +630,17 @@ export default function UploadPage() {
                     key={course.id}
                     className="border border-gray-200 rounded-xl overflow-hidden hover:border-[#2283FF] transition-colors"
                   >
-                    <div className="h-32 bg-gradient-to-r from-[#2283FF] to-blue-800"></div>
+                    <div className="h-32 overflow-hidden bg-gray-100">
+                      {course.thumbnail_url ? (
+                        <img
+                          src={course.thumbnail_url}
+                          alt={`${course.title} thumbnail`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-[#2283FF] to-blue-800" />
+                      )}
+                    </div>
                     <div className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">

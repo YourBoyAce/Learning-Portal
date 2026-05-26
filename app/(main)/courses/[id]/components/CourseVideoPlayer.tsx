@@ -9,6 +9,7 @@ interface CourseVideoPlayerProps {
   courseId: string;
   moduleId: string;
   videoUrl: string;
+  thumbnailUrl?: string | null;
   onCompleted?: () => void;
 }
 
@@ -17,11 +18,13 @@ export default function CourseVideoPlayer({
   courseId,
   moduleId,
   videoUrl,
+  thumbnailUrl,
   onCompleted,
 }: CourseVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const isCloudflareIframe = useMemo(() => {
     return [
@@ -34,13 +37,14 @@ export default function CourseVideoPlayer({
   const updateProgress = async (completed: boolean) => {
     try {
       await upsertUserProgress(userId, courseId, moduleId, completed ? 100 : 0, completed);
+    } catch (error) {
+      console.error("Error saving video progress:", error);
+      setErrorMessage("Unable to save progress right now. Please try again.");
+    } finally {
       if (completed) {
         setIsCompleted(true);
         onCompleted?.();
       }
-    } catch (error) {
-      console.error("Error saving video progress:", error);
-      setErrorMessage("Unable to save progress right now. Please try again.");
     }
   };
 
@@ -49,6 +53,10 @@ export default function CourseVideoPlayer({
     setIsCompleted(true);
     await updateProgress(true);
   };
+
+  useEffect(() => {
+    setHasStarted(false);
+  }, [moduleId, videoUrl]);
 
   useEffect(() => {
     if (!isCloudflareIframe) return;
@@ -92,7 +100,27 @@ export default function CourseVideoPlayer({
   return (
     <div className="w-full max-w-4xl mx-auto">
       <div className="relative rounded-[1.5rem] overflow-hidden shadow-xl bg-black">
-        {isCloudflareIframe ? (
+        {!hasStarted ? (
+          <button
+            type="button"
+            onClick={() => setHasStarted(true)}
+            className="relative w-full aspect-video bg-black"
+            aria-label="Play module video"
+          >
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt="Module video thumbnail"
+                className="w-full h-full object-cover"
+              />
+            ) : null}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                <div className="w-0 h-0 border-t-[12px] border-b-[12px] border-l-[20px] border-t-transparent border-b-transparent border-l-black ml-1" />
+              </div>
+            </div>
+          </button>
+        ) : isCloudflareIframe ? (
           <div className="aspect-video bg-[#111827]">
             <iframe
               src={videoUrl}
@@ -107,6 +135,7 @@ export default function CourseVideoPlayer({
             ref={videoRef}
             src={videoUrl}
             controls
+            autoPlay
             onEnded={handleEnded}
             className="w-full h-auto bg-black"
           />

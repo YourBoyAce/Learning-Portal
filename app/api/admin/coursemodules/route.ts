@@ -167,11 +167,18 @@ export async function POST(request: Request) {
     typeof formData.get("moduleId") === "string"
       ? String(formData.get("moduleId")).trim()
       : "";
+  const thumbnailUrl =
+    typeof formData.get("thumbnail_url") === "string"
+      ? String(formData.get("thumbnail_url")).trim()
+      : "";
 
   const { data: moduleResult, error: dbError } = moduleId
     ? await authContext.supabaseAdmin
         .from("coursemodules")
-        .update({ video_cf_id: uid }) // Store UID directly for better integration
+        .update({
+          video_cf_id: uid, // Store UID directly for better integration
+          ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+        })
         .eq("id", moduleId)
         .select("*")
         .single()
@@ -181,6 +188,7 @@ export async function POST(request: Request) {
           maincourse_id: maincourseId,
           title,
           video_cf_id: uid,
+          ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
         })
         .select("*")
         .single();

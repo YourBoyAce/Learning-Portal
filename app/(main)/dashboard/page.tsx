@@ -39,6 +39,9 @@ interface Insight {
 }
 
 export default function Dashboard() {
+  const normalizeProgressId = (value: unknown) =>
+    String(value ?? "").trim().replaceAll("-", "");
+
   const router = useRouter();
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
@@ -201,6 +204,8 @@ export default function Dashboard() {
             .from("coursemodules")
             .select("*")
             .eq("maincourse_id", mostRecentCourse.id)
+            .order("order_index", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
             .order("id", { ascending: true });
 
           if (!cancelled && modulesData && modulesData.length > 0) {
@@ -227,9 +232,7 @@ export default function Dashboard() {
               }
 
               setCompletedVideoIds(
-                data.map((item) =>
-                  item.video_id.replaceAll("-", "")
-                )
+                data.map((item) => normalizeProgressId(item.video_id))
               );
 
             };
@@ -249,14 +252,16 @@ export default function Dashboard() {
             if (progressData) {
               for (const p of progressData) {
                 if (p.completed) {
-                  completedSet.add(String(p.video_id));
+                  completedSet.add(normalizeProgressId(p.video_id));
                 }
               }
             }
 
             // Find the first incomplete module as the "next" module
             const firstIncomplete = modulesData.find(
-              (m: any) => !completedSet.has(String(m.id)) && !completedSet.has(String(m.video_cf_id))
+              (m: any) =>
+                !completedSet.has(normalizeProgressId(m.id)) &&
+                !completedSet.has(normalizeProgressId(m.video_cf_id))
             );
             if (firstIncomplete) {
               setNextModule(firstIncomplete);
@@ -265,7 +270,9 @@ export default function Dashboard() {
             // Sum durations of all incomplete modules
             let totalSeconds = 0;
             for (const mod of modulesData) {
-              const isCompleted = completedSet.has(String(mod.id)) || completedSet.has(String(mod.video_cf_id));
+              const isCompleted =
+                completedSet.has(normalizeProgressId(mod.id)) ||
+                completedSet.has(normalizeProgressId(mod.video_cf_id));
               if (!isCompleted && mod.duration) {
                 const parts = mod.duration.split(":").map(Number);
                 if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -376,10 +383,14 @@ export default function Dashboard() {
   };
   const totalModules = allCourseModules.length;
 
-  const completedModules = allCourseModules.filter(
-    (module: any) =>
-      completedVideoIds.includes(module.video_cf_id)
-  ).length;
+  const completedModules = allCourseModules.filter((module: any) => {
+    const normalizedModuleId = normalizeProgressId(module.id);
+    const normalizedVideoId = normalizeProgressId(module.video_cf_id);
+    return (
+      completedVideoIds.includes(normalizedModuleId) ||
+      completedVideoIds.includes(normalizedVideoId)
+    );
+  }).length;
 
   const progressPercentage =
     totalModules > 0
@@ -829,4 +840,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

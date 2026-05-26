@@ -117,7 +117,9 @@ export default function AdminCourses() {
         .from("coursemodules")
         .select("*")
         .eq("maincourse_id", course.id)
-        .order("created_at", { ascending: true });
+        .order("order_index", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
 
       if (error) throw error;
       if (data && data.length > 0) {
@@ -190,8 +192,9 @@ export default function AdminCourses() {
       }
 
       // Upload thumbnail if provided
-      let thumbnailUrl = "";
+      let thumbnailUrl: string | null | undefined;
       if (thumbnailFile) {
+        // New file uploaded
         const fileExt = thumbnailFile.name.split(".").pop();
         const fileName = `course-thumbnails/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
@@ -203,6 +206,12 @@ export default function AdminCourses() {
             .getPublicUrl(fileName);
           thumbnailUrl = urlData.publicUrl;
         }
+      } else if (isEditing && !thumbnailPreview) {
+        // Thumbnail was removed during edit
+        thumbnailUrl = null;
+      } else {
+        // No change to thumbnail
+        thumbnailUrl = undefined;
       }
 
       if (isEditing && editingCourseId) {
@@ -217,7 +226,7 @@ export default function AdminCourses() {
             id: editingCourseId,
             title,
             description,
-            ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+            ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
             modules: validModules,
           }),
         });
