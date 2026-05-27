@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import { CourseCard } from "@/app/components/course";
 import {
   BookOpen,
   CheckCircle,
@@ -14,6 +15,7 @@ import {
   Upload,
   ImageIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Course {
   id: number | string;
@@ -28,7 +30,7 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-
+const router = useRouter();
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -459,80 +461,26 @@ export default function AdminCourses() {
 
         {/* Courses Grid */}
         {!loading && filteredCourses.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCourses.map((course) => (
-              <div
-                key={course.id}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col overflow-hidden relative"
-              >
-                {/* Card Header (Image/Gradient) */}
-                <div className="h-36 bg-gradient-to-br from-[#2283FF] to-[#2563eb] relative overflow-hidden">
-                  {/* Course Thumbnail or Decorative Pattern */}
-                  {course.thumbnail_url ? (
-                    <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:16px_16px]"></div>
-                  )}
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 
-                  {/* Status Badge */}
-                  <div className="absolute top-4 left-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider shadow-sm border border-white/10">
-                      <CheckCircle className="w-3 h-3" /> Active
-                    </span>
-                  </div>
-
-                  {/* Center Icon */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
-                    <BookOpen className="w-16 h-16 text-white" />
-                  </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#2283FF] transition-colors leading-tight">
-                    {course.title}
-                  </h4>
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-1">
-                    {course.description || "No description available."}
-                  </p>
-
-                  {/* Card Footer */}
-                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
-                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                      {course.created_at
-                        ? new Date(course.created_at).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )
-                        : "Recently Added"}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleEdit(course)}
-                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#2283FF] hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Edit Course"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(course)}
-                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Course"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+  {filteredCourses.map((course) => (
+    <CourseCard
+      key={course.id}
+      id={course.id}
+      title={course.title}
+      description={course.description}
+      thumbnail={course.thumbnail_url}
+      createdAt={course.created_at}
+      variant="admin"
+      onClick={() => router.push(`/courses/${course.id}`)}
+      onEdit={() => handleEdit(course)}
+      onDelete={() => handleDeleteClick(course)}
+    />
+  ))}
+</div>
         )}
-      </div>
+      </div> 
+      
 
       {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
       {showModal && (

@@ -1,9 +1,74 @@
+// "use server";
+
+// import { createClient } from "@supabase/supabase-js";
+
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// export async function getCourseProgress(userId: string, courseId: string) {
+//   if (!supabaseUrl || !supabaseServiceRoleKey) {
+//     throw new Error("Supabase environment variables are not configured.");
+//   }
+
+//   const supabaseAdmin = createClient(
+//     supabaseUrl,
+//     supabaseServiceRoleKey,
+//     {
+//       auth: { persistSession: false },
+//     }
+//   );
+
+//   try {
+//     // 1. Get total number of course modules in this course
+//     const { count: totalModules, error: totalError } = await supabaseAdmin
+//       .from("coursemodules")
+//       .select("*", { count: "exact", head: true })
+//       .eq("maincourse_id", courseId);
+
+//     if (totalError) throw totalError;
+
+//     // 2. Get number of COMPLETED videos/modules for this specific user in this course
+//     const { count: completedModules, error: completedError } = await supabaseAdmin
+//       .from("user_video_progress")
+//       .select("*", { count: "exact", head: true })
+//       .eq("user_id", userId)
+//       .eq("course_id", courseId)
+//       .eq("completed", true);
+
+//     if (completedError) throw completedError;
+
+//     // 3. Calculate the percentage safely
+//     const total = totalModules || 0;
+//     const completed = completedModules || 0;
+    
+//     const progressPercentage = total > 0 
+//       ? Math.round((completed / total) * 100) 
+//       : 0;
+
+//     return {
+//       progressPercentage,
+//       completedModules: completed,
+//       totalModules: total,
+//     };
+    
+//   } catch (error: any) {
+//     console.error("Failed to fetch course progress:", error);
+//     return {
+//       progressPercentage: 0,
+//       completedModules: 0,
+//       totalModules: 0,
+//     };
+//   }
+// }
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const normalizeId = (id: string | null | undefined) =>
+  String(id || "").replace(/-/g, "").toLowerCase();
 
 export async function getCourseProgress(userId: string, courseId: string) {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -19,36 +84,47 @@ export async function getCourseProgress(userId: string, courseId: string) {
   );
 
   try {
-    // 1. Get total number of course modules in this course
-    const { count: totalModules, error: totalError } = await supabaseAdmin
+    // 1. Get all modules for this course
+    const { data: modules, error: modulesError } = await supabaseAdmin
       .from("coursemodules")
-      .select("*", { count: "exact", head: true })
-      .eq("maincourse_id", courseId);
+      .select("id")
+      .eq("maincourse_id", courseId)
+      .order("order_index", { ascending: true });
 
-    if (totalError) throw totalError;
+    if (modulesError) throw modulesError;
 
-    // 2. Get number of COMPLETED videos/modules for this specific user in this course
-    const { count: completedModules, error: completedError } = await supabaseAdmin
+    const totalModules = modules?.length || 0;
+
+    // 2. Get user's video progress for this course
+    const { data: progressData, error: progressError } = await supabaseAdmin
       .from("user_video_progress")
-      .select("*", { count: "exact", head: true })
+      .select("video_id, completed")
       .eq("user_id", userId)
-      .eq("course_id", courseId)
-      .eq("completed", true);
+      .eq("course_id", courseId);
 
-    if (completedError) throw completedError;
+    if (progressError) throw progressError;
 
-    // 3. Calculate the percentage safely
-    const total = totalModules || 0;
-    const completed = completedModules || 0;
-    
-    const progressPercentage = total > 0 
-      ? Math.round((completed / total) * 100) 
+    // 3. Create a set of completed video IDs (normalized)
+    const completedVideoSet = new Set(
+      progressData
+        ?.filter((p: any) => p.completed)
+        .map((p: any) => normalizeId(p.video_id))
+    );
+
+    // 4. Count modules that have matching completed videos
+    const completedModules = modules?.filter((m: any) =>
+      completedVideoSet.has(normalizeId(m.id))
+    ).length || 0;
+
+    // 5. Calculate percentage
+    const progressPercentage = totalModules > 0
+      ? Math.round((completedModules / totalModules) * 100)
       : 0;
 
     return {
       progressPercentage,
-      completedModules: completed,
-      totalModules: total,
+      completedModules,
+      totalModules,
     };
     
   } catch (error: any) {

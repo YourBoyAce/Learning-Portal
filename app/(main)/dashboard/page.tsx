@@ -5,8 +5,16 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { BookOpen, CheckCircle2 } from "lucide-react";
+import { BookOpen, CheckCircle2, FolderOpen, Users } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
+import CourseCard from "@/app/components/course/CourseCard";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"; // <-- Update path to match your folder structure
 
 type Profile = {
   full_name?: string | null;
@@ -37,6 +45,7 @@ interface Insight {
   content: string;
   author: string;
 }
+
 
 export default function Dashboard() {
   const normalizeProgressId = (value: unknown) =>
@@ -323,6 +332,45 @@ export default function Dashboard() {
     };
   }, [router]);
 
+  // Real-time listener for progress updates
+  useEffect(() => {
+    if (!userId) return;
+
+    const subscription = supabase
+      .channel(`user_video_progress:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_video_progress',
+          filter: `user_id=eq.${userId}`,
+        },
+        async (payload: any) => {
+          // When a video is marked as completed, refetch progress for that course
+          if (payload.new?.completed === true) {
+            const courseId = payload.new?.course_id;
+            if (courseId) {
+              try {
+                const updatedProgress = await getCourseProgress(userId, courseId);
+                setCourseProgress((prev) => ({
+                  ...prev,
+                  [String(courseId)]: updatedProgress,
+                }));
+              } catch (error) {
+                console.error(`Error refetching progress for course ${courseId}:`, error);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [userId]);
+
   const userName = useMemo(() => {
     return (
       profile?.full_name ||
@@ -438,90 +486,168 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Upcoming Webinars Section */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+       
+        {/* Upcoming Webinars Widget */}
+    {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 items-stretch">
+          
+          {/* 1. Upcoming Webinars Widget */}
+          <div className="bg-[#E1EAF4] rounded-[2rem] p-6 md:p-8 border border-[#2283FF]/30 shadow-[0_0_20px_rgba(34,131,255,0.15)] relative overflow-hidden transition-shadow hover:shadow-[0_0_30px_rgba(34,131,255,0.25)] flex flex-col h-full">
+            
+            {/* Optional: A subtle top inner glow for depth */}
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#2283FF]/50 to-transparent"></div>
+
+            <div className="flex items-center justify-between mb-4 relative z-10">
               <span className="text-xs font-bold text-[#2283FF] uppercase tracking-[0.2em]">
                 Live Sessions
               </span>
-              <span className="text-[10px] font-bold px-2 py-1 bg-orange-100 text-orange-600 rounded-lg">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#2283FF]/10 text-[#2283FF] rounded-lg shadow-sm border border-[#2283FF]/20">
                 {upcomingEvents.length} UPCOMING
               </span>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">
+            <h2 className="text-2xl font-bold text-gray-900 mb-1 relative z-10">
               Upcoming Webinars
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-gray-600 mb-6 relative z-10">
               Exclusive live knowledge sessions from your curators.
             </p>
 
-            {upcomingEvents.length === 0 ? (
-              <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center shadow-sm">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+            <div className="flex-1 flex flex-col">
+              {upcomingEvents.length === 0 ? (
+                <div className="bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <svg className="w-8 h-8 text-[#2283FF]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-700 font-medium">No live sessions scheduled yet.</p>
+                  <p className="text-xs text-gray-500 mt-1">Check back later or visit your calendar.</p>
                 </div>
-                <p className="text-gray-500 font-medium">No live sessions scheduled yet.</p>
-                <p className="text-xs text-gray-400 mt-1">Check back later or visit your calendar.</p>
-              </div>
-            ) : (
-              <div className="flex gap-5 overflow-x-auto pb-6 -mx-1 px-1 scrollbar-hide">
-                {upcomingEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="min-w-[270px] sm:min-w-[300px] md:min-w-[340px] bg-white border border-gray-100 rounded-[2rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-xl transition-all duration-300 relative group border-b-4 border-b-[#2283FF]/10 hover:border-b-[#2283FF]"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="w-14 h-14 bg-[#2283FF]/5 rounded-2xl flex items-center justify-center shrink-0 border border-[#2283FF]/10 group-hover:scale-110 transition-transform duration-300">
-                        <svg
-                          className="w-7 h-7 text-[#2283FF]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
+              ) : (
+                <div className="flex gap-5 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide relative z-10">
+                  {upcomingEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="min-w-[270px] sm:min-w-[300px] bg-white/70 backdrop-blur-md border border-white/50 rounded-[1.5rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-lg transition-all duration-300 relative group hover:bg-white"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-[#2283FF]/10 group-hover:scale-110 transition-transform duration-300">
+                          <svg
+                            className="w-7 h-7 text-[#2283FF]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#2283FF]/40 bg-white/50 px-2 py-1 rounded-md">
+                          {event.event_type}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#2283FF]/30">
-                        {event.event_type}
-                      </span>
-                    </div>
 
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors mb-2">
-                        {event.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
-                        {event.description?.trim() || "Deep dive into advanced concepts with our industry experts."}
-                      </p>
-                    </div>
-
-                    <div className="pt-5 border-t border-gray-50 flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Commences at</p>
-                        <p className="text-xs font-black text-[#2283FF]">
-                          {formatEventLabel(event.event_date, event.event_time)}
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors mb-2">
+                          {event.title}
+                        </h3>
+                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
+                          {event.description?.trim() || "Deep dive into advanced concepts with our industry experts."}
                         </p>
                       </div>
-                      <button className="w-10 h-10 bg-[#2283FF] rounded-xl flex items-center justify-center text-white shadow-lg shadow-[#2283FF]/20 hover:scale-110 transition-transform">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                      </button>
+
+                      <div className="pt-5 border-t border-[#2283FF]/10 flex items-center justify-between mt-auto">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
+                          <p className="text-xs font-black text-[#2283FF]">
+                            {formatEventLabel(event.event_date, event.event_time)}
+                          </p>
+                        </div>
+                        <button className="w-10 h-10 bg-[#2283FF] rounded-xl flex items-center justify-center text-white shadow-md shadow-[#2283FF]/30 hover:scale-110 hover:shadow-lg hover:shadow-[#2283FF]/40 transition-all">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* 2. Enrollment Summary / Batch Allocations Widget */}
+          <div className="bg-white rounded-[2rem] border border-gray-100 p-6 md:p-8 shadow-sm flex flex-col h-full">
+            
+            <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#2283FF]/10 rounded-xl flex items-center justify-center">
+                  <Users size={20} className="text-[#2283FF]" />
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
+                  Batch Allocations
+                </h2>
+              </div>
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#2283FF]/5 text-[#2283FF] rounded-lg uppercase tracking-widest border border-[#2283FF]/10">
+                {enrollments.length} Active
+              </span>
+            </div>
+            
+            <div className="flex-1 flex flex-col">
+              {enrollments.length === 0 ? (
+                <div className="h-full py-8 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
+                    <FolderOpen className="text-gray-400 w-8 h-8" />
+                  </div>
+                  <p className="text-gray-800 font-semibold text-lg mb-1">No Active Cohorts</p>
+                  <p className="text-gray-500 text-sm max-w-[200px]">
+                    You haven't been allocated to any specific batches yet. 
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {enrollments.map((item) => (
+                    <div
+                      key={`${item.batchId}-${item.courseId}`}
+                      className="bg-gray-50/50 hover:bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-lg hover:shadow-[#2283FF]/5 hover:border-[#2283FF]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
+                    >
+                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-[#2283FF]/5 to-[#2283FF]/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+
+                      <div className="flex items-start gap-4 mb-4 relative z-10">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#2283FF] to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-[#2283FF]/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
+                          {item.courseTitle.charAt(0)}
+                        </div>
+                        <div className="min-w-0 pt-1 flex-1">
+                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-[#2283FF] transition-colors" title={item.courseTitle}>
+                            {item.courseTitle}
+                          </p>
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-[#2283FF] text-[10px] font-bold uppercase tracking-widest mt-2 border border-blue-100/50 shadow-sm truncate max-w-full" title={item.batchName}>
+                            {item.batchName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pt-4 border-t border-gray-200/60 flex items-center justify-between relative z-10">
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Active</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
 
         {/* Active Course & Progress — "Up Next" Section */}
@@ -621,106 +747,63 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* RIGHT SIDE - LEARNING PROGRESS */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col">
+           {/* RIGHT SIDE - LEARNING PROGRESS */}
+            <div className="bg-[#E1EAF4] border border-[#2283FF]/30 rounded-[2rem] p-6 md:p-8 shadow-[0_0_20px_rgba(34,131,255,0.15)] relative overflow-hidden transition-shadow hover:shadow-[0_0_30px_rgba(34,131,255,0.25)] flex flex-col h-full">
+              
+              {/* Subtle top inner glow for depth */}
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#2283FF]/50 to-transparent"></div>
 
-              <h2 className="text-2xl font-bold text-[#2283FF] mb-8">
+              <h2 className="text-2xl font-bold text-[#2283FF] mb-8 relative z-10">
                 Learning Progress
               </h2>
 
               {/* Circle */}
-              <div className="flex justify-center">
-                <div className="relative w-44 h-44 rounded-full border-[6px] border-[#2283FF] flex items-center justify-center">
-
+              <div className="flex justify-center relative z-10">
+                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#2283FF] flex items-center justify-center bg-white/40 backdrop-blur-sm shadow-[0_0_15px_rgba(34,131,255,0.1)]">
                   <div className="text-center">
                     <h1 className="text-5xl font-black text-[#2283FF]">
                       {progressPercentage}%
                     </h1>
-
-                    <p className="text-xs tracking-[0.3em] text-gray-400 mt-2 font-semibold">
+                    <p className="text-xs tracking-[0.3em] text-[#2283FF]/70 mt-2 font-bold">
                       MASTERY
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="mt-10 space-y-5">
+              {/* Stats Wrapped in Glassmorphism */}
+              <div className="mt-auto pt-10 relative z-10">
+                <div className="bg-white/60 backdrop-blur-md border border-white/50 rounded-2xl p-5 space-y-4 shadow-sm">
+                  
+                  <div className="flex items-center justify-between border-b border-[#2283FF]/10 pb-4">
+                    <span className="text-sm font-medium text-gray-600">
+                      Modules Completed
+                    </span>
+                    <span className="text-lg font-bold text-[#2283FF]">
+                      {completedModules}/{totalModules}
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between border-b pb-4">
-                  <span className="text-sm text-gray-500">
-                    Modules Completed
-                  </span>
-
-                  <span className="text-lg font-bold text-[#2283FF]">
-                    {completedModules}/{totalModules}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">
-                    Courses Assigned
-                  </span>
-
-                  <span className="text-lg font-bold text-[#2283FF]">
-                    {enrollments.length}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600">
+                      Courses Assigned
+                    </span>
+                    <span className="text-lg font-bold text-[#2283FF]">
+                      {enrollments.length}
+                    </span>
+                  </div>
+                  
                 </div>
               </div>
+              
             </div>
           </div>
         )}
 
-        {/* Enrollment Summary */}
-        <div className="mb-12">
+{/* Active Studies Grid / Carousel */}
+        <div className="mb-12 relative px-0 sm:px-4 md:px-0">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">
-              Batch Allocations
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {enrollments.length === 0 ? (
-              <div className="col-span-full bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-sm">
-                No active batch allocations found.
-              </div>
-            ) : (
-              enrollments.slice(0, 3).map((item) => (
-                <div
-                  key={`${item.batchId}-${item.courseId}`}
-                  className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#2283FF]/5 rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-
-                  <div className="flex items-center gap-4 mb-6 relative">
-                    <div className="w-12 h-12 bg-[#2283FF] rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-[#2283FF]/20 group-hover:rotate-6 transition-transform">
-                      {item.courseTitle.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">
-                        {item.courseTitle}
-                      </p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-                        {item.batchName}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[11px] font-bold text-gray-600 uppercase">Active Enrollment</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Active Studies Grid */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
               Active Studies
             </h2>
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
@@ -728,69 +811,70 @@ export default function Dashboard() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {enrolledCourses.map((course) => (
-              <div
-                key={course.id}
-                onClick={() => handleOpenCourse(course.id)}
-                className="group bg-white border border-gray-100 rounded-[2.5rem] p-6 flex flex-col md:flex-row gap-8 hover:shadow-2xl hover:shadow-[#2283FF]/10 transition-all duration-500 cursor-pointer relative overflow-hidden"
-              >
-                {/* Decorative element */}
-                <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-[#2283FF]/5 rounded-full blur-3xl group-hover:bg-[#2283FF]/10 transition-colors" />
-
-                <div className="w-full md:w-48 h-40 rounded-[2rem] overflow-hidden shrink-0 shadow-xl shadow-black/5 relative group-hover:scale-[1.02] transition-transform duration-500">
-                  <img
-                    src={course.thumbnail_url || PLACEHOLDER_IMAGE}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    alt={course.title}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 flex flex-col justify-between py-2">
-                  <div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="px-3 py-1 bg-[#2283FF]/5 text-[#2283FF] text-[10px] font-black rounded-full uppercase tracking-widest border border-[#2283FF]/10">
-                        {course.category || "General Curriculum"}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight group-hover:text-[#2283FF] transition-colors">
-                      {course.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-gray-500 leading-relaxed line-clamp-2 mt-2">
-                      {course.description || "Master these concepts with our structured learning path."}
-                    </p>
-                  </div>
-
-                  <div className="mt-8">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-[#2283FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Momentum</span>
+          <Carousel
+            opts={{
+              align: "start",
+              loop: false,
+              dragFree: true, // Allows smooth swiping like native mobile apps
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+              {enrolledCourses.map((course) => (
+                <CarouselItem
+                  key={course.id}
+                  // Responsive sizing: 85% on mobile, 50% on tablet, 33.3% on desktop
+                  className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
+                >
+                  <div className="h-full min-h-[380px] flex items-stretch w-full shadow-sm hover:shadow-xl transition-shadow duration-300 rounded-[2rem] bg-white border border-gray-100 cursor-pointer" onClick={() => handleOpenCourse(course.id)}>
+                    <div className="flex flex-col w-full h-full rounded-[1rem] overflow-hidden">
+                    {/* Thumbnail */}
+<div className="relative w-full aspect-[16/9] bg-[#F8FAFC] overflow-hidden">
+  <img
+    src={course.thumbnail_url || PLACEHOLDER_IMAGE}
+    alt={course.title}
+    className="w-full h-full object--scale-down object-center transition-transform duration-500 group-hover:scale-105"
+  />
+</div>
+                      {/* Content */}
+                      <div className="flex-1 flex flex-col px-6 pt-4 pb-5">
+                        <h3 className="font-bold text-lg text-[#1a2536] mb-2 leading-snug line-clamp-2 min-h-[56px]" title={course.title}>
+                          {course.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-3 line-clamp-2">{course.description}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-gray-500 tracking-wide">PROGRESS</span>
+                          <span className="text-xs font-bold text-[#1a2536]">{courseProgress[String(course.id)]?.progressPercentage || 0}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
+                          <div
+                            className="h-2 rounded-full bg-[#2956e3] transition-all"
+                            style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-400 mt-auto">
+                          {(() => {
+                            const progress = courseProgress[String(course.id)]?.progressPercentage || 0;
+                            if (progress === 0) return 'Start Learning';
+                            if (progress < 90) return 'Last accessed recently';
+                            return 'Nearing Completion';
+                          })()}
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-[#2283FF]">
-                        {courseProgress[String(course.id)]?.progressPercentage || 0}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
-                      <div
-                        className="bg-gradient-to-r from-[#2283FF] via-[#2c6cb0] to-[#2283FF] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
-                        style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
-                      ></div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+
+            {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
+            {enrolledCourses.length > 3 && (
+              <>
+                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+              </>
+            )}
+          </Carousel>
         </div>
 
         <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">

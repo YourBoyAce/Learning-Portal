@@ -99,19 +99,38 @@ export default function StudentPracticeCenter() {
         );
         setQuizzes(filteredQuizzes);
 
-        // 5. Load & Filter Artifacts from localStorage
-        const savedArtifacts = localStorage.getItem("automate_portal_artifacts");
-        let allArtifacts = [];
-        if (savedArtifacts) {
-          try { allArtifacts = JSON.parse(savedArtifacts); } catch (e) { console.error(e); }
-        }
+// 5. Load Artifacts from Supabase
+const { data: artifactsData, error: artifactsError } = await supabase
+  .from("course_artifacts")
+  .select("*")
+  .eq("status", "Published")
+  .order("created_at", { ascending: false });
 
-        const filteredArtifacts = allArtifacts.filter((art: any) =>
-          art.status === "Published" &&
-          (enrolledIds.includes(String(art.courseId)) ||
-           enrolledTitles.includes(art.courseName.toLowerCase()))
-        );
-        setArtifacts(filteredArtifacts);
+if (artifactsError) {
+  console.error("Artifacts fetch error:", artifactsError);
+} else {
+  const formattedArtifacts =
+    artifactsData
+      ?.filter((art: any) =>
+        enrolledIds.includes(String(art.course_id))
+      )
+      .map((art: any) => ({
+        id: art.id,
+        name: art.name,
+        type: art.type,
+        courseId: art.course_id,
+        courseName:
+          mapping[String(art.course_id)] || "Unknown Course",
+        size: art.size,
+        description: art.description,
+        downloadsCount: art.downloads_count || 0,
+        fileUrl: art.file_url,
+        filePath: art.file_path,
+        status: art.status,
+      })) || [];
+
+  setArtifacts(formattedArtifacts);
+}
 
         // 6. Load Best Scores for each enrolled course
         const loadedBestScores: Record<string, Record<string, number>> = {};
@@ -214,37 +233,43 @@ export default function StudentPracticeCenter() {
   };
 
   // Download Action
-  const handleDownloadArtifact = (art: any) => {
-    // 1. Increment download count in local state
-    setArtifacts(prev =>
-      prev.map(a => (a.id === art.id ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 } : a))
+  const handleDownloadArtifact = async (art: any) => {
+  try {
+    // Update download count
+    const currentCount = art.downloadsCount || 0;
+
+    await supabase
+      .from("course_artifacts")
+      .update({
+        downloads_count: currentCount + 1,
+      })
+      .eq("id", art.id);
+
+    // Generate fresh public URL from file path
+    const { data } = supabase.storage
+      .from("course-artifacts")
+      .getPublicUrl(art.filePath);
+
+    console.log("Generated Download URL:", data.publicUrl);
+
+    // Open file
+    window.open(data.publicUrl, "_blank");
+
+    // Update UI instantly
+    setArtifacts((prev) =>
+      prev.map((a) =>
+        a.id === art.id
+          ? {
+              ...a,
+              downloadsCount: currentCount + 1,
+            }
+          : a
+      )
     );
-
-    // 2. Increment download count in global localStorage
-    const saved = localStorage.getItem("automate_portal_artifacts");
-    if (saved) {
-      try {
-        const allArtifacts = JSON.parse(saved);
-        const updated = allArtifacts.map((a: any) => 
-          a.id === art.id ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 } : a
-        );
-        localStorage.setItem("automate_portal_artifacts", JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // 3. Trigger mock file download in browser
-    const element = document.createElement("a");
-    const fileContent = `Course Artifact Resource: ${art.name}\nCourse: ${art.courseName}\nDescription: ${art.description || "N/A"}\nSize: ${art.size}\n\nThis is a practice-ready exercise file prepared dynamically for your learning path!`;
-    const file = new Blob([fileContent], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = art.name;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
+  } catch (err) {
+    console.error("Download error:", err);
+  }
+};
   const getFileIcon = (type: string) => {
     switch (type) {
       case "PDF": return <FileText className="w-6 h-6 text-red-500" />;

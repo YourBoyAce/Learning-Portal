@@ -23,304 +23,514 @@ interface Artifact {
   name: string;
   type: "PDF" | "ZIP" | "Code" | "Sheet" | "Other";
   courseName: string;
-  courseId?: string | number; // Added to map to Supabase maincourses table
+  courseId?: string | number;
   size: string;
   uploadDate: string;
   downloadsCount: number;
   status: "Published" | "Draft";
   description: string;
+
+  // ADD THESE
+  fileUrl?: string;
+  filePath?: string;
 }
 
-const INITIAL_ARTIFACTS: Artifact[] = [
-  {
-    id: "art-1",
-    name: "Playwright Cheat Sheet & Best Practices.pdf",
-    type: "PDF",
-    courseName: "Playwright Mastery",
-    size: "1.8 MB",
-    uploadDate: "2026-05-10",
-    downloadsCount: 142,
-    status: "Published",
-    description: "A quick-reference study guide covering selectors, assertions, and command line tools.",
-  },
-  {
-    id: "art-2",
-    name: "complete-automation-framework-starter.zip",
-    type: "ZIP",
-    courseName: "Ultimate Automation",
-    size: "4.2 MB",
-    uploadDate: "2026-05-12",
-    downloadsCount: 89,
-    status: "Published",
-    description: "Full boilerplate code repository with pre-configured directory layouts and configurations.",
-  },
-  {
-    id: "art-3",
-    name: "github-actions-workflow-templates.yaml",
-    type: "Code",
-    courseName: "CI/CD Foundations",
-    size: "24 KB",
-    uploadDate: "2026-05-14",
-    downloadsCount: 64,
-    status: "Published",
-    description: "Production-ready YAML files for setting up build, lint, and test jobs in GitHub Actions.",
-  },
-  {
-    id: "art-4",
-    name: "test-metrics-calculation-sheet.xlsx",
-    type: "Sheet",
-    courseName: "Ultimate Automation",
-    size: "350 KB",
-    uploadDate: "2026-05-17",
-    downloadsCount: 12,
-    status: "Draft",
-    description: "Template Excel worksheet for tracking test execution metrics, flaky tests, and regression rate.",
-  },
-];
+
 
 export default function AdminArtifacts() {
-  const [artifacts, setArtifacts] = useState<Artifact[]>(INITIAL_ARTIFACTS);
-  const [searchTerm, setSearchTerm] = useState("");
+const [searchTerm, setSearchTerm] = useState("");
 
-  // Create/Edit Modal State
-  const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingArtifactId, setEditingArtifactId] = useState<string | null>(null);
+// Artifacts State
+const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
-  // Form State
-  const [artName, setArtName] = useState("");
-  const [artType, setArtType] = useState<"PDF" | "ZIP" | "Code" | "Sheet" | "Other">("PDF");
-  const [courseName, setCourseName] = useState("Playwright Mastery");
-  const [courseId, setCourseId] = useState<string | number>("");
-  const [artSize, setArtSize] = useState("1.0 MB");
-  const [status, setStatus] = useState<"Published" | "Draft">("Published");
-  const [description, setDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+// Create/Edit Modal State
+const [showModal, setShowModal] = useState(false);
+const [isEditing, setIsEditing] = useState(false);
+const [editingArtifactId, setEditingArtifactId] = useState<string | null>(null);
 
-  // Load courses and artifacts on mount
-  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
+// Form State
+const [artName, setArtName] = useState("");
+const [artType, setArtType] = useState<
+  "PDF" | "ZIP" | "Code" | "Sheet" | "Other"
+>("PDF");
 
-  useEffect(() => {
-    // 1. Fetch courses from DB
-    const loadCourses = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("maincourses")
-          .select("id, title")
-          .order("title", { ascending: true });
-        if (data && !error) {
-          setDbCourses(data);
-        }
-      } catch (err) {
-        console.error("Failed to load courses:", err);
-      }
-    };
-    loadCourses();
+const [courseName, setCourseName] = useState("");
+const [courseId, setCourseId] = useState<string | number>("");
 
-    // 2. Load artifacts from localStorage
-    const saved = localStorage.getItem("automate_portal_artifacts");
-    if (saved) {
-      try {
-        setArtifacts(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse artifacts from local storage:", e);
-      }
-    } else {
-      localStorage.setItem("automate_portal_artifacts", JSON.stringify(INITIAL_ARTIFACTS));
-    }
-  }, []);
+const [artSize, setArtSize] = useState("1.0 MB");
 
-  // Sync artifacts to localStorage on change
-  useEffect(() => {
-    if (artifacts && artifacts !== INITIAL_ARTIFACTS) {
-      localStorage.setItem("automate_portal_artifacts", JSON.stringify(artifacts));
-    }
-  }, [artifacts]);
+const [status, setStatus] = useState<"Published" | "Draft">(
+  "Published"
+);
 
-  // Delete Confirmation State
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingArtifact, setDeletingArtifact] = useState<Artifact | null>(null);
+const [description, setDescription] = useState("");
 
-  const handleCreateNew = () => {
-    setIsEditing(false);
-    setEditingArtifactId(null);
-    setArtName("");
-    setArtType("PDF");
-    if (dbCourses.length > 0) {
-      setCourseId(dbCourses[0].id);
-      setCourseName(dbCourses[0].title);
-    } else {
-      setCourseId("");
-      setCourseName("Playwright Mastery");
-    }
-    setArtSize("1.0 MB");
-    setStatus("Published");
-    setDescription("");
-    setSelectedFile(null);
-    setShowModal(true);
-  };
+const [selectedFile, setSelectedFile] = useState<File | null>(
+  null
+);
 
-  const handleEdit = (art: Artifact) => {
-    setIsEditing(true);
-    setEditingArtifactId(art.id);
-    setArtName(art.name);
-    setArtType(art.type);
-    setCourseName(art.courseName);
-    setCourseId(art.courseId || "");
-    setArtSize(art.size);
-    setStatus(art.status);
-    setDescription(art.description);
-    setSelectedFile(art.name);
-    setShowModal(true);
-  };
+// Delete Confirmation State
+const [showDeleteConfirm, setShowDeleteConfirm] =
+  useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setArtName(file.name);
-      setSelectedFile(file.name);
-      
-      // Calculate file size formatted nicely
-      const sizeInMB = (file.size / (1024 * 1024)).toFixed(1);
-      if (Number(sizeInMB) > 0.1) {
-        setArtSize(`${sizeInMB} MB`);
-      } else {
-        const sizeInKB = Math.round(file.size / 1024);
-        setArtSize(`${sizeInKB} KB`);
-      }
+const [deletingArtifact, setDeletingArtifact] =
+  useState<Artifact | null>(null);
 
-      // Infer file type
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (ext === "pdf") setArtType("PDF");
-      else if (["zip", "rar", "tar", "gz"].includes(ext || "")) setArtType("ZIP");
-      else if (["js", "ts", "json", "yml", "yaml", "py", "sh"].includes(ext || "")) setArtType("Code");
-      else if (["xls", "xlsx", "csv"].includes(ext || "")) setArtType("Sheet");
-      else setArtType("Other");
-    }
-  };
+// Courses
+const [dbCourses, setDbCourses] = useState<
+  { id: string | number; title: string }[]
+>([]);
 
-  const handleSaveArtifact = () => {
-    if (!artName.trim() || !courseName.trim()) {
-      alert("Please upload a file or specify the resource name.");
+/* =========================================================
+   LOAD COURSES + ARTIFACTS
+========================================================= */
+
+useEffect(() => {
+  loadCourses();
+  loadArtifacts();
+}, []);
+
+const loadCourses = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("maincourses")
+      .select("id, title")
+      .order("title", { ascending: true });
+
+    if (error) {
+      console.error(error);
       return;
     }
 
-    if (isEditing && editingArtifactId) {
-      setArtifacts((prev) =>
-        prev.map((art) =>
-          art.id === editingArtifactId
-            ? {
-                ...art,
-                name: artName,
-                type: artType,
-                courseName,
-                courseId,
-                size: artSize,
-                status,
-                description,
-              }
-            : art
+    setDbCourses(data || []);
+  } catch (err) {
+    console.error("Failed to load courses:", err);
+  }
+};
+
+const loadArtifacts = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("course_artifacts")
+      .select(`
+        *,
+        maincourses (
+          title
         )
-      );
-    } else {
-      const newArt: Artifact = {
-        id: `art-${Date.now()}`,
-        name: artName,
-        type: artType,
-        courseName,
-        courseId,
-        size: artSize,
-        uploadDate: new Date().toISOString().split("T")[0],
-        downloadsCount: 0,
-        status,
-        description,
-      };
-      setArtifacts((prev) => [newArt, ...prev]);
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
     }
+
+    const mapped: Artifact[] =
+      data?.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        courseName:
+          item.maincourses?.title || "Unknown Course",
+        courseId: item.course_id,
+        size: item.size,
+        uploadDate: item.created_at,
+        downloadsCount: item.downloads_count || 0,
+        status: item.status,
+        description: item.description || "",
+        fileUrl: item.file_url,
+        filePath: item.file_path,
+      })) || [];
+
+    setArtifacts(mapped);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+/* =========================================================
+   CREATE NEW
+========================================================= */
+
+const handleCreateNew = () => {
+  setIsEditing(false);
+
+  setEditingArtifactId(null);
+
+  setArtName("");
+
+  setArtType("PDF");
+
+  if (dbCourses.length > 0) {
+    setCourseId(dbCourses[0].id);
+    setCourseName(dbCourses[0].title);
+  } else {
+    setCourseId("");
+    setCourseName("");
+  }
+
+  setArtSize("1.0 MB");
+
+  setStatus("Published");
+
+  setDescription("");
+
+  setSelectedFile(null);
+
+  setShowModal(true);
+};
+
+/* =========================================================
+   EDIT
+========================================================= */
+
+const handleEdit = (art: Artifact) => {
+  setIsEditing(true);
+
+  setEditingArtifactId(art.id);
+
+  setArtName(art.name);
+
+  setArtType(art.type);
+
+  setCourseName(art.courseName);
+
+  setCourseId(art.courseId || "");
+
+  setArtSize(art.size);
+
+  setStatus(art.status);
+
+  setDescription(art.description);
+
+  setSelectedFile(null);
+
+  setShowModal(true);
+};
+
+/* =========================================================
+   FILE CHANGE
+========================================================= */
+
+const handleFileChange = (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  setSelectedFile(file);
+
+  setArtName(file.name);
+
+  const sizeInMB = (
+    file.size /
+    (1024 * 1024)
+  ).toFixed(1);
+
+  if (Number(sizeInMB) > 0.1) {
+    setArtSize(`${sizeInMB} MB`);
+  } else {
+    const sizeInKB = Math.round(file.size / 1024);
+
+    setArtSize(`${sizeInKB} KB`);
+  }
+
+  const ext = file.name
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+
+  if (ext === "pdf") {
+    setArtType("PDF");
+  } else if (
+    ["zip", "rar", "tar", "gz"].includes(ext || "")
+  ) {
+    setArtType("ZIP");
+  } else if (
+    [
+      "js",
+      "ts",
+      "json",
+      "yml",
+      "yaml",
+      "py",
+      "sh",
+    ].includes(ext || "")
+  ) {
+    setArtType("Code");
+  } else if (
+    ["xls", "xlsx", "csv"].includes(ext || "")
+  ) {
+    setArtType("Sheet");
+  } else {
+    setArtType("Other");
+  }
+};
+
+/* =========================================================
+   SAVE ARTIFACT
+========================================================= */
+
+const handleSaveArtifact = async () => {
+  try {
+    if (!artName.trim() || !courseId) {
+      alert("Please complete all required fields.");
+      return;
+    }
+
+    if (!selectedFile && !isEditing) {
+      alert("Please upload a file.");
+      return;
+    }
+
+    let fileUrl = "";
+    let filePath = "";
+
+    // Upload File
+    if (selectedFile) {
+      const uniqueFileName = `${Date.now()}-${
+        selectedFile.name
+      }`;
+
+      filePath = `artifacts/${uniqueFileName}`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from("course-artifacts")
+          .upload(filePath, selectedFile);
+
+      if (uploadError) {
+        console.error(uploadError);
+        alert("Failed to upload file");
+        return;
+      }
+
+      const { data } = supabase.storage
+        .from("course-artifacts")
+        .getPublicUrl(filePath);
+
+      fileUrl = data.publicUrl;
+    }
+
+    // UPDATE
+    if (isEditing && editingArtifactId) {
+      const existing = artifacts.find(
+        (a) => a.id === editingArtifactId
+      );
+
+      const { error } = await supabase
+        .from("course_artifacts")
+        .update({
+          name: artName,
+          type: artType,
+          description,
+          course_id: courseId,
+          size: artSize,
+          status,
+          file_url:
+            fileUrl || existing?.fileUrl || "",
+          file_path:
+            filePath || existing?.filePath || "",
+        })
+        .eq("id", editingArtifactId);
+
+      if (error) {
+        console.error(error);
+        alert("Failed to update artifact");
+        return;
+      }
+    } else {
+      // CREATE
+      const { error } = await supabase
+        .from("course_artifacts")
+        .insert({
+          name: artName,
+          type: artType,
+          description,
+          course_id: courseId,
+          size: artSize,
+          status,
+          file_url: fileUrl,
+          file_path: filePath,
+          downloads_count: 0,
+        });
+
+      if (error) {
+        console.error(error);
+        alert("Failed to save artifact");
+        return;
+      }
+    }
+
+    await loadArtifacts();
 
     setShowModal(false);
-  };
 
-  const handleDeleteClick = (art: Artifact) => {
-    setDeletingArtifact(art);
-    setShowDeleteConfirm(true);
-  };
+    setSelectedFile(null);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-  const handleConfirmDelete = () => {
-    if (deletingArtifact) {
-      setArtifacts((prev) => prev.filter((a) => a.id !== deletingArtifact.id));
-      setShowDeleteConfirm(false);
-      setDeletingArtifact(null);
+/* =========================================================
+   DELETE
+========================================================= */
+
+const handleDeleteClick = (art: Artifact) => {
+  setDeletingArtifact(art);
+
+  setShowDeleteConfirm(true);
+};
+
+const handleConfirmDelete = async () => {
+  if (!deletingArtifact) return;
+
+  try {
+    // Delete file from storage
+    if (deletingArtifact.filePath) {
+      await supabase.storage
+        .from("course-artifacts")
+        .remove([deletingArtifact.filePath]);
     }
-  };
 
-  const filteredArtifacts = artifacts.filter(
-    (art) =>
-      art.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      art.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      art.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    // Delete DB row
+    const { error } = await supabase
+      .from("course_artifacts")
+      .delete()
+      .eq("id", deletingArtifact.id);
 
-  const getFileIcon = (type: Artifact["type"]) => {
-    switch (type) {
-      case "PDF":
-        return <FileText className="w-5 h-5 text-red-500" />;
-      case "ZIP":
-        return <FileArchive className="w-5 h-5 text-amber-500" />;
-      case "Code":
-        return <FileCode className="w-5 h-5 text-blue-500" />;
-      case "Sheet":
-        return <BarChart3 className="w-5 h-5 text-emerald-500" />;
-      default:
-        return <FileText className="w-5 h-5 text-gray-500" />;
+    if (error) {
+      console.error(error);
+      return;
     }
-  };
 
-  const getFileBadgeColor = (type: Artifact["type"]) => {
-    switch (type) {
-      case "PDF":
-        return "bg-red-50 text-red-700 border-red-100";
-      case "ZIP":
-        return "bg-amber-50 text-amber-700 border-amber-100";
-      case "Code":
-        return "bg-blue-50 text-blue-700 border-blue-100";
-      case "Sheet":
-        return "bg-emerald-50 text-emerald-700 border-emerald-100";
-      default:
-        return "bg-gray-50 text-gray-700 border-gray-100";
-    }
-  };
+    setArtifacts((prev) =>
+      prev.filter(
+        (a) => a.id !== deletingArtifact.id
+      )
+    );
 
-  const stats = [
-    {
-      label: "Total Artifacts",
-      value: artifacts.length.toString(),
-      icon: FileText,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-    },
-    {
-      label: "Total Downloads",
-      value: artifacts.reduce((acc, a) => acc + a.downloadsCount, 0).toString(),
-      icon: DownloadCloud,
-      iconBg: "bg-purple-50",
-      iconColor: "text-purple-600",
-    },
-    {
-      label: "Storage Used",
-      value: "6.4 MB",
-      icon: HardDrive,
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-600",
-    },
-    {
-      label: "Published items",
-      value: artifacts.filter((a) => a.status === "Published").length.toString(),
-      icon: CheckCircle,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-    },
-  ];
+    setShowDeleteConfirm(false);
+
+    setDeletingArtifact(null);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+/* =========================================================
+   FILTERED ARTIFACTS
+========================================================= */
+
+const filteredArtifacts = artifacts.filter(
+  (art) =>
+    art.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    art.courseName
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    art.description
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+);
+
+/* =========================================================
+   FILE ICONS
+========================================================= */
+
+const getFileIcon = (type: Artifact["type"]) => {
+  switch (type) {
+    case "PDF":
+      return (
+        <FileText className="w-5 h-5 text-red-500" />
+      );
+
+    case "ZIP":
+      return (
+        <FileArchive className="w-5 h-5 text-amber-500" />
+      );
+
+    case "Code":
+      return (
+        <FileCode className="w-5 h-5 text-blue-500" />
+      );
+
+    case "Sheet":
+      return (
+        <BarChart3 className="w-5 h-5 text-emerald-500" />
+      );
+
+    default:
+      return (
+        <FileText className="w-5 h-5 text-gray-500" />
+      );
+  }
+};
+
+const getFileBadgeColor = (
+  type: Artifact["type"]
+) => {
+  switch (type) {
+    case "PDF":
+      return "bg-red-50 text-red-700 border-red-100";
+
+    case "ZIP":
+      return "bg-amber-50 text-amber-700 border-amber-100";
+
+    case "Code":
+      return "bg-blue-50 text-blue-700 border-blue-100";
+
+    case "Sheet":
+      return "bg-emerald-50 text-emerald-700 border-emerald-100";
+
+    default:
+      return "bg-gray-50 text-gray-700 border-gray-100";
+  }
+};
+
+/* =========================================================
+   STATS
+========================================================= */
+
+const stats = [
+  {
+    label: "Total Artifacts",
+    value: artifacts.length.toString(),
+    icon: FileText,
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
+  },
+  {
+    label: "Total Downloads",
+    value: artifacts
+      .reduce(
+        (acc, a) => acc + a.downloadsCount,
+        0
+      )
+      .toString(),
+    icon: DownloadCloud,
+    iconBg: "bg-purple-50",
+    iconColor: "text-purple-600",
+  },
+  {
+    label: "Storage Used",
+    value: "6.4 MB",
+    icon: HardDrive,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+  },
+  {
+    label: "Published Items",
+    value: artifacts
+      .filter((a) => a.status === "Published")
+      .length.toString(),
+    icon: CheckCircle,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+  },
+];
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">

@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { BookOpen } from "lucide-react";
+import CourseCard from "@/app/components/course/CourseCard";
 
 type Course = {
   id: string | number;
   title: string;
-  description: string | null;
-  thumbnail_url?: string | null;
-  created_at?: string | null;
+  description: string | undefined;
+  thumbnail_url?: string | undefined;
+  created_at?: string | undefined;
 };
 
 type Module = {
@@ -626,39 +627,17 @@ export default function UploadPage() {
                 )}
 
                 {displayedCourses.map((course) => (
-                  <div
-                    key={course.id}
-                    className="border border-gray-200 rounded-xl overflow-hidden hover:border-[#2283FF] transition-colors"
-                  >
-                    <div className="h-32 overflow-hidden bg-gray-100">
-                      {course.thumbnail_url ? (
-                        <img
-                          src={course.thumbnail_url}
-                          alt={`${course.title} thumbnail`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-r from-[#2283FF] to-blue-800" />
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Active
-                        </span>
-                      </div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                        {course.title}
-                      </h4>
-                      <p className="text-xs text-gray-500 mb-3 line-clamp-2">
-                        {course.description || "No description available."}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                        <span>{formatCreatedAt(course.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+  <CourseCard
+    key={course.id}
+    id={course.id}
+    title={course.title}
+    description={course.description}
+    thumbnail={course.thumbnail_url}
+    createdAt={course.created_at}
+    variant="admin"
+    showProgress={false}
+  />
+))}
 
                 {/* View More Card */}
                 {!showAllCourses && courses.length > 4 && (
