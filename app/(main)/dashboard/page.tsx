@@ -489,19 +489,16 @@ export default function Dashboard() {
        
         {/* Upcoming Webinars Widget */}
     {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
           
           {/* 1. Upcoming Webinars Widget */}
-          <div className="bg-[#E1EAF4] rounded-[2rem] p-6 md:p-8 border border-[#2283FF]/30 shadow-[0_0_20px_rgba(34,131,255,0.15)] relative overflow-hidden transition-shadow hover:shadow-[0_0_30px_rgba(34,131,255,0.25)] flex flex-col h-full">
-            
-            {/* Optional: A subtle top inner glow for depth */}
-            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#2283FF]/50 to-transparent"></div>
+          <div className="bg-[#EAF2FB] rounded-2xl p-6 md:p-7 border border-[#2283FF]/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
 
-            <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className="flex items-center justify-between mb-3 relative z-10">
               <span className="text-xs font-bold text-[#2283FF] uppercase tracking-[0.2em]">
                 Live Sessions
               </span>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#2283FF]/10 text-[#2283FF] rounded-lg shadow-sm border border-[#2283FF]/20">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-[#2283FF] rounded-md border border-[#2283FF]/20">
                 {upcomingEvents.length} UPCOMING
               </span>
             </div>
@@ -509,14 +506,14 @@ export default function Dashboard() {
             <h2 className="text-2xl font-bold text-gray-900 mb-1 relative z-10">
               Upcoming Webinars
             </h2>
-            <p className="text-sm text-gray-600 mb-6 relative z-10">
+            <p className="text-sm text-gray-600 mb-5 relative z-10">
               Exclusive live knowledge sessions from your curators.
             </p>
 
             <div className="flex-1 flex flex-col">
               {upcomingEvents.length === 0 ? (
-                <div className="bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 bg-[#F8FAFC] rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
                     <svg className="w-8 h-8 text-[#2283FF]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -525,14 +522,14 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500 mt-1">Check back later or visit your calendar.</p>
                 </div>
               ) : (
-                <div className="flex gap-5 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide relative z-10">
+                <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide relative z-10">
                   {upcomingEvents.map((event) => (
                     <div
                       key={event.id}
-                      className="min-w-[270px] sm:min-w-[300px] bg-white/70 backdrop-blur-md border border-white/50 rounded-[1.5rem] p-6 flex flex-col gap-5 shadow-sm hover:shadow-lg transition-all duration-300 relative group hover:bg-white"
+                      className="min-w-[270px] sm:min-w-[300px] bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-all duration-300 relative group"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-[#2283FF]/10 group-hover:scale-110 transition-transform duration-300">
+                        <div className="w-12 h-12 bg-[#F8FAFC] rounded-xl flex items-center justify-center shrink-0 border border-[#2283FF]/10 group-hover:scale-105 transition-transform duration-300">
                           <svg
                             className="w-7 h-7 text-[#2283FF]"
                             fill="none"
@@ -547,7 +544,7 @@ export default function Dashboard() {
                             />
                           </svg>
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#2283FF]/40 bg-white/50 px-2 py-1 rounded-md">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#2283FF]/60 bg-[#EAF2FB] px-2 py-1 rounded-md">
                           {event.event_type}
                         </span>
                       </div>
@@ -561,14 +558,14 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <div className="pt-5 border-t border-[#2283FF]/10 flex items-center justify-between mt-auto">
+                      <div className="pt-4 border-t border-[#2283FF]/10 flex items-center justify-between mt-auto">
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
                           <p className="text-xs font-black text-[#2283FF]">
                             {formatEventLabel(event.event_date, event.event_time)}
                           </p>
                         </div>
-                        <button className="w-10 h-10 bg-[#2283FF] rounded-xl flex items-center justify-center text-white shadow-md shadow-[#2283FF]/30 hover:scale-110 hover:shadow-lg hover:shadow-[#2283FF]/40 transition-all">
+                        <button className="w-9 h-9 bg-[#2283FF] rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
@@ -582,9 +579,9 @@ export default function Dashboard() {
           </div>
 
           {/* 2. Enrollment Summary / Batch Allocations Widget */}
-          <div className="bg-white rounded-[2rem] border border-gray-100 p-6 md:p-8 shadow-sm flex flex-col h-full">
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-7 shadow-sm flex flex-col h-full">
             
-            <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-50">
+            <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#2283FF]/10 rounded-xl flex items-center justify-center">
                   <Users size={20} className="text-[#2283FF]" />
@@ -593,7 +590,7 @@ export default function Dashboard() {
                   Batch Allocations
                 </h2>
               </div>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#2283FF]/5 text-[#2283FF] rounded-lg uppercase tracking-widest border border-[#2283FF]/10">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#EAF2FB] text-[#2283FF] rounded-md uppercase tracking-widest border border-[#2283FF]/10">
                 {enrollments.length} Active
               </span>
             </div>
@@ -614,7 +611,7 @@ export default function Dashboard() {
                   {enrollments.map((item) => (
                     <div
                       key={`${item.batchId}-${item.courseId}`}
-                      className="bg-gray-50/50 hover:bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-lg hover:shadow-[#2283FF]/5 hover:border-[#2283FF]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
+                      className="bg-[#F8FAFC] hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-[#2283FF]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
                     >
                       <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-[#2283FF]/5 to-[#2283FF]/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
 
@@ -655,7 +652,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
 
             {/* LEFT SIDE - UP NEXT */}
-            <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 sm:p-8 shadow-sm">
+            <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 sm:p-7 shadow-sm">
 
               {/* Header row */}
               <div className="flex items-start justify-between mb-5">
@@ -748,18 +745,15 @@ export default function Dashboard() {
             </div>
 
            {/* RIGHT SIDE - LEARNING PROGRESS */}
-            <div className="bg-[#E1EAF4] border border-[#2283FF]/30 rounded-[2rem] p-6 md:p-8 shadow-[0_0_20px_rgba(34,131,255,0.15)] relative overflow-hidden transition-shadow hover:shadow-[0_0_30px_rgba(34,131,255,0.25)] flex flex-col h-full">
-              
-              {/* Subtle top inner glow for depth */}
-              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#2283FF]/50 to-transparent"></div>
+            <div className="bg-[#EAF2FB] border border-[#2283FF]/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
 
-              <h2 className="text-2xl font-bold text-[#2283FF] mb-8 relative z-10">
+              <h2 className="text-2xl font-bold text-[#2283FF] mb-7 relative z-10">
                 Learning Progress
               </h2>
 
               {/* Circle */}
               <div className="flex justify-center relative z-10">
-                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#2283FF] flex items-center justify-center bg-white/40 backdrop-blur-sm shadow-[0_0_15px_rgba(34,131,255,0.1)]">
+                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#2283FF] flex items-center justify-center bg-white shadow-sm">
                   <div className="text-center">
                     <h1 className="text-5xl font-black text-[#2283FF]">
                       {progressPercentage}%
@@ -772,8 +766,8 @@ export default function Dashboard() {
               </div>
 
               {/* Stats Wrapped in Glassmorphism */}
-              <div className="mt-auto pt-10 relative z-10">
-                <div className="bg-white/60 backdrop-blur-md border border-white/50 rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="mt-auto pt-8 relative z-10">
+                <div className="bg-white border border-gray-100 rounded-xl p-5 space-y-4 shadow-sm">
                   
                   <div className="flex items-center justify-between border-b border-[#2283FF]/10 pb-4">
                     <span className="text-sm font-medium text-gray-600">
@@ -802,7 +796,7 @@ export default function Dashboard() {
 
 {/* Active Studies Grid / Carousel */}
         <div className="mb-12 relative px-0 sm:px-4 md:px-0">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
               Active Studies
             </h2>
@@ -826,8 +820,8 @@ export default function Dashboard() {
                   // Responsive sizing: 85% on mobile, 50% on tablet, 33.3% on desktop
                   className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                 >
-                  <div className="h-full min-h-[380px] flex items-stretch w-full shadow-sm hover:shadow-xl transition-shadow duration-300 rounded-[2rem] bg-white border border-gray-100 cursor-pointer" onClick={() => handleOpenCourse(course.id)}>
-                    <div className="flex flex-col w-full h-full rounded-[1rem] overflow-hidden">
+                  <div className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white border border-gray-100 cursor-pointer" onClick={() => handleOpenCourse(course.id)}>
+                    <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
                     {/* Thumbnail */}
 <div className="relative w-full aspect-[16/9] bg-[#F8FAFC] overflow-hidden">
   <img

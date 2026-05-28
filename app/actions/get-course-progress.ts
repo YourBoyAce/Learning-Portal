@@ -87,7 +87,7 @@ export async function getCourseProgress(userId: string, courseId: string) {
     // 1. Get all modules for this course
     const { data: modules, error: modulesError } = await supabaseAdmin
       .from("coursemodules")
-      .select("id")
+      .select("id, video_cf_id")
       .eq("maincourse_id", courseId)
       .order("order_index", { ascending: true });
 
@@ -112,9 +112,12 @@ export async function getCourseProgress(userId: string, courseId: string) {
     );
 
     // 4. Count modules that have matching completed videos
-    const completedModules = modules?.filter((m: any) =>
-      completedVideoSet.has(normalizeId(m.id))
-    ).length || 0;
+    const completedModules =
+      modules?.filter((m: any) => {
+        const moduleId = normalizeId(m.id);
+        const cloudflareId = normalizeId(m.video_cf_id);
+        return completedVideoSet.has(moduleId) || completedVideoSet.has(cloudflareId);
+      }).length || 0;
 
     // 5. Calculate percentage
     const progressPercentage = totalModules > 0

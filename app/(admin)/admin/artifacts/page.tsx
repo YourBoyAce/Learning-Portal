@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
+const ARTIFACT_STORAGE_BUCKET =
+  process.env.NEXT_PUBLIC_SUPABASE_ARTIFACTS_BUCKET || "course-artifacts";
+const ARTIFACT_BUCKET_FALLBACKS = ["course-artifacts", "course_artifacts"];
+
 interface Artifact {
   id: string;
   name: string;
@@ -38,6 +42,28 @@ interface Artifact {
 
 
 export default function AdminArtifacts() {
+const getArtifactBucketCandidates = () =>
+  Array.from(
+    new Set([ARTIFACT_STORAGE_BUCKET, ...ARTIFACT_BUCKET_FALLBACKS])
+  );
+
+const getArtifactContentType = (file: File) => {
+  if (file.type) return file.type;
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext === "pdf") return "application/pdf";
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "csv") return "text/csv";
+  if (ext === "xlsx") {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  }
+  if (ext === "xls") return "application/vnd.ms-excel";
+  if (ext === "zip") return "application/zip";
+
+  return "application/octet-stream";
+};
+
 const [searchTerm, setSearchTerm] = useState("");
 
 // Artifacts State
@@ -295,23 +321,43 @@ const handleSaveArtifact = async () => {
 
       filePath = `artifacts/${uniqueFileName}`;
 
-      const { error: uploadError } =
-        await supabase.storage
-          .from("course-artifacts")
-          .upload(filePath, selectedFile);
+      let usedBucket = "";
+      let lastUploadError: any = null;
 
-      if (uploadError) {
-        console.error(uploadError);
-        alert("Failed to upload file");
+      for (const bucket of getArtifactBucketCandidates()) {
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, selectedFile, {
+            contentType: getArtifactContentType(selectedFile),
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (!uploadError) {
+          usedBucket = bucket;
+          lastUploadError = null;
+          break;
+        }
+
+        lastUploadError = uploadError;
+      }
+
+      if (!usedBucket) {
+        console.error(lastUploadError);
+        alert(
+          `Failed to upload file: ${lastUploadError?.message || "Unknown error"}`
+        );
         return;
       }
 
       const { data } = supabase.storage
-        .from("course-artifacts")
+        .from(usedBucket)
         .getPublicUrl(filePath);
 
       fileUrl = data.publicUrl;
     }
+
+    let successMessage = "";
 
     // UPDATE
     if (isEditing && editingArtifactId) {
@@ -340,6 +386,10 @@ const handleSaveArtifact = async () => {
         alert("Failed to update artifact");
         return;
       }
+
+      successMessage = selectedFile
+        ? "Artifact updated and file uploaded successfully."
+        : "Artifact details updated successfully.";
     } else {
       // CREATE
       const { error } = await supabase
@@ -361,6 +411,8 @@ const handleSaveArtifact = async () => {
         alert("Failed to save artifact");
         return;
       }
+
+      successMessage = "Artifact uploaded successfully.";
     }
 
     await loadArtifacts();
@@ -368,6 +420,7 @@ const handleSaveArtifact = async () => {
     setShowModal(false);
 
     setSelectedFile(null);
+    alert(successMessage);
   } catch (err) {
     console.error(err);
   }
@@ -389,9 +442,12 @@ const handleConfirmDelete = async () => {
   try {
     // Delete file from storage
     if (deletingArtifact.filePath) {
-      await supabase.storage
-        .from("course-artifacts")
-        .remove([deletingArtifact.filePath]);
+      for (const bucket of getArtifactBucketCandidates()) {
+        const { error } = await supabase.storage
+          .from(bucket)
+          .remove([deletingArtifact.filePath]);
+        if (!error) break;
+      }
     }
 
     // Delete DB row
@@ -779,6 +835,7 @@ const stats = [
                       </span>
                       <input
                         type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.zip,.rar,.tar,.gz,.js,.ts,.json,.yml,.yaml,.py,.sh,.xls,.xlsx,.csv"
                         onChange={handleFileChange}
                         className="hidden"
                       />

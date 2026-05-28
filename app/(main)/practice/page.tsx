@@ -21,7 +21,57 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const ARTIFACT_STORAGE_BUCKET =
+  process.env.NEXT_PUBLIC_SUPABASE_ARTIFACTS_BUCKET || "course-artifacts";
+const ARTIFACT_BUCKET_FALLBACKS = ["course-artifacts", "course_artifacts"];
+
 export default function StudentPracticeCenter() {
+  const getArtifactBucketCandidates = (art: any) => {
+    const fromUrl = typeof art?.fileUrl === "string"
+      ? (art.fileUrl.match(/\/object\/public\/([^/]+)\//)?.[1] || "")
+      : "";
+
+    return Array.from(
+      new Set([ARTIFACT_STORAGE_BUCKET, ...ARTIFACT_BUCKET_FALLBACKS, fromUrl].filter(Boolean))
+    );
+  };
+
+  const normalizeArtifactFilePath = (rawPath: string, buckets: string[]) => {
+    let normalized = (rawPath || "").trim();
+    if (!normalized) return "";
+
+    // Remove any full storage URL prefix if accidentally persisted.
+    normalized = normalized.replace(/^https?:\/\/[^/]+\/storage\/v1\/object\/public\/[^/]+\//, "");
+
+    // Remove accidental leading "<bucket>/" if included in DB file_path.
+    for (const bucket of buckets) {
+      if (normalized.startsWith(`${bucket}/`)) {
+        normalized = normalized.slice(bucket.length + 1);
+        break;
+      }
+    }
+
+    // Remove a leading slash if present.
+    normalized = normalized.replace(/^\/+/, "");
+    return normalized;
+  };
+
+  const getArtifactFilePath = (art: any) => {
+    const buckets = getArtifactBucketCandidates(art);
+    if (art?.filePath) {
+      return normalizeArtifactFilePath(art.filePath, buckets);
+    }
+
+    if (typeof art?.fileUrl !== "string") {
+      return "";
+    }
+
+    const match = art.fileUrl.match(/\/object\/public\/[^/]+\/(.+)$/);
+    return match?.[1]
+      ? normalizeArtifactFilePath(decodeURIComponent(match[1]), buckets)
+      : "";
+  };
+
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
 
@@ -234,42 +284,66 @@ if (artifactsError) {
 
   // Download Action
   const handleDownloadArtifact = async (art: any) => {
-  try {
-    // Update download count
-    const currentCount = art.downloadsCount || 0;
+    try {
+      const filePath = getArtifactFilePath(art);
+      if (!filePath && !art?.fileUrl) {
+        console.error("Artifact has no file path/url:", art);
+        return;
+      }
 
-    await supabase
-      .from("course_artifacts")
-      .update({
-        downloads_count: currentCount + 1,
-      })
-      .eq("id", art.id);
+      let downloadedBlob: Blob | null = null;
+      if (filePath) {
+        const bucketCandidates = getArtifactBucketCandidates(art);
+        for (const bucket of bucketCandidates) {
+          const { data, error } = await supabase.storage.from(bucket).download(filePath);
+          if (!error && data) {
+            downloadedBlob = data;
+            break;
+          }
+        }
+      }
 
-    // Generate fresh public URL from file path
-    const { data } = supabase.storage
-      .from("course-artifacts")
-      .getPublicUrl(art.filePath);
+      if (downloadedBlob) {
+        const objectUrl = URL.createObjectURL(downloadedBlob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = art?.name || "artifact";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      } else if (art.fileUrl) {
+        // Final fallback for legacy rows where only file_url is usable.
+        window.open(art.fileUrl, "_blank");
+      } else {
+        console.error("Unable to resolve a valid downloadable artifact:", art);
+        return;
+      }
 
-    console.log("Generated Download URL:", data.publicUrl);
+      // Update download count
+      const currentCount = art.downloadsCount || 0;
+      await supabase
+        .from("course_artifacts")
+        .update({
+          downloads_count: currentCount + 1,
+        })
+        .eq("id", art.id);
 
-    // Open file
-    window.open(data.publicUrl, "_blank");
-
-    // Update UI instantly
-    setArtifacts((prev) =>
-      prev.map((a) =>
-        a.id === art.id
-          ? {
-              ...a,
-              downloadsCount: currentCount + 1,
-            }
-          : a
-      )
-    );
-  } catch (err) {
-    console.error("Download error:", err);
-  }
-};
+      // Update UI instantly
+      setArtifacts((prev) =>
+        prev.map((a) =>
+          a.id === art.id
+            ? {
+                ...a,
+                downloadsCount: currentCount + 1,
+              }
+            : a
+        )
+      );
+    } catch (err) {
+      console.error("Download error:", err);
+    }
+  };
   const getFileIcon = (type: string) => {
     switch (type) {
       case "PDF": return <FileText className="w-6 h-6 text-red-500" />;
@@ -565,7 +639,7 @@ if (artifactsError) {
                       const isSelected = selectedAnswer === oIdx;
                       const isCorrectAnswer = oIdx === activeQuiz.questions[currentQuestionIndex].correctAnswer;
                       
-                      let optionStyle = "border-gray-200 bg-white hover:border-[#174778]/50 hover:bg-gray-50/30";
+                      let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-[#174778]/50 hover:bg-gray-50/30";
                       
                       if (isAnswerSubmitted) {
                         if (isCorrectAnswer) {
@@ -573,7 +647,7 @@ if (artifactsError) {
                         } else if (isSelected) {
                           optionStyle = "border-red-200 bg-red-50 text-red-800 font-bold";
                         } else {
-                          optionStyle = "border-gray-100 bg-gray-50/30 text-gray-400 opacity-60";
+                          optionStyle = "border-gray-100 bg-gray-50/30 text-gray-500 opacity-80";
                         }
                       } else if (isSelected) {
                         optionStyle = "border-[#174778] bg-blue-50/50 text-[#174778] font-bold ring-2 ring-[#174778]/10";
@@ -592,7 +666,7 @@ if (artifactsError) {
                             }`}>
                               {String.fromCharCode(65 + oIdx)}
                             </span>
-                            <span className="mt-0.5 leading-snug">{option}</span>
+                            <span className="mt-0.5 leading-snug text-inherit">{option}</span>
                           </span>
                           
                           {isAnswerSubmitted && isCorrectAnswer && (

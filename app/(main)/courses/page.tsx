@@ -317,9 +317,14 @@ async function loadDashboardData() {
       // ------------------------------------------
       // COMPLETED MODULES
       // ------------------------------------------
-      const completedModules = modules.filter((m: any) =>
-        completedVideoSet.has(normalizeId(m.id))
-      ).length;
+      const completedModules = modules.filter((m: any) => {
+        const moduleId = normalizeId(m.id);
+        const cloudflareId = normalizeId(m.video_cf_id);
+        return (
+          completedVideoSet.has(moduleId) ||
+          completedVideoSet.has(cloudflareId)
+        );
+      }).length;
 
       // ------------------------------------------
       // PERCENTAGE
