@@ -53,11 +53,62 @@ interface Module {
   order_index: number;
 }
 
+const ARTIFACT_STORAGE_BUCKET =
+  process.env.NEXT_PUBLIC_SUPABASE_ARTIFACTS_BUCKET || "course-artifacts";
+const ARTIFACT_BUCKET_FALLBACKS = ["course-artifacts", "course_artifacts"];
+
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setLoading: setGlobalLoading } = useLoading();
+
+  // Helper functions for artifact downloading (from practice page)
+  const getArtifactBucketCandidates = (art: any) => {
+    const fromUrl = typeof art?.fileUrl === "string"
+      ? (art.fileUrl.match(/\/object\/public\/([^/]+)\//)?.[1] || "")
+      : "";
+
+    return Array.from(
+      new Set([ARTIFACT_STORAGE_BUCKET, ...ARTIFACT_BUCKET_FALLBACKS, fromUrl].filter(Boolean))
+    );
+  };
+
+  const normalizeArtifactFilePath = (rawPath: string, buckets: string[]) => {
+    let normalized = (rawPath || "").trim();
+    if (!normalized) return "";
+
+    // Remove any full storage URL prefix if accidentally persisted.
+    normalized = normalized.replace(/^https?:\/\/[^/]+\/storage\/v1\/object\/public\/[^/]+\//, "");
+
+    // Remove accidental leading "<bucket>/" if included in DB file_path.
+    for (const bucket of buckets) {
+      if (normalized.startsWith(`${bucket}/`)) {
+        normalized = normalized.slice(bucket.length + 1);
+        break;
+      }
+    }
+
+    // Remove a leading slash if present.
+    normalized = normalized.replace(/^\/+/, "");
+    return normalized;
+  };
+
+  const getArtifactFilePath = (art: any) => {
+    const buckets = getArtifactBucketCandidates(art);
+    if (art?.filePath) {
+      return normalizeArtifactFilePath(art.filePath, buckets);
+    }
+
+    if (typeof art?.fileUrl !== "string") {
+      return "";
+    }
+
+    const match = art.fileUrl.match(/\/object\/public\/[^/]+\/(.+)$/);
+    return match?.[1]
+      ? normalizeArtifactFilePath(decodeURIComponent(match[1]), buckets)
+      : "";
+  };
 
   // Added userId to state so we can pass it down to the video player
   const [userId, setUserId] = useState<string | null>(null);
@@ -137,25 +188,42 @@ export default function CoursePlayerPage() {
       );
       setCourseQuizzes(filteredQuizzes);
 
-      // 3. Fetch artifacts from localStorage
-      const savedArtifacts = localStorage.getItem("automate_portal_artifacts");
-      let allArtifacts = [];
-      if (savedArtifacts) {
+      // 3. Fetch artifacts directly from Supabase (admin panel saves to DB, not localStorage)
+      const fetchArtifacts = async () => {
         try {
-          allArtifacts = JSON.parse(savedArtifacts);
-        } catch (e) {
-          console.error("Failed to parse artifacts:", e);
-        }
-      }
+          const { data: dbArtifacts, error } = await supabase
+            .from("course_artifacts")
+            .select(`*, maincourses(title)`)
+            .eq("status", "Published")
+            .eq("course_id", id);
 
-      // 4. Filter artifacts for this course
-      const filteredArtifacts = allArtifacts.filter(
-        (art: any) =>
-          art.status === "Published" &&
-          (String(art.courseId) === String(id) ||
-            art.courseName.toLowerCase() === course.title.toLowerCase()),
-      );
-      setCourseArtifacts(filteredArtifacts);
+          if (!error && dbArtifacts && dbArtifacts.length > 0) {
+            setCourseArtifacts(
+              dbArtifacts.map((it: any) => ({
+                id: it.id,
+                name: it.name,
+                type: it.type,
+                courseName: it.maincourses?.title || "",
+                courseId: it.course_id,
+                size: it.size,
+                description: it.description || "",
+                downloadsCount: it.downloads_count || 0,
+                status: it.status,
+                fileUrl: it.file_url,
+                filePath: it.file_path,
+              }))
+            );
+          } else {
+            setCourseArtifacts([]);
+          }
+        } catch (dbErr) {
+          console.error("Failed to fetch artifacts from DB:", dbErr);
+          setCourseArtifacts([]);
+        }
+      };
+
+      // invoke
+      fetchArtifacts();
 
       // 5. Load best attempts from localStorage
       const savedScores = localStorage.getItem(`best_scores_${course.id}`);
@@ -169,41 +237,66 @@ export default function CoursePlayerPage() {
     }
   }, [course, id]);
 
-  const handleDownloadArtifact = (art: any) => {
-    setCourseArtifacts((prev) =>
-      prev.map((a) =>
-        a.id === art.id
-          ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 }
-          : a,
-      ),
-    );
-
-    const saved = localStorage.getItem("automate_portal_artifacts");
-    if (saved) {
-      try {
-        const allArtifacts = JSON.parse(saved);
-        const updated = allArtifacts.map((a: any) =>
-          a.id === art.id
-            ? { ...a, downloadsCount: (a.downloadsCount || 0) + 1 }
-            : a,
-        );
-        localStorage.setItem(
-          "automate_portal_artifacts",
-          JSON.stringify(updated),
-        );
-      } catch (e) {
-        console.error(e);
+  const handleDownloadArtifact = async (art: any) => {
+    try {
+      const filePath = getArtifactFilePath(art);
+      if (!filePath && !art?.fileUrl) {
+        console.error("Artifact has no file path/url:", art);
+        return;
       }
-    }
 
-    const element = document.createElement("a");
-    const fileContent = `Course Artifact Resource: ${art.name}\nCourse: ${course?.title || "N/A"}\nDescription: ${art.description || "N/A"}\nSize: ${art.size}\n\nThis is a practice-ready exercise file prepared dynamically for your learning path!`;
-    const file = new Blob([fileContent], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = art.name;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+      let downloadedBlob: Blob | null = null;
+      if (filePath) {
+        const bucketCandidates = getArtifactBucketCandidates(art);
+        for (const bucket of bucketCandidates) {
+          const { data, error } = await supabase.storage.from(bucket).download(filePath);
+          if (!error && data) {
+            downloadedBlob = data;
+            break;
+          }
+        }
+      }
+
+      if (downloadedBlob) {
+        const objectUrl = URL.createObjectURL(downloadedBlob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = art?.name || "artifact";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      } else if (art.fileUrl) {
+        // Final fallback for legacy rows where only file_url is usable.
+        window.open(art.fileUrl, "_blank");
+      } else {
+        console.error("Unable to resolve a valid downloadable artifact:", art);
+        return;
+      }
+
+      // Update download count
+      const currentCount = art.downloadsCount || 0;
+      await supabase
+        .from("course_artifacts")
+        .update({
+          downloads_count: currentCount + 1,
+        })
+        .eq("id", art.id);
+
+      // Update UI instantly
+      setCourseArtifacts((prev) =>
+        prev.map((a) =>
+          a.id === art.id
+            ? {
+                ...a,
+                downloadsCount: currentCount + 1,
+              }
+            : a,
+        ),
+      );
+    } catch (error) {
+      console.error("Error downloading artifact:", error);
+    }
   };
 
   const handleStartQuiz = (quiz: any) => {
@@ -847,10 +940,12 @@ export default function CoursePlayerPage() {
           >
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-all">
-                {art.type === "Code Snippet" ? (
+                {art.type === "Code" || art.type === "Code Snippet" ? (
                   <FileCode size={16} />
-                ) : art.type === "Presentation" ? (
+                ) : art.type === "Sheet" || art.type === "Presentation" ? (
                   <Layers size={16} />
+                ) : art.type === "PDF" ? (
+                  <FileText size={16} />
                 ) : (
                   <FileArchive size={16} />
                 )}
