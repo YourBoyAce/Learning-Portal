@@ -5,7 +5,8 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
-import { generateCertificatePDF } from "@/app/lib/certificate";
+import Certificate from "@/app/components/certificate/Certificate";
+import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import {
   PlayCircle,
   CheckCircle2,
@@ -103,6 +104,7 @@ export default function CoursePlayerPage() {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
+  const [showCertificate, setShowCertificate] = useState(false);
 
   const getProgressStorageKey = (uid: string, courseId: string) =>
     `course_progress_${uid}_${courseId}`;
@@ -520,40 +522,34 @@ export default function CoursePlayerPage() {
     return Math.round((completedCount / modules.length) * 100);
   }, [modules, userProgress]);
 
+  // Auto-generate certificate in DB when progress reaches 100%
   useEffect(() => {
-    if (progressPercentage === 100 && !hasCertificate && !loading) {
-      setShowCertificateModal(true);
-    }
-  }, [progressPercentage, hasCertificate, loading]);
-
-  const handleGenerateCertificate = async () => {
-    try {
-      setIsGeneratingCertificate(true);
-      if (!userId) return;
-
-      const { error } = await supabase.from("certificates").insert({
-        user_id: userId,
-        course_id: id as string,
-        certificate_url: "CLAIMED",
-      });
-
-      if (error && error.code !== "23505") {
-        throw error;
+    const generateCertificateInDb = async () => {
+      if (progressPercentage === 100 && !hasCertificate && !loading && userId && id) {
+        try {
+          setIsGeneratingCertificate(true);
+          const { error } = await supabase
+            .from("certificates")
+            .insert({
+              user_id: userId,
+              course_id: id,
+              issued_at: new Date().toISOString(),
+            });
+          
+          if (error && error.code !== "23505") { // Ignore unique constraint violation
+            throw error;
+          }
+          setHasCertificate(true);
+          setShowCertificateModal(true);
+        } catch (err) {
+          console.error("Error generating certificate in DB:", err);
+        } finally {
+          setIsGeneratingCertificate(false);
+        }
       }
-
-      setHasCertificate(true);
-      await generateCertificatePDF(
-        studentName,
-        course?.title || "Course Completed",
-      );
-      setShowCertificateModal(false);
-    } catch (e) {
-      console.error("Error generating certificate:", e);
-    } finally {
-      setIsGeneratingCertificate(false);
-    }
-  };
-
+    };
+    generateCertificateInDb();
+  }, [progressPercentage, hasCertificate, loading, userId, id]);
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
     modules.forEach((mod) => {
@@ -642,6 +638,26 @@ export default function CoursePlayerPage() {
             <span className="font-bold text-[#174778]">{course?.title}</span>.
           </p>
         </div>
+
+        {hasCertificate && (
+          <div className="p-5 sm:p-8 bg-amber-50/50 rounded-xl sm:rounded-[2rem] border border-amber-200/50 space-y-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                <Award size={16} className="text-amber-600" />
+                Course Completed!
+              </h4>
+              <p className="text-xs text-amber-700/80 leading-relaxed max-w-xl">
+                Congratulations on masterfully completing this course! Your official certificate of achievement has been issued.
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowCertificateModal(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 self-start sm:self-center shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
+            >
+              <Award size={14} /> View Certificate
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
@@ -921,6 +937,15 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex items-center gap-6">
+            {hasCertificate && (
+              <Button
+                onClick={() => setShowCertificateModal(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm border border-amber-600/10 transition-all cursor-pointer"
+              >
+                <Award size={14} /> View Certificate
+              </Button>
+            )}
+
             <div className="hidden md:flex flex-col items-end">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
                 Your Progress
@@ -1420,63 +1445,51 @@ export default function CoursePlayerPage() {
         </div>
       )}
 
-      {/* CERTIFICATE MODAL */}
       {showCertificateModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-
-          <div className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-8 flex flex-col items-center text-center transform animate-in zoom-in-95 duration-300">
-            <div className="absolute -top-12 w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-xl shadow-amber-500/30 border-4 border-white">
-              <Award size={40} className="text-white" />
-            </div>
-
-            <div className="mt-12 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Congratulations!
-              </h2>
-              <p className="text-sm text-gray-500 leading-relaxed">
-                You have successfully completed 100% of the course material.
-                Your certificate of completion is ready to be generated.
-              </p>
-            </div>
-
-            <div className="w-full bg-gray-50 rounded-2xl p-4 mb-8 border border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                Course
-              </p>
-              <p className="text-sm font-bold text-[#174778] max-w-sm mx-auto mt-2 leading-snug">
-                {course?.title}
-              </p>
-            </div>
-
-            <div className="w-full space-y-3 relative z-10">
-              <Button
-                onClick={handleGenerateCertificate}
-                disabled={isGeneratingCertificate}
-                className="w-full py-6 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold tracking-wide shadow-lg shadow-amber-500/25 border border-amber-400/25 transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
-              >
-                {isGeneratingCertificate ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Generating Certificate...
-                  </>
-                ) : (
-                  <>
-                    <DownloadCloud size={20} />
-                    Generate & Download Certificate
-                  </>
-                )}
-              </Button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
+            <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
+              
+              {/* Close Button */}
               <button
                 onClick={() => setShowCertificateModal(false)}
-                className="text-xs font-bold text-gray-400 hover:text-[#174778] transition-colors tracking-wider uppercase block mx-auto"
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
               >
-                Maybe Later
+                <XIcon size={20} />
               </button>
+
+              {/* Responsive Certificate Preview */}
+              <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
+                <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
+                  <Certificate
+                    userName={studentName}
+                    courseName={course.title}
+                    completedDate={new Date().toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-2">
+                <CertificateDownload
+                  userName={studentName}
+                  courseName={course.title}
+                  completedDate={new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                />
+              </div>
+
             </div>
           </div>
         </div>
       )}
+      
     </div>
   );
 }

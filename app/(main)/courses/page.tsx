@@ -9,6 +9,8 @@ import { getCourseProgress } from "@/app/actions/get-course-progress";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import CourseCard from "@/app/components/course/CourseCard";
+import Certificate from "@/app/components/certificate/Certificate";
+import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import {
   Carousel,
   CarouselContent,
@@ -40,6 +42,8 @@ interface CurriculumCourse {
   duration?: string;
   modules?: any[]; // Array of modules
   certificate_url?: string | null;
+  certificate_id?: string | null;
+issued_at?: string | null;
 }
 
 interface Webinar {
@@ -248,7 +252,7 @@ async function loadDashboardData() {
     // --------------------------------------------------
     const { data: certsData } = await supabase
       .from("certificates")
-      .select("course_id, certificate_url")
+      .select("*")
       .eq("user_id", session.user.id);
 
     // --------------------------------------------------
@@ -363,20 +367,24 @@ async function loadDashboardData() {
         description:
           course.description ||
           "Course description unavailable.",
-
+      
         module_label: course.category
           ? course.category.toUpperCase()
           : "GENERAL",
-
+      
         thumbnail_url: course.thumbnail_url,
-
+      
         progress: progressPercentage,
-
+      
         modules,
-
+      
+        certificate_id: cert?.id || null,
+      
+        issued_at: cert?.issued_at || null,
+      
         certificate_url:
           cert?.certificate_url || null,
-
+      
         duration:
           progressPercentage === 0
             ? "Ready to begin"
@@ -442,7 +450,7 @@ async function loadDashboardData() {
 
   // Real-time listener for progress updates
   useEffect(() => {
-    if (!userId || curriculum.length === 0) return;
+    if (!userId) return;
 
     const subscription = supabase
       .channel(`user_video_progress:${userId}`)
@@ -454,22 +462,9 @@ async function loadDashboardData() {
           table: 'user_video_progress',
           filter: `user_id=eq.${userId}`,
         },
-        async (payload: any) => {
-          // When a video is marked as completed, refetch progress for that course
-          if (payload.new?.completed === true) {
-            const courseId = payload.new?.course_id;
-            if (courseId) {
-              try {
-                const updatedProgress = await getCourseProgress(userId, courseId);
-                setCourseProgress((prev) => ({
-                  ...prev,
-                  [String(courseId)]: updatedProgress,
-                }));
-              } catch (error) {
-                console.error(`Error refetching progress for course ${courseId}:`, error);
-              }
-            }
-          }
+        async () => {
+          // Re-load all dashboard data when any progress change occurs
+          await loadDashboardData();
         }
       )
       .subscribe();
@@ -479,30 +474,7 @@ async function loadDashboardData() {
     };
  }, [userId]);
 
-  const handleGenerateCertificate = async (courseId: string | number) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const mockCertUrl = "CLAIMED";
-      const { error } = await supabase
-        .from("certificates")
-        .insert({
-          user_id: session.user.id,
-          course_id: courseId,
-          certificate_url: mockCertUrl,
-        });
-
-      if (error) {
-        console.error("Error creating certificate:", error);
-      }
-
-      await loadDashboardData();
-    } catch (e) {
-      console.error("Error in handleGenerateCertificate:", e);
-    }
-  };
-
+  
   const handleMarkInsightAsRead = async () => {
     if (!userId || insights.length === 0) return;
     const nextIndex = (currentInsightIndex + 1) % insights.length;
@@ -528,6 +500,7 @@ async function loadDashboardData() {
 
   const activeCourses = curriculum.filter((course) => course.progress < 100);
   const completedCourses = curriculum.filter((course) => course.progress === 100);
+  console.log("COMPLETED COURSES", completedCourses);
 
   
 console.log("ACTIVE COURSES", activeCourses);
@@ -634,6 +607,41 @@ console.log("COURSE PROGRESS", courseProgress);
   ))}
 </div>
 
+{/*Completed courses */}
+<section className="mt-12">
+  <h2 className="text-2xl font-bold mb-6">
+    Completed Courses
+  </h2>
+
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    {completedCourses.map((course) => (
+      <div
+        key={course.id}
+        className="bg-white rounded-xl border p-6 shadow-sm"
+      >
+        <h3 className="font-semibold text-lg">
+          {course.title}
+        </h3>
+
+        <p className="text-green-600 font-medium mt-2">
+          Completed
+        </p>
+
+        {course.certificate_id && (
+          <CertificateDownload
+            studentName={userProfileName}
+            courseName={course.title}
+            issuedDate={
+              course.issued_at ||
+              new Date().toISOString()
+            }
+          />
+        )}
+      </div>
+    ))}
+  </div>
+</section>
+
         {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
         <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">
           <div className="absolute right-6 top-6 text-[#2283FF]/5">
@@ -694,55 +702,31 @@ console.log("COURSE PROGRESS", courseProgress);
                 <X size={20} />
               </button>
 
-              {/* Classical Certificate Design */}
-              <div className="w-full flex flex-col items-center">
-                {/* Gold Seal / Badge */}
-                <div className="w-20 h-20 bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg mb-6 border-4 border-white">
-                  <Award size={36} className="text-white" />
+              {/* Responsive Certificate Preview */}
+              <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
+                <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
+                  <Certificate
+                    userName={userProfileName}
+                    courseName={selectedCertificateCourse.title}
+                    completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  />
                 </div>
+              </div>
 
-                <span className="text-[10px] md:text-xs font-black tracking-[0.35em] text-amber-600 uppercase mb-4">
-                  Certificate of Achievement
-                </span>
-                
-                <h2 className="text-3xl md:text-5xl font-extrabold text-slate-800 tracking-tight mb-6 font-serif">
-                  The Automate
-                </h2>
-
-                <p className="text-sm text-gray-500 font-medium max-w-md mb-8 leading-relaxed">
-                  This prestigious academic credential is proudly presented to
-                </p>
-
-                <p className="text-2xl md:text-4xl font-black text-[#2283FF] tracking-tight mb-4 border-b-2 border-[#2283FF]/10 pb-2 px-8 min-w-[280px]">
-                  {userProfileName}
-                </p>
-
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-6">
-                  For outstanding dedication and masterfully completing
-                </p>
-
-                <h3 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight max-w-xl mb-12">
-                  {selectedCertificateCourse.title}
-                </h3>
-
-                <div className="w-full flex flex-col sm:grid sm:grid-cols-2 gap-6 sm:gap-8 pt-8 border-t border-gray-100 max-w-lg">
-                  <div className="text-center sm:text-left">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Date of Issuance</p>
-                    <p className="text-sm font-bold text-slate-800 mt-1">
-                      {new Date().toLocaleDateString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div className="text-center sm:text-right">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Authorized Signature</p>
-                    <p className="text-sm font-bold text-slate-800 mt-1 italic font-serif text-[#2283FF]">
-                      The Automate Curators
-                    </p>
-                  </div>
-                </div>
+              <div className="mb-2">
+                <CertificateDownload
+                  userName={userProfileName}
+                  courseName={selectedCertificateCourse.title}
+                  completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                />
               </div>
 
             </div>

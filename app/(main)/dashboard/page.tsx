@@ -81,241 +81,226 @@ export default function Dashboard() {
   const [completedVideoIds, setCompletedVideoIds] = useState<string[]>([]);
 
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadDashboardData = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    const load = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
 
-      const user = session?.user ?? null;
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
+    setUserEmail(user.email ?? null);
+    setUserId(user.id);
 
-      if (cancelled) return;
+    const { data: fetchedProfile } = await supabase
+      .from("profiles")
+      .select("full_name,role")
+      .eq("id", user.id)
+      .single();
 
-      setUserEmail(user.email ?? null);
-      setUserId(user.id);
+    const today = new Date().toISOString().split("T")[0];
+    const { data: calendarRows } = await supabase
+      .from("calendar_events")
+      .select("id,title,description,event_date,event_time,event_type")
+      .eq("user_id", user.id)
+      .gte("event_date", today)
+      .order("event_date", { ascending: true })
+      .order("event_time", { ascending: true })
+      .limit(5);
 
-      const { data: fetchedProfile } = await supabase
+    setUpcomingEvents((calendarRows ?? []) as CalendarEvent[]);
+
+    if (session?.access_token) {
+      const enrollmentsResponse = await fetch("/api/enrollments", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      // fetch profile
+      const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name,role")
-        .eq("id", user.id)
+        .select("current_insight_index, full_name")
+        .eq("id", session.user.id)
         .single();
 
-      const today = new Date().toISOString().split("T")[0];
-      const { data: calendarRows } = await supabase
-        .from("calendar_events")
-        .select("id,title,description,event_date,event_time,event_type")
-        .eq("user_id", user.id)
-        .gte("event_date", today)
-        .order("event_date", { ascending: true })
-        .order("event_time", { ascending: true })
-        .limit(5);
+      setCurrentInsightIndex(profile?.current_insight_index || 0);
+      setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
+      //Fetch Scholarly insights
+      const { data: insightsData } = await supabase
+        .from("scholarly_insights")
+        .select("*")
+        .order("id", { ascending: true });
 
-      setUpcomingEvents((calendarRows ?? []) as CalendarEvent[]);
+      if (insightsData) setInsights(insightsData);
 
-      if (session?.access_token) {
-        const enrollmentsResponse = await fetch("/api/enrollments", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-        // fetch profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("current_insight_index, full_name")
-          .eq("id", session.user.id)
-          .single();
+      const enrollmentsResult = await enrollmentsResponse
+        .json()
+        .catch(() => null);
 
-        setCurrentInsightIndex(profile?.current_insight_index || 0);
-        setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
-        //Fetch Scholarly insights
-        const { data: insightsData } = await supabase
-          .from("scholarly_insights")
-          .select("*")
-          .order("id", { ascending: true });
+      if (
+        enrollmentsResponse.ok &&
+        Array.isArray(enrollmentsResult?.enrollments)
+      ) {
+        setEnrollments(enrollmentsResult.enrollments as Enrollment[]);
+      }
+    }
 
-        if (insightsData) setInsights(insightsData);
+    setProfile((fetchedProfile ?? null) as Profile | null);
 
-        const enrollmentsResult = await enrollmentsResponse
-          .json()
-          .catch(() => null);
+    // Fetch enrolled courses
+    const { data: enrollmentsData } = await supabase
+      .from("course_enrollments")
+      .select(
+        `
+        course_id,
+        enrolled_at,
+        maincourses (
+          id,
+          title,
+          description,
+          category,
+          thumbnail_url
+        )
+      `,
+      )
+      .eq("user_id", user.id)
+      .order("enrolled_at", { ascending: false });
 
-        if (
-          enrollmentsResponse.ok &&
-          Array.isArray(enrollmentsResult?.enrollments)
-        ) {
-          setEnrollments(enrollmentsResult.enrollments as Enrollment[]);
+    if (enrollmentsData && enrollmentsData.length > 0) {
+      const validEnrollments = enrollmentsData.filter(
+        (e: any) => e.maincourses,
+      );
+      const mappedCourses = validEnrollments.map((e: any) => e.maincourses);
+      setEnrolledCourses(mappedCourses);
+
+      // Fetch progress for each enrolled course
+      if (user.id && mappedCourses.length > 0) {
+        const progressMap: Record<string, { progressPercentage: number; completedModules: number; totalModules: number }> = {};
+
+        for (const course of mappedCourses) {
+          try {
+            const progress = await getCourseProgress(user.id, course.id);
+            progressMap[String(course.id)] = progress;
+          } catch (error) {
+            console.error(`Error fetching progress for course ${course.id}:`, error);
+            progressMap[String(course.id)] = { progressPercentage: 0, completedModules: 0, totalModules: 0 };
+          }
         }
+
+        setCourseProgress(progressMap);
       }
 
-      if (cancelled) return;
-      setProfile((fetchedProfile ?? null) as Profile | null);
+      if (mappedCourses.length > 0) {
+        const mostRecentCourse = mappedCourses[0];
+        setNextCourse(mostRecentCourse);
 
-      // Fetch enrolled courses
-      const { data: enrollmentsData } = await supabase
-        .from("course_enrollments")
-        .select(
-          `
-          course_id,
-          enrolled_at,
-          maincourses (
-            id,
-            title,
-            description,
-            category,
-            thumbnail_url
-          )
-        `,
-        )
-        .eq("user_id", user.id)
-        .order("enrolled_at", { ascending: false });
+        // Fetch ALL modules for the most recent course
+        const { data: modulesData } = await supabase
+          .from("coursemodules")
+          .select("*")
+          .eq("maincourse_id", mostRecentCourse.id)
+          .order("order_index", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
 
-      if (cancelled) return;
+        if (modulesData && modulesData.length > 0) {
+          setNextModule(modulesData[0]);
+          setAllCourseModules(modulesData);
 
-      if (enrollmentsData && enrollmentsData.length > 0) {
-        const validEnrollments = enrollmentsData.filter(
-          (e: any) => e.maincourses,
-        );
-        const mappedCourses = validEnrollments.map((e: any) => e.maincourses);
-        setEnrolledCourses(mappedCourses);
+          //for progress calculation
+          const fetchCompletedVideos = async () => {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
 
-        // Fetch progress for each enrolled course
-        if (user.id && mappedCourses.length > 0) {
-          const progressMap: Record<string, { progressPercentage: number; completedModules: number; totalModules: number }> = {};
+            if (!user) return;
 
-          for (const course of mappedCourses) {
-            try {
-              const progress = await getCourseProgress(user.id, course.id);
-              progressMap[String(course.id)] = progress;
-            } catch (error) {
-              console.error(`Error fetching progress for course ${course.id}:`, error);
-              progressMap[String(course.id)] = { progressPercentage: 0, completedModules: 0, totalModules: 0 };
-            }
-          }
-
-          if (!cancelled) {
-            setCourseProgress(progressMap);
-          }
-        }
-
-        if (mappedCourses.length > 0) {
-          const mostRecentCourse = mappedCourses[0];
-          setNextCourse(mostRecentCourse);
-
-          // Fetch ALL modules for the most recent course
-          const { data: modulesData } = await supabase
-            .from("coursemodules")
-            .select("*")
-            .eq("maincourse_id", mostRecentCourse.id)
-            .order("order_index", { ascending: true, nullsFirst: false })
-            .order("created_at", { ascending: true })
-            .order("id", { ascending: true });
-
-          if (!cancelled && modulesData && modulesData.length > 0) {
-            setNextModule(modulesData[0]);
-            setAllCourseModules(modulesData);
-
-            //for progress calculation
-            const fetchCompletedVideos = async () => {
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-
-              if (!user) return;
-
-              const { data, error } = await supabase
-                .from("user_video_progress")
-                .select("video_id")
-                .eq("user_id", user.id)
-                .eq("completed", true);
-
-              if (error) {
-                console.error("Progress fetch error:", error);
-                return;
-              }
-
-              setCompletedVideoIds(
-                data.map((item) => normalizeProgressId(item.video_id))
-              );
-
-            };
-            fetchCompletedVideos();
-
-
-
-            // Fetch user_video_progress for this course to check completion
-            const { data: progressData } = await supabase
+            const { data, error } = await supabase
               .from("user_video_progress")
-              .select("video_id, completed")
+              .select("video_id")
               .eq("user_id", user.id)
-              .eq("course_id", mostRecentCourse.id);
+              .eq("completed", true);
 
-            // Build a set of completed module IDs
-            const completedSet = new Set<string>();
-            if (progressData) {
-              for (const p of progressData) {
-                if (p.completed) {
-                  completedSet.add(normalizeProgressId(p.video_id));
-                }
+            if (error) {
+              console.error("Progress fetch error:", error);
+              return;
+            }
+
+            setCompletedVideoIds(
+              data.map((item) => normalizeProgressId(item.video_id))
+            );
+
+          };
+          fetchCompletedVideos();
+
+          // Fetch user_video_progress for this course to check completion
+          const { data: progressData } = await supabase
+            .from("user_video_progress")
+            .select("video_id, completed")
+            .eq("user_id", user.id)
+            .eq("course_id", mostRecentCourse.id);
+
+          // Build a set of completed module IDs
+          const completedSet = new Set<string>();
+          if (progressData) {
+            for (const p of progressData) {
+              if (p.completed) {
+                completedSet.add(normalizeProgressId(p.video_id));
               }
             }
+          }
 
-            // Find the first incomplete module as the "next" module
-            const firstIncomplete = modulesData.find(
-              (m: any) =>
-                !completedSet.has(normalizeProgressId(m.id)) &&
-                !completedSet.has(normalizeProgressId(m.video_cf_id))
-            );
-            if (firstIncomplete) {
-              setNextModule(firstIncomplete);
+          // Find the first incomplete module as the "next" module
+          const firstIncomplete = modulesData.find(
+            (m: any) =>
+              !completedSet.has(normalizeProgressId(m.id)) &&
+              !completedSet.has(normalizeProgressId(m.video_cf_id))
+          );
+          if (firstIncomplete) {
+            setNextModule(firstIncomplete);
+          }
+
+          // Sum durations of all incomplete modules
+          let totalSeconds = 0;
+          for (const mod of modulesData) {
+            const isCompleted =
+              completedSet.has(normalizeProgressId(mod.id)) ||
+              completedSet.has(normalizeProgressId(mod.video_cf_id));
+            if (!isCompleted && mod.duration) {
+              const parts = mod.duration.split(":").map(Number);
+              if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+              else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
             }
+          }
 
-            // Sum durations of all incomplete modules
-            let totalSeconds = 0;
+          // If no durations found on modules, sum all module durations as total
+          if (totalSeconds === 0) {
             for (const mod of modulesData) {
-              const isCompleted =
-                completedSet.has(normalizeProgressId(mod.id)) ||
-                completedSet.has(normalizeProgressId(mod.video_cf_id));
-              if (!isCompleted && mod.duration) {
+              if (mod.duration) {
                 const parts = mod.duration.split(":").map(Number);
                 if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
                 else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
               }
             }
-
-            // If no durations found on modules, sum all module durations as total
-            if (totalSeconds === 0) {
-              for (const mod of modulesData) {
-                if (mod.duration) {
-                  const parts = mod.duration.split(":").map(Number);
-                  if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
-                  else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
-                }
-              }
-            }
-
-            const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-            const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-            const secs = String(totalSeconds % 60).padStart(2, "0");
-            if (!cancelled) {
-              setTotalTime(`${hrs}:${mins}:${secs}`);
-            }
           }
+
+          const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+          const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+          const secs = String(totalSeconds % 60).padStart(2, "0");
+          setTotalTime(`${hrs}:${mins}:${secs}`);
         }
       }
+    }
 
+    setLoading(false);
+  };
 
-      setLoading(false);
-    };
-
-
-    load();
+  useEffect(() => {
+    loadDashboardData();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -325,9 +310,7 @@ export default function Dashboard() {
       },
     );
 
-
     return () => {
-      cancelled = true;
       listener.subscription.unsubscribe();
     };
   }, [router]);
@@ -346,22 +329,9 @@ export default function Dashboard() {
           table: 'user_video_progress',
           filter: `user_id=eq.${userId}`,
         },
-        async (payload: any) => {
-          // When a video is marked as completed, refetch progress for that course
-          if (payload.new?.completed === true) {
-            const courseId = payload.new?.course_id;
-            if (courseId) {
-              try {
-                const updatedProgress = await getCourseProgress(userId, courseId);
-                setCourseProgress((prev) => ({
-                  ...prev,
-                  [String(courseId)]: updatedProgress,
-                }));
-              } catch (error) {
-                console.error(`Error refetching progress for course ${courseId}:`, error);
-              }
-            }
-          }
+        async () => {
+          // Re-load all dashboard data when any progress change occurs
+          await loadDashboardData();
         }
       )
       .subscribe();
