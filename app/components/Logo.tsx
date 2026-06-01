@@ -11,12 +11,12 @@ export function Logo({
     <svg
       width={width}
       height={height}
-      viewBox="0 0 300 100"
+      viewBox="0 0 350 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Stylized 'A' */}
+      {/* Stylized 'A' (Reverted to original paths) */}
       <path
         d="M 50 15 L 85 75 L 61 75 L 50 55 L 39 75 L 15 75 Z"
         fill="#2283FF"
@@ -25,26 +25,27 @@ export function Logo({
       
       {/* Text 'Auto-Mate' */}
       <text
-        x="95"
-        y="53"
-        fontFamily="sans-serif"
-        fontWeight="bold"
+        x="100"
+        y="60"
+        fontFamily="'Futura', 'Tw Cen MT', 'Jost', 'Spartan', sans-serif"
+        fontWeight="700"
         fontSize="44"
         fill="#2283FF"
-        letterSpacing="-1"
+        letterSpacing="-1.5"
       >
         Auto-Mate
       </text>
       
       {/* Subtext 'Lead Next' */}
       <text
-        x="135"
-        y="75"
-        fontFamily="sans-serif"
+        x="213"
+        y="82"
+        fontFamily="'Futura', 'Tw Cen MT', 'Jost', 'Spartan', sans-serif"
         fontWeight="300"
-        fontSize="16"
-        fill="#2283FF"
-        letterSpacing="4"
+        fontSize="15"
+        fill="#4A9CF8"
+        letterSpacing="7"
+        textAnchor="middle"
       >
         Lead Next
       </text>

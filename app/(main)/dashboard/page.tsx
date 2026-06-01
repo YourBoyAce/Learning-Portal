@@ -878,9 +878,8 @@ export default function Dashboard() {
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="bg-[#2283FF] hover:bg-[#2283FF] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
-            >
-              <CheckCircle2 size={16} /> Mark as Read
+              className="w-1/6 justify-center"
+            > Mark as Read
             </Button>
           </div>
         </section>

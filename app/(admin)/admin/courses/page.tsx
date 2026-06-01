@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { CourseCard } from "@/app/components/course";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   BookOpen,
   CheckCircle,
@@ -13,7 +16,6 @@ import {
   X,
   Loader2,
   Upload,
-  ImageIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -343,24 +345,21 @@ const router = useRouter();
     });
 
   const stats = [
-    {
-      label: "Total Courses",
-      value: courses.length.toString(),
-      icon: BookOpen,
-      iconBg: "bg-violet-50",
-      iconColor: "text-violet-600",
-    },
-    {
-      label: "Active Courses",
-      value: courses.length.toString(),
-      icon: CheckCircle,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-    },
-  ];
+  {
+    label: "Total Courses",
+    value: courses.length.toString(),
+    icon: ICONS.BOOK,
+  },
+  {
+    label: "Active Courses",
+    value: courses.length.toString(),
+    icon: ICONS.GLOBE,
+  },
+  
+];
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -372,37 +371,54 @@ const router = useRouter();
               Create, edit, and publish your course catalog.
             </p>
           </div>
-          <button
+          <Button
             onClick={handleCreateNew}
-            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors flex items-center gap-2 shadow-sm"
+            className="w-full justify-center sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             New Course
-          </button>
+          </Button>
         </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4"
-            >
               <div
-                className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}
+                key={stat.label}
+                className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
               >
-                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stat.value}
+                <div className="flex items-center justify-center shrink-0">
+                  <Image
+                    src={stat.icon}
+                    alt={stat.label}
+                    width={30}
+                    height={30}
+                  />
                 </div>
-                <div className="text-xs text-gray-500 font-medium">
-                  {stat.label}
+          
+                <div className="flex flex-col">
+                  <span
+                    className="text-2xl font-bold"
+                    style={{
+                      color: "var(--color-primary)",
+                      fontFamily: "var(--font-primary)",
+                    }}
+                  >
+                    {stat.value}
+                  </span>
+          
+                  <span
+                    className="text-sm"
+                    style={{
+                      color: "var(--color-text-secondary)",
+                      fontFamily: "var(--font-primary)",
+                    }}
+                  >
+                    {stat.label}
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
 
         {/* Course Catalog Header & Search */}
@@ -487,7 +503,7 @@ const router = useRouter();
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
                 {isEditing ? "Edit Course" : "Create New Course"}
               </h3>
@@ -500,7 +516,7 @@ const router = useRouter();
             </div>
 
             {/* Modal Body - Scrollable */}
-            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+            <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                   Course Title
@@ -556,7 +572,7 @@ const router = useRouter();
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
                     Modules (Optional)
                   </label>
@@ -619,7 +635,7 @@ const router = useRouter();
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"

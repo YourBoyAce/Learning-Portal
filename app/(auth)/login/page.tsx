@@ -2,7 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
-import { Logo } from "@/app/components/Logo";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -90,7 +92,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#F5F7FA] p-4 py-8 flex flex-col items-center justify-center">
       {/* HEADER */}
       <div className="text-center mb-4 shrink-0 flex flex-col items-center">
-        <Logo width={220} height={75} />
+        <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
       </div>
 
       {/* MAIN CONTAINER */}
@@ -172,10 +174,10 @@ export default function LoginPage() {
           )}
 
           {/* BUTTON */}
-          <button
+          <Button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-[#2283FF] text-white py-2 rounded-md mt-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full mt-6 justify-center"
           >
             {loading ? (
               "Signing in..."
@@ -197,22 +199,24 @@ export default function LoginPage() {
                 </svg>
               </>
             )}
-          </button>
+          </Button>
         </form>
       </div>
 
       {/* RIGHT SIDE - FACTS CARD (positioned at screen edge) */}
       <div className="hidden xl:block fixed right-8 top-1/2 -translate-y-1/2 w-64">
         {/* INFO CARD */}
-        <div className="bg-[#F5F0EB] border-l-4 border-[#8B4513] p-4 rounded-r-md shadow-sm">
+        <div
+  className="border-l-4 p-4 rounded-r-md shadow-sm"
+  style={{
+    backgroundColor: "rgba(22, 130, 241, 0.08)",
+    borderLeftColor: "var(--color-accent)",
+  }}
+>
           <div className="w-6 h-6 mb-2">
-            <svg
-              className="w-5 h-5 text-[#8B4513]"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zm-1 14h2v-1h-2v1zm-2-3h6v-1H9v1z" />
-            </svg>
+            <Image src={ICONS.BULB} alt="Info" width={24} height={24} className="object-contain" />
+              
+            
           </div>
           <h3 className="font-semibold text-xs text-gray-800 mb-1">
             Did you know?

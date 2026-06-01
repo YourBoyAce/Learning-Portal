@@ -6,11 +6,13 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { getMyLearningData } from "@/app/actions/my-learning";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import CourseCard from "@/app/components/course/CourseCard";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   Carousel,
   CarouselContent,
@@ -680,9 +682,8 @@ console.log("COURSE PROGRESS", courseProgress);
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="bg-[#2283FF] hover:bg-[#2283FF] text-white rounded-lg flex items-center gap-2 shadow-sm font-semibold px-5"
-            >
-              <CheckCircle2 size={16} /> Mark as Read
+              className="w-1/6 justify-center"
+            > Mark as Read
             </Button>
           </div>
         </section>

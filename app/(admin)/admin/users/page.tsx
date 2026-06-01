@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   createUser,
   updateUserRole,
@@ -211,7 +214,7 @@ export default function AdminUsers() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans text-gray-900">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 lg:p-10 font-sans text-gray-900">
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
@@ -222,7 +225,7 @@ export default function AdminUsers() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[380px_1fr] gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[380px_1fr] gap-6 lg:gap-8 items-start">
           {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
             {/* ADD NEW USER FORM */}
@@ -234,7 +237,7 @@ export default function AdminUsers() {
                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
                     Email Address
                   </label>
-                  <input
+              <input
                     type="email"
                     required
                     value={email}
@@ -290,13 +293,13 @@ export default function AdminUsers() {
                   </div>
                 )}
 
-                <button
+                <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-[#2283FF] hover:opacity-90 text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm disabled:opacity-70 flex items-center justify-center mt-4"
+                  className="w-full"
                 >
                   {isSubmitting ? "Creating..." : "Create User"}
-                </button>
+                </Button>
               </form>
             </div>
 
@@ -320,7 +323,12 @@ export default function AdminUsers() {
               </div>
 
               <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative z-10 shrink-0">
-                <Users className="text[#174778]" size={24} />
+                <Image
+                  src={ICONS.USERS}
+                  alt="User Icon"
+                  width={30}
+                  height={30}
+                />
               </div>
             </div>
           </div>
@@ -340,7 +348,7 @@ export default function AdminUsers() {
                     placeholder={`Search by ${filterType}...`}
                     value={filterQuery}
                     onChange={(e) => setFilterQuery(e.target.value)}
-                    className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#2283FF] w-[200px]"
+                    className="w-full sm:w-[200px] pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#2283FF]"
                   />
                 </div>
 
@@ -390,7 +398,7 @@ export default function AdminUsers() {
             </div>
 
             <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[860px] text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">

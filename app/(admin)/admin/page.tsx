@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Users, BookOpen, Search, Loader2, Clock, LogIn, Timer } from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 
 interface LoginLog {
   userId: string;
@@ -117,9 +120,22 @@ export default function AdminDashboard() {
     if (hrs > 0) return `${hrs}h ${mins % 60}m`;
     return `${mins}m`;
   };
+   const stats = [
+  {
+    label: "Total Scholars",
+    value: totalStudents.toString(),
+    icon: ICONS.USERS,
+  },
+  {
+    label: "Active Courses",
+    value: courses.length.toString(),
+    icon: ICONS.GLOBE,
+  },
+  
+];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
@@ -134,44 +150,52 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Total Students */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
-            <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-              <Users className="w-7 h-7 text-[#2283FF]" />
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-gray-900">
-                {loading ? <Loader2 className="w-6 h-6 animate-spin text-gray-400" /> : totalStudents}
-              </div>
-              <div className="text-sm font-medium text-gray-500 mt-1">
-                Total Scholars
-              </div>
-            </div>
-          </div>
-
-          {/* Active Courses */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center gap-4">
-            <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
-              <BookOpen className="w-7 h-7 text-emerald-600" />
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-gray-900">
-                {loading ? <Loader2 className="w-6 h-6 animate-spin text-gray-400" /> : activeCoursesCount}
-              </div>
-              <div className="text-sm font-medium text-gray-500 mt-1">
-                Active Courses
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Stats Row */}
+                <div className="grid grid-cols-1  mb-8 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+                  {stats.map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+                      >
+                        <div className="flex items-center justify-center shrink-0">
+                          <Image
+                            src={stat.icon}
+                            alt={stat.label}
+                            width={30}
+                            height={30}
+                          />
+                        </div>
+                  
+                        <div className="flex flex-col">
+                          <span
+                            className="text-2xl font-bold"
+                            style={{
+                              color: "var(--color-primary)",
+                              fontFamily: "var(--font-primary)",
+                            }}
+                          >
+                            {stat.value}
+                          </span>
+                  
+                          <span
+                            className="text-sm"
+                            style={{
+                              color: "var(--color-text-secondary)",
+                              fontFamily: "var(--font-primary)",
+                            }}
+                          >
+                            {stat.label}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* User Management Section */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Recent Users
               </h2>
@@ -179,7 +203,7 @@ export default function AdminDashboard() {
 
             {/* Users Table */}
             <div className="overflow-x-auto flex-1">
-              <table className="w-full">
+              <table className="w-full min-w-[560px]">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -251,18 +275,18 @@ export default function AdminDashboard() {
             </div>
 
             {totalStudents > 5 && (
-              <button
+              <Button
                 onClick={() => router.push("/admin/users")}
                 className="mt-6 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-100 hover:text-[#2283FF] transition-colors"
               >
                 View all {totalStudents} scholars
-              </button>
+              </Button>
             )}
           </div>
 
           {/* Course Management Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h2 className="text-lg font-semibold text-gray-900">
                 Recently Added Courses
               </h2>
@@ -315,8 +339,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Today's Login Analytics */}
-        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-[#2283FF]/10 rounded-lg flex items-center justify-center">
                 <LogIn className="w-5 h-5 text-[#2283FF]" />
@@ -326,7 +350,7 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:flex sm:items-center">
               <div className="text-center">
                 <p className="text-2xl font-bold text-[#2283FF]">{loginLogs.length}</p>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Users Today</p>
@@ -339,7 +363,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left py-3 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Scholar</th>

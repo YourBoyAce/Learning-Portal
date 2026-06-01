@@ -1,0 +1,85 @@
+:root {
+  /* Brand */
+
+  --color-primary: #2283ff;
+
+  /* Accent */
+
+  --color-accent: #1682f1;
+  --color-accent-hover: #1a73e8;
+  --color-info: #1e9cd7;
+  --color-success: #25c8e5;
+  --color-highlight: #4158fe;
+
+  /* Text */
+
+  --color-text-primary: #233036;
+  --color-text-secondary: #666666;
+  --color-text-muted: #cccccc;
+
+  /* Background */
+
+  --color-background: #ffffff;
+  --color-card: #ffffff;
+
+  /* Utility */
+
+  --color-black: #000000;
+
+  /* Radius */
+
+  --radius-default: 8px;
+
+  /* Font */
+
+  --font-primary: var(--font-roboto, "Roboto"), system-ui, sans-serif;
+}
+.nav-item {
+  border-radius: var(--radius-default);
+  transition: all 0.2s ease;
+
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-button-font-size);
+  font-weight: var(--typography-h1-font-weight);
+  line-height: var(--typography-button-line-height);
+}
+
+.nav-item-active {
+  background-color: var(--color-primary);
+  color: var(--color-background);
+}
+
+.nav-item-inactive {
+  color: var(--color-text-secondary);
+}
+
+.nav-item-inactive:hover {
+  background-color: #f5f7fa;
+}
+
+/* Button Styles */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px 20px;
+
+  border-radius: var(--radius-default);
+  border: none;
+
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-button-font-size);
+  font-weight: var(--typography-button-font-weight);
+  line-height: var(--typography-button-line-height);
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-brand {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-weight: var(--typography-button-font-weight);
+  border-radius: var(--radius-default);
+}

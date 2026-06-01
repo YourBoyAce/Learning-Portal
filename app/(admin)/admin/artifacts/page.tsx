@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   FileText,
   Plus,
@@ -554,9 +557,7 @@ const stats = [
   {
     label: "Total Artifacts",
     value: artifacts.length.toString(),
-    icon: FileText,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
+    icon: ICONS.MATERIAL,
   },
   {
     label: "Total Downloads",
@@ -566,30 +567,24 @@ const stats = [
         0
       )
       .toString(),
-    icon: DownloadCloud,
-    iconBg: "bg-purple-50",
-    iconColor: "text-purple-600",
+    icon: ICONS.FOLDER,
   },
   {
     label: "Storage Used",
     value: "6.4 MB",
-    icon: HardDrive,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
+    icon: ICONS.STORAGE,
   },
   {
     label: "Published Items",
     value: artifacts
       .filter((a) => a.status === "Published")
       .length.toString(),
-    icon: CheckCircle,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
+    icon: ICONS.ITEMS,
   },
 ];
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -601,37 +596,49 @@ const stats = [
               Upload study sheets, exercises, boilerplate repositories, and other downloadable resources.
             </p>
           </div>
-          <button
+          <Button
             onClick={handleCreateNew}
-            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm"
+            className="w-full justify-center sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             Upload Resource
-          </button>
+          </Button>
         </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4"
-            >
-              <div
-                className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}
-              >
-                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 font-medium">
-                  {stat.label}
-                </div>
-              </div>
-            </div>
-          ))}
+         {stats.map((stat) => (
+  <div
+    key={stat.label}
+    className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100"
+  >
+    {/* Icon + Value */}
+    <div className="flex items-center gap-4 mb-3">
+      <div
+        className="flex items-center justify-center w-12 h-12 rounded-lg"
+        style={{
+          backgroundColor: "rgba(22,130,241,0.08)",
+        }}
+      >
+        <Image
+          src={stat.icon}
+          alt={stat.label}
+          width={24}
+          height={24}
+        />
+      </div>
+
+      <h3 className="text-2xl font-bold text-[var(--color-primary)]">
+        {stat.value}
+      </h3>
+    </div>
+
+    {/* Label */}
+    <p className="text-sm text-[var(--color-text-secondary)]">
+      {stat.label}
+    </p>
+  </div>
+))}
         </div>
 
         {/* Search */}
@@ -661,18 +668,17 @@ const stats = [
             <p className="text-sm text-gray-500 mb-6 max-w-md">
               Upload resources such as documentation, design models, or project files so your learners can download them in their student dashboard.
             </p>
-            <button
+            <Button
               onClick={handleCreateNew}
-              className="bg-[#2283FF] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm"
-            >
+            className="w-full justify-center">
               <Plus className="w-4 h-4" />
               Upload First Artifact
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[760px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-6">
@@ -751,20 +757,20 @@ const stats = [
                       </td>
                       <td className="p-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
+                          <Button
                             onClick={() => handleEdit(art)}
-                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#2283FF] hover:bg-blue-50 rounded-lg transition-colors"
+                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
                             title="Edit Artifact"
                           >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
+                            <Pencil className="w-4 text-primary h-4" />
+                          </Button>
+                          <Button
                             onClick={() => handleDeleteClick(art)}
-                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
                             title="Delete Artifact"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <Trash2 className="w-4 text-red-600 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -781,7 +787,7 @@ const stats = [
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
                 {isEditing ? "Edit Resource" : "Upload New Resource"}
               </h3>
@@ -794,7 +800,7 @@ const stats = [
             </div>
 
             {/* Scrollable Body */}
-            <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+            <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
               {/* File Uploader box (Only if creating new, or allowed to update file) */}
               {!isEditing && (
                 <div>
@@ -802,7 +808,7 @@ const stats = [
                     Artifact File
                   </label>
                   {selectedFile ? (
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="p-2 bg-white rounded-lg border border-gray-100 shrink-0">
                           {getFileIcon(artType)}
@@ -945,19 +951,19 @@ const stats = [
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-white">
-              <button
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 bg-white">
+              <Button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full text-primary bg-white hover:bg-gray-100 justify-center sm:w-1/2"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSaveArtifact}
-                className="px-5 py-2 text-sm font-semibold text-white bg-[#2283FF] rounded-lg hover:opacity-90 transition-opacity"
+                className="w-full justify-center sm:w-1/2"
               >
                 {isEditing ? "Save Changes" : "Publish Resource"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

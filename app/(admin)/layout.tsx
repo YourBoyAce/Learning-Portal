@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
-import { Logo } from "@/app/components/Logo";
+import Image from "next/image";
+import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({
   children,
@@ -16,6 +18,11 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,199 +71,130 @@ export default function AdminLayout({
   };
 
   const navItems = [
-    {
-      label: "Dashboard",
-      href: "/admin",
-      active: pathname === "/admin",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Manage Courses",
-      href: "/admin/courses",
-      active: pathname === "/admin/courses",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Batch Management",
-      href: "/admin/batches",
-      active: pathname === "/admin/batches",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Upload Video",
-      href: "/admin/upload",
-      active: pathname === "/admin/upload",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Manage Users",
-      href: "/admin/users",
-      active: pathname === "/admin/users",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Manage Webinars",
-      href: "/admin/webinars",
-      active: pathname === "/admin/webinars",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Quiz Management",
-      href: "/admin/quizzes",
-      active: pathname === "/admin/quizzes",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "Artifacts Management",
-      href: "/admin/artifacts",
-      active: pathname === "/admin/artifacts",
-      icon: (
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-          />
-        </svg>
-      ),
-    },
-  ];
+  {
+    label: "Dashboard",
+    href: "/admin",
+    active: pathname === "/admin",
+    icon: pathname === "/admin"
+      ? ICONS.DASHBOARDLIGHT
+      : ICONS.DASHBOARD,
+  },
 
+  {
+    label: "Manage Courses",
+    href: "/admin/courses",
+    active: pathname === "/admin/courses",
+    icon: pathname === "/admin/courses"
+      ? ICONS.BOOKLIGHT
+      : ICONS.BOOK,
+  },
+
+  {
+    label: "Batch Management",
+    href: "/admin/batches",
+    active: pathname === "/admin/batches",
+    icon: pathname === "/admin/batches"
+      ? ICONS.BATCHLIGHT
+      : ICONS.BATCH,
+  },
+
+  {
+    label: "Upload Video",
+    href: "/admin/upload",
+    active: pathname === "/admin/upload",
+    icon: pathname === "/admin/upload"
+      ? ICONS.ARROWLIGHT
+      : ICONS.ARROW,
+  },
+
+  {
+    label: "Manage Users",
+    href: "/admin/users",
+    active: pathname === "/admin/users",
+    icon: pathname === "/admin/users"
+      ? ICONS.USERSLIGHT
+      : ICONS.USERS,
+  },
+
+  {
+    label: "Manage Webinars",
+    href: "/admin/webinars",
+    active: pathname === "/admin/webinars",
+    icon: pathname === "/admin/webinars"
+      ? ICONS.GLOBELIGHT
+      : ICONS.GLOBE,
+  },
+
+  {
+    label: "Quiz Management",
+    href: "/admin/quizzes",
+    active: pathname === "/admin/quizzes",
+    icon: pathname === "/admin/quizzes"
+      ? ICONS.BULBLIGHT
+      : ICONS.BULB,
+  },
+
+  {
+    label: "Artifacts Management",
+    href: "/admin/artifacts",
+    active: pathname === "/admin/artifacts",
+    icon: pathname === "/admin/artifacts"
+      ? ICONS.MATERIALLIGHT
+      : ICONS.MATERIAL,
+  },
+];
   return (
-    <div className="flex h-screen bg-[#F5F7FA]">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-100">
+    <div className="flex h-screen bg-[#F5F7FA] overflow-hidden">
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:max-w-none lg:translate-x-0 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="p-5 sm:p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <Logo width={180} height={60} />
+            <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(false)}
+              className="ml-auto rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+              aria-label="Close admin navigation"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        <nav className="flex-1 p-4">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">
-            Admin Panel
-          </p>
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.label}>
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                    item.active
-                      ? "bg-[#2283FF] text-white"
-                      : "text-gray-700 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-2">
+  {navItems.map((item) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      className={`nav-item flex items-center gap-3 px-4 py-3 ${
+        item.active
+          ? "nav-item-active"
+          : "nav-item-inactive"
+      }`}
+    >
+      <Image
+        src={item.icon}
+        alt={item.label}
+        width={20}
+        height={20}
+      />
+
+      <span>{item.label}</span>
+    </Link>
+  ))}
+</nav>
 
         <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/profile">
@@ -275,10 +213,11 @@ export default function AdminLayout({
             </div>
           </Link>
 
-          <button
+          <Button
             type="button"
+            className="w-full justify-center"
             onClick={handleSignOut}
-            className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2"
+            
           >
             <svg
               className="w-4 h-4"
@@ -294,9 +233,27 @@ export default function AdminLayout({
               />
             </svg>
             Sign Out
-          </button>
+          </Button>
         </div>
       </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+            aria-label="Open admin navigation"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <Image src="/logo.svg" alt="Auto-Mate" width={130} height={40} className="object-contain" />
+          <div className="h-10 w-10 rounded-full bg-[#2283FF] text-white flex items-center justify-center font-semibold">
+            {userEmail?.[0]?.toUpperCase() || "U"}
+          </div>
+        </header>
 
       {showSignOutDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -307,25 +264,26 @@ export default function AdminLayout({
             <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to sign out of your account?
             </p>
-            <div className="flex gap-3">
-              <button
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
+              <Button
                 onClick={() => setShowSignOutDialog(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full justify-center sm:w-1/2"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={confirmSignOut}
-                className="flex-1 px-4 py-2 bg-[#2283FF] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+                className="w-full justify-center sm:w-1/2"
               >
                 Sign Out
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }

@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
-import { BookOpen } from "lucide-react";
 import CourseCard from "@/app/components/course/CourseCard";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 
 type Course = {
   id: string | number;
@@ -403,7 +405,7 @@ export default function UploadPage() {
   const displayedCourses = showAllCourses ? courses : courses.slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -422,7 +424,12 @@ export default function UploadPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-              <BookOpen className="w-6 h-6 text-violet-600" />
+              <Image
+                src={ICONS.BOOK}
+                alt="Courses Icon"
+                width={30}
+                height={30}
+              />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
@@ -449,7 +456,7 @@ export default function UploadPage() {
         {/* Main Content - 2 Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Left Panel - Upload Form */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Upload New Video
@@ -542,7 +549,7 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 rounded-xl p-8 text-center cursor-pointer transition-all ${
+                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
                     isDragging
                       ? "border-[#2283FF] bg-blue-50"
                       : "border-dashed border-gray-300 hover:border-gray-400"
@@ -592,23 +599,23 @@ export default function UploadPage() {
                   )}
                 </div>
 
-                <button
+                <Button
                   type="submit"
                   disabled={isUploading}
-                  className="w-full bg-[#2283FF] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full"
                 >
                   {isUploading
                     ? `Uploading... ${uploadProgress}%`
                     : "Upload Video Asset"}
-                </button>
+                </Button>
               </form>
             </div>
           </div>
 
           {/* Right Panel - Active Curriculum */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Active Curriculum
                 </h3>

@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image"; 
 import {
   Plus,
   Search,
@@ -169,7 +172,7 @@ export default function AdminWebinarsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
@@ -181,13 +184,13 @@ export default function AdminWebinarsPage() {
               Schedule and curate upcoming webinars for scholars.
             </p>
           </div>
-          <button
+          <Button
             onClick={() => handleOpenModal()}
-            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2283FF] transition-all shadow-sm flex items-center gap-2"
+            className="w-full justify-center sm:w-auto"
           >
             <Plus size={18} />
             Create Webinar
-          </button>
+          </Button>
         </div>
 
         {/* Search & Stats */}
@@ -221,7 +224,7 @@ export default function AdminWebinarsPage() {
         {/* List View */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full min-w-[760px] border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider text-black">
@@ -305,20 +308,20 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
+                          <Button
                             onClick={() => handleOpenModal(webinar)}
-                            className="p-2 text-gray-400 hover:text-[#2283FF] hover:bg-white rounded-lg transition-all"
+                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
                             title="Edit"
                           >
-                            <Edit size={18} />
-                          </button>
-                          <button
+                            <Edit size={18} className="text-primary" />
+                          </Button>
+                          <Button
                             onClick={() => handleDeleteWebinar(webinar.id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
                             title="Delete"
                           >
-                            <Trash2 size={18} />
-                          </button>
+                            <Trash2 size={18} className="text-red-600" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -333,7 +336,7 @@ export default function AdminWebinarsPage() {
         {showModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-4 sm:px-8 py-5 sm:py-6 border-b border-gray-100 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
                     {isEditing ? "Edit Webinar" : "Create New Webinar"}
@@ -344,7 +347,7 @@ export default function AdminWebinarsPage() {
                 </div>
               </div>
 
-              <div className="px-8 py-6 max-h-[70vh] overflow-y-auto">
+              <div className="px-4 sm:px-8 py-5 sm:py-6 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Title */}
                   <div className="md:col-span-2">
@@ -462,7 +465,7 @@ export default function AdminWebinarsPage() {
                 </div>
               </div>
 
-              <div className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+              <div className="px-4 sm:px-8 py-5 sm:py-6 border-t border-gray-100 bg-gray-50/50 flex flex-col-reverse sm:flex-row gap-3">
                 <button
                   onClick={() => setShowModal(false)}
                   className="flex-1 px-4 py-3 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"

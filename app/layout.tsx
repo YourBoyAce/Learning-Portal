@@ -1,12 +1,17 @@
 import "./globals.css";
 import React from "react";
-import { Geist } from "next/font/google";
+import { Roboto } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { LoadingProvider } from "./context/LoadingContext";
 import LoadingManager from "./components/ui/LoadingManager";
 import LoadingWrapper from "./components/ui/LoadingWrapper";
+import { TYPOGRAPHY_CSS_VARIABLES } from "./styles/typography";
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700", "900"],
+  variable: "--font-roboto",
+});
 
 export default function RootLayout({
   children,
@@ -14,7 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html className={cn("font-sans", geist.variable)}>
+    <html
+      lang="en"
+      className={cn("font-sans", roboto.variable)}
+      style={TYPOGRAPHY_CSS_VARIABLES as React.CSSProperties}
+    >
       <body>
         <LoadingProvider>
           <LoadingManager />

@@ -1,6 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap");
 @import "tailwindcss";
 @import "shadcn/tailwind.css";
+@import "./styles/theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -58,6 +58,21 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  --typography-xl-font-size: 48px;
+  --typography-xl-line-height: 56px;
+  --typography-xl-font-weight: 700;
+  --typography-h1-font-size: 24px;
+  --typography-h1-line-height: 32px;
+  --typography-h1-font-weight: 500;
+  --typography-h2-font-size: 20px;
+  --typography-h2-line-height: 28px;
+  --typography-h2-font-weight: 400;
+  --typography-body-font-size: 16px;
+  --typography-body-line-height: 28px;
+  --typography-body-font-weight: 300;
+  --typography-button-font-size: 14px;
+  --typography-button-line-height: 20px;
+  --typography-button-font-weight: 700;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -82,8 +97,26 @@
   --color-border: var(--border-glass);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-primary);
+  --font-heading: var(--font-primary);
+  --text-xs: var(--typography-button-font-size);
+  --text-xs--line-height: var(--typography-button-line-height);
+  --text-sm: var(--typography-button-font-size);
+  --text-sm--line-height: var(--typography-button-line-height);
+  --text-base: var(--typography-body-font-size);
+  --text-base--line-height: var(--typography-body-line-height);
+  --text-lg: var(--typography-h2-font-size);
+  --text-lg--line-height: var(--typography-h2-line-height);
+  --text-xl: var(--typography-h2-font-size);
+  --text-xl--line-height: var(--typography-h2-line-height);
+  --text-2xl: var(--typography-h1-font-size);
+  --text-2xl--line-height: var(--typography-h1-line-height);
+  --text-3xl: var(--typography-xl-font-size);
+  --text-3xl--line-height: var(--typography-xl-line-height);
+  --text-4xl: var(--typography-xl-font-size);
+  --text-4xl--line-height: var(--typography-xl-line-height);
+  --text-5xl: var(--typography-xl-font-size);
+  --text-5xl--line-height: var(--typography-xl-line-height);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -129,7 +162,10 @@ html {
 body {
   background: #0a0a0f !important;
   color: #f1f5f9 !important;
-  font-family: "Roboto", system-ui, sans-serif;
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-body-font-size);
+  font-weight: var(--typography-body-font-weight);
+  line-height: var(--typography-body-line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
@@ -587,4 +623,70 @@ body {
   html {
     @apply font-sans;
   }
+  h1 {
+    font-family: var(--font-primary), system-ui, sans-serif;
+    font-size: var(--typography-xl-font-size);
+    font-weight: var(--typography-xl-font-weight);
+    line-height: var(--typography-xl-line-height);
+  }
+  h2 {
+    font-family: var(--font-primary), system-ui, sans-serif;
+    font-size: var(--typography-h1-font-size);
+    font-weight: var(--typography-h1-font-weight);
+    line-height: var(--typography-h1-line-height);
+  }
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-primary), system-ui, sans-serif;
+    font-size: var(--typography-h2-font-size);
+    font-weight: var(--typography-h2-font-weight);
+    line-height: var(--typography-h2-line-height);
+  }
+  p,
+  li,
+  label,
+  input,
+  textarea,
+  select {
+    font-family: var(--font-primary), system-ui, sans-serif;
+    font-size: var(--typography-body-font-size);
+    font-weight: var(--typography-body-font-weight);
+    line-height: var(--typography-body-line-height);
+  }
+  button {
+    font-family: var(--font-primary), system-ui, sans-serif;
+    font-size: var(--typography-button-font-size);
+    font-weight: var(--typography-button-font-weight);
+    line-height: var(--typography-button-line-height);
+  }
+}
+
+.heading-xl {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-xl-font-size);
+  line-height: var(--typography-xl-line-height);
+  font-weight: var(--typography-xl-font-weight);
+}
+
+.heading-h1 {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-h1-font-size);
+  line-height: var(--typography-h1-line-height);
+  font-weight: var(--typography-h1-font-weight);
+}
+
+.heading-h2 {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-h2-font-size);
+  line-height: var(--typography-h2-line-height);
+  font-weight: var(--typography-h2-font-weight);
+}
+
+.body-text {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-body-font-size);
+  line-height: var(--typography-body-line-height);
+  font-weight: var(--typography-body-font-weight);
 }

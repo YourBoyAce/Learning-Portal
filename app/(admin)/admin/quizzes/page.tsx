@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   HelpCircle,
-  CheckCircle,
   Plus,
   Search,
   Pencil,
@@ -11,8 +13,6 @@ import {
   X,
   PlusCircle,
   Layers,
-  Award,
-  Users,
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -393,42 +393,33 @@ export default function AdminQuizzes() {
   );
 
   const stats = [
-    {
-      label: "Total Quizzes",
-      value: quizzes.length.toString(),
-      icon: HelpCircle,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-    },
-    {
-      label: "Active Quizzes",
-      value: quizzes.filter((q) => q.status === "Active").length.toString(),
-      icon: CheckCircle,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-    },
-    {
-      label: "Total Attempts",
-      value: quizzes
-        .reduce((acc, q) => acc + q.attemptsCount, 0)
-        .toString(),
-      icon: Users,
-      iconBg: "bg-purple-50",
-      iconColor: "text-purple-600",
-    },
-    {
-      label: "Avg. Passing Grade",
-      value: `${Math.round(
-        quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length
-      )}%`,
-      icon: Award,
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-600",
-    },
-  ];
-
+  {
+    label: "Total Quizzes",
+    value: quizzes.length.toString(),
+    icon: ICONS.BULB,
+  },
+  {
+    label: "Active Quizzes",
+    value: quizzes.filter((q) => q.status === "Active").length.toString(),
+    icon: ICONS.CLOCK,
+  },
+  {
+    label: "Total Attempts",
+    value: quizzes
+      .reduce((acc, q) => acc + q.attemptsCount, 0)
+      .toString(),
+    icon: ICONS.ITEMS,
+  },
+  {
+    label: "Avg. Passing Grade",
+    value: `${Math.round(
+      quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length
+    )}%`,
+    icon: ICONS.CHAMPION,
+  },
+];
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -440,38 +431,47 @@ export default function AdminQuizzes() {
               Design, manage and assess learner understanding with custom quizzes.
             </p>
           </div>
-          <button
+          <Button
             onClick={handleCreateNew}
-            className="bg-[#2283FF] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-sm"
+            className="w-full justify-center sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             New Quiz
-          </button>
+          </Button>
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4"
-            >
-              <div
-                className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}
-              >
-                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 font-medium">
-                  {stat.label}
-                </div>
-              </div>
-            </div>
-          ))}
+       {/* Stats Row */}
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  {stats.map((stat) => (
+    <div
+      key={stat.label}
+      className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100"
+    >
+      <div className="flex items-center gap-4 mb-3">
+        
+        <div className="flex items-center justify-center w-12 h-12 rounded-lg">
+          <Image
+            src={stat.icon}
+            alt={stat.label}
+            width={24}
+            height={24}
+          />
         </div>
+
+        <div>
+          <div className="text-2xl font-bold text-[var(--color-primary)]">
+            {stat.value}
+          </div>
+
+          <div className="text-sm text-[var(--color-text-secondary)]">
+            {stat.label}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  ))}
+</div>
 
         {/* Search */}
         <div className="flex items-center justify-between flex-wrap gap-4 mt-8 mb-6">
@@ -511,7 +511,7 @@ export default function AdminQuizzes() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[760px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-6">
@@ -580,20 +580,20 @@ export default function AdminQuizzes() {
                       </td>
                       <td className="p-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
+                          <Button
                             onClick={() => handleEdit(quiz)}
-                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#2283FF] hover:bg-blue-50 rounded-lg transition-colors"
+                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
                             title="Edit Quiz"
                           >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
+                            <Pencil className="w-4 text-primary h-4" />
+                          </Button>
+                          <Button
                             onClick={() => handleDeleteClick(quiz)}
-                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
                             title="Delete Quiz"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <Trash2 className="w-4 text-red-600 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -610,7 +610,7 @@ export default function AdminQuizzes() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
                 {isEditing ? "Edit Quiz" : "Create New Quiz"}
               </h3>
@@ -623,7 +623,7 @@ export default function AdminQuizzes() {
             </div>
 
             {/* Scrollable Body */}
-            <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1 bg-gray-50/30">
+            <div className="px-4 sm:px-6 py-5 space-y-6 overflow-y-auto flex-1 bg-gray-50/30">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -708,7 +708,7 @@ export default function AdminQuizzes() {
 
               {/* Questions Section */}
               <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <label className="block text-sm font-bold text-gray-800 uppercase tracking-wider">
                     Questions List
                   </label>
@@ -755,7 +755,7 @@ export default function AdminQuizzes() {
                     </div>
 
                     {/* Options */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
                       {question.options.map((opt, oIdx) => (
                         <div key={oIdx} className="flex items-center gap-2">
                           <span className="text-xs font-bold text-gray-400 uppercase w-4">
@@ -798,19 +798,19 @@ export default function AdminQuizzes() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-white">
-              <button
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 bg-white">
+              <Button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full text-primary bg-white hover:bg-gray-100 justify-center sm:w-1/2"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSaveQuiz}
-                className="px-5 py-2 text-sm font-semibold text-white bg-[#2283FF] rounded-lg hover:opacity-90 transition-opacity"
+                className="w-full justify-center sm:w-1/2"
               >
                 {isEditing ? "Save Changes" : "Create Quiz"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -833,7 +833,7 @@ export default function AdminQuizzes() {
                 ? All question data and statistics will be removed permanently.
               </p>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3">
               <button
                 onClick={() => {
                   setShowDeleteConfirm(false);

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
+import {Button} from "@/components/ui/button";
+import {ICONS} from "@/app/styles/icons";
+import Image from "next/image";
 import {
   FileText,
   FileArchive,
@@ -15,11 +18,7 @@ import {
   Check,
   RefreshCw,
   X as XIcon,
-  Loader2,
-  BookOpen,
-  PlayCircle
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const ARTIFACT_STORAGE_BUCKET =
   process.env.NEXT_PUBLIC_SUPABASE_ARTIFACTS_BUCKET || "course-artifacts";
@@ -353,6 +352,16 @@ if (artifactsError) {
       default: return <FileText className="w-6 h-6 text-gray-500" />;
     }
   };
+  const quizIcon =
+    activeTab === "quizzes"
+      ? ICONS.BULBLIGHT
+      : ICONS.BULB;
+
+  const materialIcon =
+    activeTab === "artifacts"
+      ? ICONS.MATERIALLIGHT
+      : ICONS.MATERIAL;
+
 
 
 
@@ -363,7 +372,7 @@ if (artifactsError) {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight flex items-center gap-2">
               Quizzes & Artifacts
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -372,29 +381,35 @@ if (artifactsError) {
           </div>
 
           {/* Segmented control tabs */}
-          <div className="grid grid-cols-2 sm:flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 w-full sm:w-auto">
-            <button
+          <div className="grid w-full min-w-0 grid-cols-1 gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm sm:w-auto sm:grid-cols-2 sm:shrink-0">
+            <Button
               onClick={() => setActiveTab("quizzes")}
-              className={`px-2 py-2 sm:px-5 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
+              className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
                 activeTab === "quizzes"
-                  ? "bg-[#2283FF] text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-800"
+                  ? ""
+                  : "bg-white text-gray-500 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
               }`}
             >
-              <HelpCircle className="w-4 h-4" />
-              Quizzes ({quizzes.length})
-            </button>
-            <button
+              <Image
+  src={quizIcon}
+  width={24}
+  height={24}
+  alt="Quizzes"
+/>
+              <span className="truncate">Quizzes ({quizzes.length})</span>
+            </Button>
+            <Button
               onClick={() => setActiveTab("artifacts")}
-              className={`px-2 py-2 sm:px-5 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
+              className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
                 activeTab === "artifacts"
-                  ? "bg-[#2283FF] text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-800"
+                  ? ""
+                  : "bg-white text-gray-500 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
               }`}
             >
-              <DownloadCloud className="w-4 h-4" />
-              Materials ({artifacts.length})
-            </button>
+              <Image src={materialIcon}  width={24}
+  height={24} alt="Materials" />
+              <span className="truncate">Materials ({artifacts.length})</span>
+            </Button>
           </div>
         </div>
 
@@ -418,8 +433,8 @@ if (artifactsError) {
                   <div className="space-y-4">
                     {/* Header elements */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="w-10 h-10 rounded-full bg-blue-50 text-[#174778] flex items-center justify-center shrink-0 group-hover:bg-[#174778] group-hover:text-white transition-all">
-                        <HelpCircle className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-full bg-blue-50 text-[#2283FF] flex items-center justify-center shrink-0 group-hover:bg-[#2283FF] group-hover:text-white transition-all">
+                        <Image src={ICONS.BULB} alt="Bulb" width={24} height={24} />
                       </div>
                       <span className="text-[9px] font-bold text-gray-400 bg-gray-50 border border-gray-100 rounded-md px-2 py-0.5 uppercase tracking-wider block">
                         {quiz.courseName}
@@ -443,9 +458,9 @@ if (artifactsError) {
                       <div className="flex items-center justify-between px-4 py-2 rounded-xl bg-gray-50 border border-gray-100">
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Best Score</span>
                         <span className={`text-xs font-bold flex items-center gap-1 ${
-                          isPassed ? "text-emerald-600" : "text-amber-600"
+                          isPassed ? "text-[#2283FF]" : "text-red-600"
                         }`}>
-                          <Award className="w-3.5 h-3.5" />
+                          <Image src={ICONS.CHAMPION} alt="Award" width={14} height={14} />
                           {score}% ({isPassed ? "Passed" : "Review"})
                         </span>
                       </div>
@@ -453,10 +468,10 @@ if (artifactsError) {
 
                     <Button
                       onClick={() => handleStartQuiz(quiz)}
-                      className={`w-full py-4.5 text-xs font-bold rounded-2xl transition-all ${
+                      className={`w-full ${
                         isPassed
                           ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100"
-                          : "bg-[#174778] text-white hover:bg-[#113a63]"
+                          : "bg-[#2283FF] text-white hover:bg-[#1A73E8]"
                       }`}
                     >
                       {hasAttempted ? "Practice Again" : "Start Practice Quiz"}
@@ -468,7 +483,7 @@ if (artifactsError) {
 
             {quizzes.length === 0 && (
               <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                <div className="w-16 h-16 bg-blue-50 text-[#174778] rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto mb-4">
                   <HelpCircle className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">No Practice Quizzes Available</h3>
@@ -521,9 +536,9 @@ if (artifactsError) {
                   <div className="pt-4 border-t border-gray-50 mt-4">
                     <Button
                       onClick={() => handleDownloadArtifact(art)}
-                      className="w-full py-4.5 text-xs font-bold rounded-2xl bg-[#174778] text-white hover:bg-[#113a63] flex items-center justify-center gap-2"
+                      className="w-full"
                     >
-                      <DownloadCloud className="w-4 h-4" />
+                      <Image src={ICONS.MATERIALLIGHT} width={16} height={16} alt="Download" />
                       Download Resource
                     </Button>
                   </div>
@@ -533,7 +548,7 @@ if (artifactsError) {
 
             {artifacts.length === 0 && (
               <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                <div className="w-16 h-16 bg-blue-50 text-[#174778] rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto mb-4">
                   <DownloadCloud className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">No Study Materials Found</h3>
@@ -555,7 +570,7 @@ if (artifactsError) {
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#174778] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#2283FF] flex items-center justify-center">
                   <HelpCircle size={20} />
                 </div>
                 <div>
@@ -579,17 +594,17 @@ if (artifactsError) {
               {/* STEP 1: INTRO */}
               {quizStep === "intro" && (
                 <div className="text-center py-6 max-w-md mx-auto space-y-6">
-                  <div className="w-20 h-20 bg-blue-50 text-[#174778] rounded-full flex items-center justify-center mx-auto border border-blue-100">
+                  <div className="w-20 h-20 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto border border-blue-100">
                     <Award size={40} className="stroke-1" />
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-gray-900 mb-2">Ready to test your skills?</h4>
                     <p className="text-gray-500 text-sm leading-relaxed">
-                      You are about to start <span className="font-bold text-[#174778]">{activeQuiz.title}</span>. Answer each question carefully. You can review your performance at the end.
+                      You are about to start <span className="font-bold text-[#2283FF]">{activeQuiz.title}</span>. Answer each question carefully. You can review your performance at the end.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-left">
+                  <div className="grid grid-cols-1 gap-4 text-left sm:grid-cols-2">
                     <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Questions</span>
                       <span className="text-lg font-bold text-gray-900">{activeQuiz.questions.length} Items</span>
@@ -602,7 +617,7 @@ if (artifactsError) {
 
                   <Button
                     onClick={() => setQuizStep("questions")}
-                    className="w-full py-4.5 bg-[#174778] hover:bg-[#113a63] text-white rounded-full font-bold shadow-md hover:shadow-lg transition-all"
+                    className="w-full py-4.5 bg-[#2283FF] hover:bg-[#1A73E8] text-white rounded-full font-bold shadow-md hover:shadow-lg transition-all"
                   >
                     Start Practice Quiz
                   </Button>
@@ -616,11 +631,11 @@ if (artifactsError) {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                       <span>Question {currentQuestionIndex + 1} of {activeQuiz.questions.length}</span>
-                      <span className="text-[#174778]">{Math.round(((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100)}% Complete</span>
+                      <span className="text-[#2283FF]">{Math.round(((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100)}% Complete</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#174778] transition-all duration-300"
+                        className="h-full bg-[#2283FF] transition-all duration-300"
                         style={{ width: `${((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100}%` }}
                       />
                     </div>
@@ -639,7 +654,7 @@ if (artifactsError) {
                       const isSelected = selectedAnswer === oIdx;
                       const isCorrectAnswer = oIdx === activeQuiz.questions[currentQuestionIndex].correctAnswer;
                       
-                      let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-[#174778]/50 hover:bg-gray-50/30";
+                      let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-[#2283FF]/50 hover:bg-gray-50/30";
                       
                       if (isAnswerSubmitted) {
                         if (isCorrectAnswer) {
@@ -650,7 +665,7 @@ if (artifactsError) {
                           optionStyle = "border-gray-100 bg-gray-50/30 text-gray-500 opacity-80";
                         }
                       } else if (isSelected) {
-                        optionStyle = "border-[#174778] bg-blue-50/50 text-[#174778] font-bold ring-2 ring-[#174778]/10";
+                        optionStyle = "border-[#2283FF] bg-blue-50/50 text-[#2283FF] font-bold ring-2 ring-[#2283FF]/10";
                       }
 
                       return (
@@ -662,7 +677,7 @@ if (artifactsError) {
                         >
                           <span className="flex items-start gap-3">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                              isSelected ? "bg-[#174778] text-white" : "bg-gray-100 text-gray-500"
+                              isSelected ? "bg-[#2283FF] text-white" : "bg-gray-100 text-gray-500"
                             }`}>
                               {String.fromCharCode(65 + oIdx)}
                             </span>
@@ -686,7 +701,7 @@ if (artifactsError) {
                       <Button
                         onClick={handleVerifyAnswer}
                         disabled={selectedAnswer === null}
-                        className="px-8 py-5 rounded-full bg-[#174778] hover:bg-[#113a63] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                        className="w-full px-6 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8"
                       >
                         Verify Answer
                       </Button>
@@ -694,7 +709,7 @@ if (artifactsError) {
                       currentQuestionIndex < activeQuiz.questions.length - 1 ? (
                         <Button
                           onClick={handleNextQuestion}
-                          className="px-8 py-5 rounded-full bg-[#174778] hover:bg-[#113a63] text-white text-xs font-bold uppercase tracking-wider"
+                          className="w-full px-6 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold uppercase tracking-wider sm:w-auto sm:px-8"
                         >
                           Next Question
                         </Button>
@@ -755,7 +770,7 @@ if (artifactsError) {
                           </Button>
                           <Button
                             onClick={() => setShowQuizModal(false)}
-                            className="w-full sm:flex-1 py-5 rounded-full bg-[#174778] hover:bg-[#113a63] text-white text-xs font-bold"
+                            className="w-full sm:flex-1 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold"
                           >
                             Close Quiz
                           </Button>
