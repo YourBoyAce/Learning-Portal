@@ -536,18 +536,18 @@ console.log("COURSE PROGRESS", courseProgress);
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Heading & Stats */}
           <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
-            <h1 className="text-4xl md:text-[44px] font-bold text-[#2283FF] mb-4 tracking-tight leading-tight">
+            <h1 className="text-4xl md:text-[44px] font-bold text-[#174778] mb-4 tracking-tight leading-tight">
               Continuing Your Journey
             </h1>
             <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
               Welcome back to{" "}
-              <span className="font-bold text-[#2283FF]">The Automate</span>.
+              <span className="font-bold text-[#1682F1]">The Automate</span>.
               You have{" "}
-              <span className="font-semibold text-[#2283FF] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-[#1E9CD7] underline decoration-dotted underline-offset-4">
                 {stats.liveSessions} upcoming webinars
               </span>{" "}
               and{" "}
-              <span className="font-semibold text-[#2283FF] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-[#25C8E5] underline decoration-dotted underline-offset-4">
                 {stats.pendingModules} pending module
                 {stats.pendingModules !== 1 ? "s" : ""}
               </span>{" "}
@@ -557,7 +557,7 @@ console.log("COURSE PROGRESS", courseProgress);
 
           {/* Right: Weekly Progress Widget */}
           <div className="lg:col-span-1">
-            <section className="bg-[#2283FF] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
+            <section className="bg-gradient-to-br from-[#174778] to-[#1682F1] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
               <div className="relative z-10 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-blue-100 mb-2">
@@ -632,7 +632,7 @@ console.log("COURSE PROGRESS", courseProgress);
 
 {/*Completed courses */}
 <section className="mt-12 text-gray-900">
-  <h2 className="text-2xl font-bold text-[#2283FF]">
+  <h2 className="text-2xl font-bold text-[#1682F1]">
     Completed Courses
   </h2>
 
@@ -640,14 +640,14 @@ console.log("COURSE PROGRESS", courseProgress);
     {completedCourses.map((course) => (
       <div
         key={course.id}
-        className="bg-white rounded-xl border p-6 shadow-sm text-gray-900"
+        className="bg-white rounded-xl border border-[#D0E8F2] p-6 shadow-sm text-gray-900 hover:border-[#1E9CD7] transition-colors"
       >
-        <h3 className="font-bold text-[#2283FF]">
+        <h3 className="font-bold text-[#174778]">
           {course.title}
         </h3>
 
-        <p className="text-green-600 font-medium mt-2">
-          Completed
+        <p className="text-[#25C8E5] font-medium mt-2">
+          ✓ Completed
         </p>
 
         {course.certificate_id && (
@@ -666,16 +666,16 @@ console.log("COURSE PROGRESS", courseProgress);
 </section>
 
         {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
-        <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-[#2283FF]/5">
+        <section className="bg-gradient-to-r from-[#E8F2FF] to-[#F0F8FF] border-l-[6px] border-[#1682F1] p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-[#1682F1]/10">
             <BookOpen size={80} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-[#1682F1] rounded-full flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-white" />
             </div>
-            <h3 className="font-bold text-[#2283FF] text-base">
+            <h3 className="font-bold text-[#174778] text-base">
               The Automate Insight
             </h3>
           </div>
@@ -687,7 +687,7 @@ console.log("COURSE PROGRESS", courseProgress);
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
-                  <p className="text-[11px] text-gray-800 font-bold mt-4 tracking-wider uppercase">
+                  <p className="text-[11px] text-[#0050DE] font-bold mt-4 tracking-wider uppercase">
                     &mdash; {currentInsight.author}
                   </p>
                 )}
@@ -703,7 +703,7 @@ console.log("COURSE PROGRESS", courseProgress);
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="w-1/6 justify-center"
+              className="w-1/6 justify-center bg-[#1682F1] hover:bg-[#0050DE]"
             > Mark as Read
             </Button>
           </div>

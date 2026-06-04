@@ -418,7 +418,7 @@ export default function Dashboard() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Welcome Banner - Dark Blue */}
-        <div className="bg-[#2283FF] rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
+        <div className="bg-gradient-to-r from-[#174778] to-[#1682F1] rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">
             Welcome back to The Automate, {userName}.
           </h1>
@@ -431,7 +431,7 @@ export default function Dashboard() {
             <div className="flex gap-3">
               <button
                 onClick={handlePlayModule}
-                className="bg-white text-[#2283FF] px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors"
+                className="bg-white text-[#174778] px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors"
               >
                 Resume Last Lesson
                 <svg
@@ -458,13 +458,13 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
           
           {/* 1. Upcoming Webinars Widget */}
-          <div className="bg-[#EAF2FB] rounded-2xl p-6 md:p-7 border border-[#2283FF]/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
+          <div className="bg-[#F0F7FF] rounded-2xl p-6 md:p-7 border border-[#1682F1]/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
 
             <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-xs font-bold text-[#2283FF] uppercase tracking-[0.2em]">
+              <span className="text-xs font-bold text-[#1682F1] uppercase tracking-[0.2em]">
                 Live Sessions
               </span>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-[#2283FF] rounded-md border border-[#2283FF]/20">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-[#1682F1] rounded-md border border-[#1682F1]/20">
                 {upcomingEvents.length} UPCOMING
               </span>
             </div>
@@ -480,7 +480,7 @@ export default function Dashboard() {
               {upcomingEvents.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
                   <div className="w-14 h-14 bg-[#F8FAFC] rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                    <svg className="w-8 h-8 text-[#2283FF]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-8 h-8 text-[#1682F1]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
@@ -495,9 +495,9 @@ export default function Dashboard() {
                       className="min-w-[270px] sm:min-w-[300px] bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-all duration-300 relative group"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="w-12 h-12 bg-[#F8FAFC] rounded-xl flex items-center justify-center shrink-0 border border-[#2283FF]/10 group-hover:scale-105 transition-transform duration-300">
+                        <div className="w-12 h-12 bg-[#F8FAFC] rounded-xl flex items-center justify-center shrink-0 border border-[#1682F1]/10 group-hover:scale-105 transition-transform duration-300">
                           <svg
-                            className="w-7 h-7 text-[#2283FF]"
+                            className="w-7 h-7 text-[#1682F1]"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -510,13 +510,13 @@ export default function Dashboard() {
                             />
                           </svg>
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#2283FF]/60 bg-[#EAF2FB] px-2 py-1 rounded-md">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#1682F1]/60 bg-[#F0F7FF] px-2 py-1 rounded-md">
                           {event.event_type}
                         </span>
                       </div>
 
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#1682F1] transition-colors mb-2">
                           {event.title}
                         </h3>
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
@@ -524,14 +524,14 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-[#2283FF]/10 flex items-center justify-between mt-auto">
+                      <div className="pt-4 border-t border-[#1682F1]/10 flex items-center justify-between mt-auto">
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
-                          <p className="text-xs font-black text-[#2283FF]">
+                          <p className="text-xs font-black text-[#1682F1]">
                             {formatEventLabel(event.event_date, event.event_time)}
                           </p>
                         </div>
-                        <button className="w-9 h-9 bg-[#2283FF] rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all">
+                        <button className="w-9 h-9 bg-[#1682F1] rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all hover:bg-[#0050DE]">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
@@ -549,14 +549,14 @@ export default function Dashboard() {
             
             <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#2283FF]/10 rounded-xl flex items-center justify-center">
-                  <Users size={20} className="text-[#2283FF]" />
+                <div className="w-10 h-10 bg-[#1682F1]/10 rounded-xl flex items-center justify-center">
+                  <Users size={20} className="text-[#1682F1]" />
                 </div>
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
                   Batch Allocations
                 </h2>
               </div>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#EAF2FB] text-[#2283FF] rounded-md uppercase tracking-widest border border-[#2283FF]/10">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#F0F7FF] text-[#1682F1] rounded-md uppercase tracking-widest border border-[#1682F1]/10">
                 {enrollments.length} Active
               </span>
             </div>
@@ -577,19 +577,19 @@ export default function Dashboard() {
                   {enrollments.map((item) => (
                     <div
                       key={`${item.batchId}-${item.courseId}`}
-                      className="bg-[#F8FAFC] hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-[#2283FF]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
+                      className="bg-[#F8FAFC] hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-[#1682F1]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
                     >
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-[#2283FF]/5 to-[#2283FF]/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-[#1682F1]/5 to-[#25C8E5]/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
 
                       <div className="flex items-start gap-4 mb-4 relative z-10">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#2283FF] to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-[#2283FF]/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#1682F1] to-[#25C8E5] rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-[#1682F1]/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
                           {item.courseTitle.charAt(0)}
                         </div>
                         <div className="min-w-0 pt-1 flex-1">
-                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-[#2283FF] transition-colors" title={item.courseTitle}>
+                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-[#1682F1] transition-colors" title={item.courseTitle}>
                             {item.courseTitle}
                           </p>
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-[#2283FF] text-[10px] font-bold uppercase tracking-widest mt-2 border border-blue-100/50 shadow-sm truncate max-w-full" title={item.batchName}>
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-[#1682F1] text-[10px] font-bold uppercase tracking-widest mt-2 border border-[#1682F1]/20 shadow-sm truncate max-w-full" title={item.batchName}>
                             {item.batchName}
                           </span>
                         </div>
@@ -622,7 +622,7 @@ export default function Dashboard() {
 
               {/* Header row */}
               <div className="flex items-start justify-between mb-5">
-                <span className="text-[10px] font-black text-white bg-[#542112] px-3 py-1.5 rounded-md uppercase tracking-widest">
+                <span className="text-[10px] font-black text-white bg-[#174778] px-3 py-1.5 rounded-md uppercase tracking-widest">
                   Up Next
                 </span>
 
@@ -631,7 +631,7 @@ export default function Dashboard() {
                     Total Time
                   </p>
 
-                  <p className="text-2xl sm:text-3xl font-black text-[#2283FF] tracking-tight font-mono">
+                  <p className="text-2xl sm:text-3xl font-black text-[#1682F1] tracking-tight font-mono">
                     {totalTime}
                   </p>
                 </div>
@@ -646,10 +646,10 @@ export default function Dashboard() {
               {nextModule ? (
                 <div
                   onClick={handlePlayModule}
-                  className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-[#2283FF]/30 transition-all cursor-pointer group"
+                  className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-[#1682F1]/30 transition-all cursor-pointer group"
                 >
                   {/* Instructor image */}
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-[#2283FF]/30 transition-colors">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-[#1682F1]/30 transition-colors">
                     <img
                       src="/images/instructor.png"
                       alt="Instructor"
@@ -659,7 +659,7 @@ export default function Dashboard() {
 
                   {/* Module info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-gray-900 group-hover:text-[#2283FF] transition-colors text-sm sm:text-base leading-snug">
+                    <h3 className="font-bold text-gray-900 group-hover:text-[#1682F1] transition-colors text-sm sm:text-base leading-snug">
                       {nextModule.title}
                     </h3>
 
@@ -690,7 +690,7 @@ export default function Dashboard() {
                       e.stopPropagation();
                       handlePlayModule();
                     }}
-                    className="w-12 h-12 bg-[#2283FF] rounded-full flex items-center justify-center text-white shrink-0 hover:bg-[#113a63] hover:scale-110 transition-all shadow-lg shadow-[#174778]/20"
+                    className="w-12 h-12 bg-[#1682F1] rounded-full flex items-center justify-center text-white shrink-0 hover:bg-[#0050DE] hover:scale-110 transition-all shadow-lg shadow-[#1682F1]/20"
                   >
                     <svg
                       className="w-5 h-5 ml-0.5"
@@ -711,20 +711,20 @@ export default function Dashboard() {
             </div>
 
            {/* RIGHT SIDE - LEARNING PROGRESS */}
-            <div className="bg-[#EAF2FB] border border-[#2283FF]/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
+            <div className="bg-[#F0F7FF] border border-[#1682F1]/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
 
-              <h2 className="text-2xl font-bold text-[#2283FF] mb-7 relative z-10">
+              <h2 className="text-2xl font-bold text-[#174778] mb-7 relative z-10">
                 Learning Progress
               </h2>
 
               {/* Circle */}
               <div className="flex justify-center relative z-10">
-                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#2283FF] flex items-center justify-center bg-white shadow-sm">
+                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#1682F1] flex items-center justify-center bg-white shadow-sm">
                   <div className="text-center">
-                    <h1 className="text-5xl font-black text-[#2283FF]">
+                    <h1 className="text-5xl font-black text-[#1682F1]">
                       {progressPercentage}%
                     </h1>
-                    <p className="text-xs tracking-[0.3em] text-[#2283FF]/70 mt-2 font-bold">
+                    <p className="text-xs tracking-[0.3em] text-[#1682F1]/70 mt-2 font-bold">
                       MASTERY
                     </p>
                   </div>
@@ -735,11 +735,11 @@ export default function Dashboard() {
               <div className="mt-auto pt-8 relative z-10">
                 <div className="bg-white border border-gray-100 rounded-xl p-5 space-y-4 shadow-sm">
                   
-                  <div className="flex items-center justify-between border-b border-[#2283FF]/10 pb-4">
+                  <div className="flex items-center justify-between border-b border-[#1682F1]/10 pb-4">
                     <span className="text-sm font-medium text-gray-600">
                       Modules Completed
                     </span>
-                    <span className="text-lg font-bold text-[#2283FF]">
+                    <span className="text-lg font-bold text-[#1682F1]">
                       {completedModules}/{totalModules}
                     </span>
                   </div>
@@ -748,7 +748,7 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                    <span className="text-lg font-bold text-[#2283FF]">
+                    <span className="text-lg font-bold text-[#1682F1]\">
                       {enrollments.length}
                     </span>
                   </div>
@@ -763,10 +763,10 @@ export default function Dashboard() {
 {/* Active Studies Grid / Carousel */}
         <div className="mb-12 relative px-0 sm:px-4 md:px-0">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h2 className="text-2xl font-bold text-[#174778] tracking-tight">
               Active Studies
             </h2>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
+            <span className="text-[10px] font-black text-[#1682F1] uppercase tracking-[0.3em]\">
               {enrolledCourses.length} Courses in Progress
             </span>
           </div>
@@ -808,7 +808,7 @@ export default function Dashboard() {
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
                           <div
-                            className="h-2 rounded-full bg-[#2956e3] transition-all"
+                            className="h-2 rounded-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all\"
                             style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
                           ></div>
                         </div>
@@ -830,23 +830,23 @@ export default function Dashboard() {
             {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
             {enrolledCourses.length > 3 && (
               <>
-                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
-                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#1682F1] hover:bg-gray-50 hover:text-[#0050DE] h-12 w-12 z-10" />
+                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#1682F1] hover:bg-gray-50 hover:text-[#0050DE] h-12 w-12 z-10" />
               </>
             )}
           </Carousel>
         </div>
 
-        <section className="bg-[#FDFBF7] border-l-[6px] border-[#2283FF] p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-[#2283FF]/5">
+        <section className="bg-gradient-to-r from-[#E8F2FF] to-[#F0F8FF] border-l-[6px] border-[#1682F1] p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-[#1682F1]/10">
             <BookOpen size={80} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-[#1682F1] rounded-full flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-white" />
             </div>
-            <h3 className="font-bold text-[#2283FF] text-base">
+            <h3 className="font-bold text-[#174778] text-base">
               The Automate Insight
             </h3>
           </div>
@@ -858,7 +858,7 @@ export default function Dashboard() {
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
-                  <p className="text-[11px] text-gray-500 font-bold mt-4 tracking-wider uppercase">
+                  <p className="text-[11px] text-[#0050DE] font-bold mt-4 tracking-wider uppercase">
                     &mdash; {currentInsight.author}
                   </p>
                 )}
@@ -874,7 +874,7 @@ export default function Dashboard() {
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="w-1/6 justify-center"
+              className="w-1/6 justify-center bg-[#1682F1] hover:bg-[#0050DE]"
             > Mark as Read
             </Button>
           </div>

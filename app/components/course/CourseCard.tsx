@@ -59,7 +59,7 @@ export default function CourseCard({
         className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col overflow-hidden relative cursor-pointer"
       >
         {/* Header */}
-        <div className="h-36 bg-gradient-to-br from-[#2283FF] to-[#2563eb] relative overflow-hidden">
+        <div className="h-36 bg-gradient-to-br from-[#174778] to-[#1682F1] relative overflow-hidden\">
           {thumbnail ? (
             <img
               src={thumbnail}
@@ -81,7 +81,7 @@ export default function CourseCard({
 
         {/* Body */}
         <div className="p-5 flex-1 flex flex-col">
-          <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#2283FF] transition-colors leading-tight">
+          <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#1682F1] transition-colors leading-tight\">
             {title}
           </h4>
 
@@ -107,7 +107,7 @@ export default function CourseCard({
                   e.stopPropagation();
                   onEdit?.();
                 }}
-                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#2283FF] hover:bg-blue-50 rounded-lg transition-colors"
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1682F1] hover:bg-blue-50 rounded-lg transition-colors\"
                 title="Edit Course"
               >
                 <Pencil className="w-4 h-4" />
@@ -140,7 +140,7 @@ export default function CourseCard({
     return (
       <div
         onClick={onClick}
-        className="group bg-white rounded-[1rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#2283FF]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
+        className="group bg-white rounded-[1rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#1682F1]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer\"
       >
         {/* Thumbnail */}
         <div className="relative w-full h-48 sm:h-64 overflow-hidden">
@@ -151,7 +151,7 @@ export default function CourseCard({
               className="w-full h-full object-contain p-2 transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#2283FF] via-[#1a6fdb] to-[#0f172a]" />
+            <div className="w-full h-full bg-gradient-to-br from-[#174778] via-[#1682F1] to-[#0f172a]\" />
           )}
 
           {/* Overlay */}
@@ -196,7 +196,7 @@ export default function CourseCard({
 
         {/* Body */}
         <div className="flex-1 flex flex-col p-6 pt-5">
-          <h3 className="text-xl font-bold text-[#0f172a] group-hover:text-[#2283FF] transition-colors leading-snug mb-2">
+          <h3 className="text-xl font-bold text-[#0f172a] group-hover:text-[#1682F1] transition-colors leading-snug mb-2\">
             {title}
           </h3>
 
@@ -212,14 +212,14 @@ export default function CourseCard({
                   Progress
                 </span>
 
-                <span className="text-xs font-black text-[#2283FF]">
+                <span className="text-xs font-black text-[#1682F1]\">
                   {progressPercentage}%
                 </span>
               </div>
 
               <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
                 <div
-                  className="bg-gradient-to-r from-[#2283FF] via-[#2c6cb0] to-[#2283FF] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
+                  className="bg-gradient-to-r from-[#1682F1] via-[#25C8E5] to-[#1682F1] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000\"
                   style={{
                     width: `${progressPercentage}%`,
                   }}
@@ -241,10 +241,10 @@ export default function CourseCard({
   return (
     <div
       onClick={onClick}
-      className="group bg-white border border-gray-100 rounded-[2.5rem] p-6 flex flex-col md:flex-row gap-8 hover:shadow-2xl hover:shadow-[#2283FF]/10 transition-all duration-500 cursor-pointer relative overflow-hidden"
+      className="group bg-white border border-gray-100 rounded-[2.5rem] p-6 flex flex-col md:flex-row gap-8 hover:shadow-2xl hover:shadow-[#1682F1]/10 transition-all duration-500 cursor-pointer relative overflow-hidden\"
     >
       {/* Decorative Blur */}
-      <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-[#2283FF]/5 rounded-full blur-3xl group-hover:bg-[#2283FF]/10 transition-colors" />
+      <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-[#1682F1]/5 rounded-full blur-3xl group-hover:bg-[#1682F1]/10 transition-colors\" />
 
       {/* Thumbnail */}
       <div className="w-full md:w-48 h-40 rounded-[2rem] overflow-hidden shrink-0 shadow-xl shadow-black/5 relative group-hover:scale-[1.02] transition-transform duration-500">

@@ -372,7 +372,7 @@ if (artifactsError) {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
           <div>
-            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-[#174778] tracking-tight flex items-center gap-2">
               Quizzes & Artifacts
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -386,8 +386,8 @@ if (artifactsError) {
               onClick={() => setActiveTab("quizzes")}
               className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
                 activeTab === "quizzes"
-                  ? ""
-                  : "bg-white text-gray-500 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
+                  ? "bg-[#1682F1] text-white"
+                  : "bg-white text-gray-500 hover:bg-[#1682F1]/10 hover:text-[#1682F1]"
               }`}
             >
               <Image
@@ -402,8 +402,8 @@ if (artifactsError) {
               onClick={() => setActiveTab("artifacts")}
               className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
                 activeTab === "artifacts"
-                  ? ""
-                  : "bg-white text-gray-500 hover:bg-[#2283FF]/10 hover:text-[#2283FF]"
+                  ? "bg-[#1682F1] text-white"
+                  : "bg-white text-gray-500 hover:bg-[#1682F1]/10 hover:text-[#1682F1]"
               }`}
             >
               <Image src={materialIcon}  width={24}
@@ -433,7 +433,7 @@ if (artifactsError) {
                   <div className="space-y-4">
                     {/* Header elements */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="w-10 h-10 rounded-full bg-blue-50 text-[#2283FF] flex items-center justify-center shrink-0 group-hover:bg-[#2283FF] group-hover:text-white transition-all">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1682F1] flex items-center justify-center shrink-0 group-hover:bg-[#1682F1] group-hover:text-white transition-all\">
                         <Image src={ICONS.BULB} alt="Bulb" width={24} height={24} />
                       </div>
                       <span className="text-[9px] font-bold text-gray-400 bg-gray-50 border border-gray-100 rounded-md px-2 py-0.5 uppercase tracking-wider block">
@@ -442,7 +442,7 @@ if (artifactsError) {
                     </div>
 
                     <div>
-                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#2283FF] transition-colors line-clamp-1">
+                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#1682F1] transition-colors line-clamp-1\">
                         {quiz.title}
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-wider mt-1.5">
@@ -458,7 +458,7 @@ if (artifactsError) {
                       <div className="flex items-center justify-between px-4 py-2 rounded-xl bg-gray-50 border border-gray-100">
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Best Score</span>
                         <span className={`text-xs font-bold flex items-center gap-1 ${
-                          isPassed ? "text-[#2283FF]" : "text-red-600"
+                          isPassed ? "text-[#1682F1]" : "text-red-600"
                         }`}>
                           <Image src={ICONS.CHAMPION} alt="Award" width={14} height={14} />
                           {score}% ({isPassed ? "Passed" : "Review"})
@@ -471,7 +471,7 @@ if (artifactsError) {
                       className={`w-full ${
                         isPassed
                           ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100"
-                          : "bg-[#2283FF] text-white hover:bg-[#1A73E8]"
+                          : "bg-[#1682F1] text-white hover:bg-[#0050DE]"
                       }`}
                     >
                       {hasAttempted ? "Practice Again" : "Start Practice Quiz"}
@@ -483,7 +483,7 @@ if (artifactsError) {
 
             {quizzes.length === 0 && (
               <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                <div className="w-16 h-16 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-50 text-[#1682F1] rounded-full flex items-center justify-center mx-auto mb-4\">
                   <HelpCircle className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">No Practice Quizzes Available</h3>
@@ -516,7 +516,7 @@ if (artifactsError) {
                     </div>
 
                     <div>
-                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#2283FF] transition-colors truncate" title={art.name}>
+                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#1682F1] transition-colors truncate" title={art.name}>
                         {art.name}
                       </h3>
                       <div className="flex items-center gap-3 text-xs text-gray-400 font-bold uppercase tracking-wider mt-1.5">
@@ -548,7 +548,7 @@ if (artifactsError) {
 
             {artifacts.length === 0 && (
               <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                <div className="w-16 h-16 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-50 text-[#1682F1] rounded-full flex items-center justify-center mx-auto mb-4\">
                   <DownloadCloud className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">No Study Materials Found</h3>
@@ -570,7 +570,7 @@ if (artifactsError) {
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#2283FF] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1682F1] flex items-center justify-center">
                   <HelpCircle size={20} />
                 </div>
                 <div>
@@ -594,7 +594,7 @@ if (artifactsError) {
               {/* STEP 1: INTRO */}
               {quizStep === "intro" && (
                 <div className="text-center py-6 max-w-md mx-auto space-y-6">
-                  <div className="w-20 h-20 bg-blue-50 text-[#2283FF] rounded-full flex items-center justify-center mx-auto border border-blue-100">
+                      <div className="w-20 h-20 bg-blue-50 text-[#1682F1] rounded-full flex items-center justify-center mx-auto border border-blue-100\">
                     <Award size={40} className="stroke-1" />
                   </div>
                   <div>
@@ -617,8 +617,7 @@ if (artifactsError) {
 
                   <Button
                     onClick={() => setQuizStep("questions")}
-                    className="w-full py-4.5 bg-[#2283FF] hover:bg-[#1A73E8] text-white rounded-full font-bold shadow-md hover:shadow-lg transition-all"
-                  >
+                    className="w-full py-4.5 bg-[#1682F1] hover:bg-[#0050DE] text-white rounded-full font-bold shadow-md hover:shadow-lg transition-all\">
                     Start Practice Quiz
                   </Button>
                 </div>
@@ -631,11 +630,11 @@ if (artifactsError) {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                       <span>Question {currentQuestionIndex + 1} of {activeQuiz.questions.length}</span>
-                      <span className="text-[#2283FF]">{Math.round(((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100)}% Complete</span>
+                      <span className="text-[#1682F1]">{Math.round(((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100)}% Complete</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-[#2283FF] transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all duration-300\"
                         style={{ width: `${((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100}%` }}
                       />
                     </div>
@@ -654,7 +653,7 @@ if (artifactsError) {
                       const isSelected = selectedAnswer === oIdx;
                       const isCorrectAnswer = oIdx === activeQuiz.questions[currentQuestionIndex].correctAnswer;
                       
-                      let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-[#2283FF]/50 hover:bg-gray-50/30";
+                      let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-[#1682F1]/50 hover:bg-gray-50/30";
                       
                       if (isAnswerSubmitted) {
                         if (isCorrectAnswer) {
@@ -665,7 +664,7 @@ if (artifactsError) {
                           optionStyle = "border-gray-100 bg-gray-50/30 text-gray-500 opacity-80";
                         }
                       } else if (isSelected) {
-                        optionStyle = "border-[#2283FF] bg-blue-50/50 text-[#2283FF] font-bold ring-2 ring-[#2283FF]/10";
+                        optionStyle = "border-[#1682F1] bg-blue-50/50 text-[#1682F1] font-bold ring-2 ring-[#1682F1]/10";
                       }
 
                       return (
@@ -677,7 +676,7 @@ if (artifactsError) {
                         >
                           <span className="flex items-start gap-3">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                              isSelected ? "bg-[#2283FF] text-white" : "bg-gray-100 text-gray-500"
+                              isSelected ? "bg-[#1682F1] text-white" : "bg-gray-100 text-gray-500"
                             }`}>
                               {String.fromCharCode(65 + oIdx)}
                             </span>
@@ -701,7 +700,7 @@ if (artifactsError) {
                       <Button
                         onClick={handleVerifyAnswer}
                         disabled={selectedAnswer === null}
-                        className="w-full px-6 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8"
+                        className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8\"
                       >
                         Verify Answer
                       </Button>
@@ -709,7 +708,7 @@ if (artifactsError) {
                       currentQuestionIndex < activeQuiz.questions.length - 1 ? (
                         <Button
                           onClick={handleNextQuestion}
-                          className="w-full px-6 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold uppercase tracking-wider sm:w-auto sm:px-8"
+                          className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider sm:w-auto sm:px-8\"
                         >
                           Next Question
                         </Button>
@@ -770,7 +769,7 @@ if (artifactsError) {
                           </Button>
                           <Button
                             onClick={() => setShowQuizModal(false)}
-                            className="w-full sm:flex-1 py-5 rounded-full bg-[#2283FF] hover:bg-[#1A73E8] text-white text-xs font-bold"
+                            className="w-full sm:flex-1 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold\"
                           >
                             Close Quiz
                           </Button>
