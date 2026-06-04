@@ -433,7 +433,7 @@ if (artifactsError) {
                   <div className="space-y-4">
                     {/* Header elements */}
                     <div className="flex items-start justify-between gap-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1682F1] flex items-center justify-center shrink-0 group-hover:bg-[#1682F1] group-hover:text-white transition-all\">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1682F1] flex items-center justify-center shrink-0 group-hover:bg-[#1682F1] group-hover:text-white transition-all">
                         <Image src={ICONS.BULB} alt="Bulb" width={24} height={24} />
                       </div>
                       <span className="text-[9px] font-bold text-gray-400 bg-gray-50 border border-gray-100 rounded-md px-2 py-0.5 uppercase tracking-wider block">
@@ -442,7 +442,7 @@ if (artifactsError) {
                     </div>
 
                     <div>
-                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#1682F1] transition-colors line-clamp-1\">
+                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-[#1682F1] transition-colors line-clamp-1">
                         {quiz.title}
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-wider mt-1.5">
@@ -634,7 +634,7 @@ if (artifactsError) {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all duration-300\"
+                        className="h-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all duration-300"
                         style={{ width: `${((currentQuestionIndex + 1) / activeQuiz.questions.length) * 100}%` }}
                       />
                     </div>
@@ -700,7 +700,7 @@ if (artifactsError) {
                       <Button
                         onClick={handleVerifyAnswer}
                         disabled={selectedAnswer === null}
-                        className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8\"
+                        className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8"
                       >
                         Verify Answer
                       </Button>
@@ -708,7 +708,7 @@ if (artifactsError) {
                       currentQuestionIndex < activeQuiz.questions.length - 1 ? (
                         <Button
                           onClick={handleNextQuestion}
-                          className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider sm:w-auto sm:px-8\"
+                          className="w-full px-6 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold uppercase tracking-wider sm:w-auto sm:px-8"
                         >
                           Next Question
                         </Button>
@@ -769,7 +769,7 @@ if (artifactsError) {
                           </Button>
                           <Button
                             onClick={() => setShowQuizModal(false)}
-                            className="w-full sm:flex-1 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold\"
+                            className="w-full sm:flex-1 py-5 rounded-full bg-[#1682F1] hover:bg-[#0050DE] text-white text-xs font-bold"
                           >
                             Close Quiz
                           </Button>

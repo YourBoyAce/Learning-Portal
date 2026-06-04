@@ -748,7 +748,7 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                    <span className="text-lg font-bold text-[#1682F1]\">
+                  <span className="text-lg font-bold text-[#1682F1]">
                       {enrollments.length}
                     </span>
                   </div>
@@ -766,7 +766,7 @@ export default function Dashboard() {
             <h2 className="text-2xl font-bold text-[#174778] tracking-tight">
               Active Studies
             </h2>
-            <span className="text-[10px] font-black text-[#1682F1] uppercase tracking-[0.3em]\">
+            <span className="text-[10px] font-black text-[#1682F1] uppercase tracking-[0.3em]">
               {enrolledCourses.length} Courses in Progress
             </span>
           </div>
@@ -808,7 +808,7 @@ export default function Dashboard() {
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
                           <div
-                            className="h-2 rounded-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all\"
+                          className="h-2 rounded-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all"
                             style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
                           ></div>
                         </div>
