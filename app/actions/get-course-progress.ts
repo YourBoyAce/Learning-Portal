@@ -70,6 +70,39 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const normalizeId = (id: string | null | undefined) =>
   String(id || "").replace(/-/g, "").toLowerCase();
 
+function getLatestModuleCompletion(
+  modules: any[] = [],
+  progressRows: any[] = [],
+) {
+  const completionByModuleId = new Map<string, boolean>();
+  const updatedAtByModuleId = new Map<string, string>();
+
+  for (const progress of progressRows) {
+    const normalizedProgressId = normalizeId(progress.video_id);
+    if (!normalizedProgressId) continue;
+
+    const matchedModule = modules.find((module) => {
+      return (
+        normalizeId(module.id) === normalizedProgressId ||
+        normalizeId(module.video_cf_id) === normalizedProgressId
+      );
+    });
+
+    if (!matchedModule) continue;
+
+    const moduleId = String(matchedModule.id);
+    const updatedAt = String(progress.updated_at || "");
+    const previousUpdatedAt = updatedAtByModuleId.get(moduleId);
+
+    if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
+      completionByModuleId.set(moduleId, Boolean(progress.completed));
+      updatedAtByModuleId.set(moduleId, updatedAt);
+    }
+  }
+
+  return completionByModuleId;
+}
+
 export async function getCourseProgress(userId: string, courseId: string) {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error("Supabase environment variables are not configured.");
@@ -98,26 +131,22 @@ export async function getCourseProgress(userId: string, courseId: string) {
     // 2. Get user's video progress for this course
     const { data: progressData, error: progressError } = await supabaseAdmin
       .from("user_video_progress")
-      .select("video_id, completed")
+      .select("video_id, completed, updated_at")
       .eq("user_id", userId)
       .eq("course_id", courseId);
 
     if (progressError) throw progressError;
 
-    // 3. Create a set of completed video IDs (normalized)
-    const completedVideoSet = new Set(
-      progressData
-        ?.filter((p: any) => p.completed)
-        .map((p: any) => normalizeId(p.video_id))
+    // 3. Resolve duplicate module/video-id rows by newest update.
+    const moduleCompletion = getLatestModuleCompletion(
+      modules ?? [],
+      progressData ?? [],
     );
 
     // 4. Count modules that have matching completed videos
     const completedModules =
-      modules?.filter((m: any) => {
-        const moduleId = normalizeId(m.id);
-        const cloudflareId = normalizeId(m.video_cf_id);
-        return completedVideoSet.has(moduleId) || completedVideoSet.has(cloudflareId);
-      }).length || 0;
+      modules?.filter((m: any) => moduleCompletion.get(String(m.id))).length ||
+      0;
 
     // 5. Calculate percentage
     const progressPercentage = totalModules > 0

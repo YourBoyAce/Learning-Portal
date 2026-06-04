@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Stream, type StreamPlayerApi } from "@cloudflare/stream-react";
 // Navigating up from components -> [id] -> courses -> (main) -> app -> actions
-import { upsertUserProgress } from "../../../../actions/user-progress";
+import {
+  saveUserPlaybackPosition,
+  upsertUserProgress,
+} from "../../../../actions/user-progress";
 
 interface CourseVideoPlayerProps {
   userId: string;
@@ -10,7 +14,11 @@ interface CourseVideoPlayerProps {
   moduleId: string;
   videoUrl: string;
   thumbnailUrl?: string | null;
+  initialPositionSeconds?: number;
+  progressAliasIds?: string[];
+  autoPlay?: boolean;
   onCompleted?: () => void;
+  onProgressPosition?: (positionSeconds: number) => void;
 }
 
 export default function CourseVideoPlayer({
@@ -19,12 +27,21 @@ export default function CourseVideoPlayer({
   moduleId,
   videoUrl,
   thumbnailUrl,
+  initialPositionSeconds = 0,
+  progressAliasIds = [],
+  autoPlay = false,
   onCompleted,
+  onProgressPosition,
 }: CourseVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<StreamPlayerApi | undefined>(undefined);
+  const lastSavedPositionRef = useRef(0);
+  const lastSavedAtRef = useRef(0);
+  const initialSeekAppliedRef = useRef(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
+
+  const startPosition = Math.max(0, Math.floor(initialPositionSeconds || 0));
 
   const isCloudflareIframe = useMemo(() => {
     return [
@@ -34,9 +51,76 @@ export default function CourseVideoPlayer({
     ].some((token) => videoUrl.includes(token));
   }, [videoUrl]);
 
+  const streamSource = useMemo(() => {
+    if (!isCloudflareIframe) return null;
+    try {
+      const url = new URL(videoUrl);
+      const segments = url.pathname.split("/").filter(Boolean);
+      const iframeIndex = segments.findIndex((segment) => segment === "iframe");
+      if (iframeIndex > 0) return segments[iframeIndex - 1];
+      return segments[segments.length - 1] || null;
+    } catch {
+      return videoUrl.split("?")[0].split("/").filter(Boolean).pop() || null;
+    }
+  }, [isCloudflareIframe, videoUrl]);
+
+  const getProgressPercent = (positionSeconds: number, durationSeconds: number) => {
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return 0;
+    return Math.max(
+      0,
+      Math.min(99, Math.floor((positionSeconds / durationSeconds) * 100)),
+    );
+  };
+
+  const savePlaybackPosition = async (
+    positionSeconds: number,
+    durationSeconds: number,
+    force = false,
+  ) => {
+    if (!Number.isFinite(positionSeconds) || positionSeconds < 0 || isCompleted) {
+      return;
+    }
+
+    const roundedPosition = Math.floor(positionSeconds);
+    if (roundedPosition < 3) return;
+
+    const now = Date.now();
+    const movedEnough =
+      Math.abs(roundedPosition - lastSavedPositionRef.current) >= 5;
+    const waitedEnough = now - lastSavedAtRef.current >= 10000;
+
+    onProgressPosition?.(roundedPosition);
+
+    if (!force && (!movedEnough || !waitedEnough)) return;
+
+    lastSavedPositionRef.current = roundedPosition;
+    lastSavedAtRef.current = now;
+
+    try {
+      await saveUserPlaybackPosition(
+        userId,
+        courseId,
+        moduleId,
+        roundedPosition,
+        getProgressPercent(roundedPosition, durationSeconds),
+        progressAliasIds,
+      );
+    } catch (error) {
+      console.error("Error saving playback position:", error);
+    }
+  };
+
   const updateProgress = async (completed: boolean) => {
     try {
-      await upsertUserProgress(userId, courseId, moduleId, completed ? 100 : 0, completed);
+      await upsertUserProgress(
+        userId,
+        courseId,
+        moduleId,
+        completed ? 100 : 0,
+        completed,
+        progressAliasIds,
+        completed ? 0 : lastSavedPositionRef.current,
+      );
     } catch (error) {
       console.error("Error saving video progress:", error);
       setErrorMessage("Unable to save progress right now. Please try again.");
@@ -51,12 +135,72 @@ export default function CourseVideoPlayer({
   const handleEnded = async () => {
     if (isCompleted || isCloudflareIframe) return;
     setIsCompleted(true);
+    onProgressPosition?.(0);
     await updateProgress(true);
   };
 
   useEffect(() => {
-    setHasStarted(false);
-  }, [moduleId, videoUrl]);
+    setIsCompleted(false);
+    setErrorMessage(null);
+    lastSavedPositionRef.current = startPosition;
+    lastSavedAtRef.current = 0;
+    initialSeekAppliedRef.current = startPosition <= 0;
+  }, [moduleId, videoUrl, startPosition]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || isCloudflareIframe || startPosition <= 0) return;
+
+    const applyInitialPosition = () => {
+      if (
+        !initialSeekAppliedRef.current &&
+        Number.isFinite(video.duration) &&
+        startPosition < video.duration - 2
+      ) {
+        video.currentTime = startPosition;
+        initialSeekAppliedRef.current = true;
+      }
+    };
+
+    if (video.readyState >= 1) {
+      applyInitialPosition();
+    }
+
+    video.addEventListener("loadedmetadata", applyInitialPosition);
+    return () => video.removeEventListener("loadedmetadata", applyInitialPosition);
+  }, [isCloudflareIframe, moduleId, startPosition, videoUrl]);
+
+  useEffect(() => {
+    const player = streamRef.current;
+    if (
+      !player ||
+      !isCloudflareIframe ||
+      startPosition <= 0 ||
+      initialSeekAppliedRef.current
+    ) {
+      return;
+    }
+
+    const seekToStartPosition = () => {
+      if (
+        !initialSeekAppliedRef.current &&
+        Number.isFinite(player.duration) &&
+        startPosition < player.duration - 2
+      ) {
+        player.currentTime = startPosition;
+        initialSeekAppliedRef.current = true;
+      }
+    };
+
+    seekToStartPosition();
+    player.addEventListener("loadedmetadata", seekToStartPosition);
+    player.addEventListener("canplay", seekToStartPosition);
+
+    return () => {
+      player.removeEventListener("loadedmetadata", seekToStartPosition);
+      player.removeEventListener("canplay", seekToStartPosition);
+    };
+  }, [isCloudflareIframe, moduleId, startPosition, videoUrl]);
 
   useEffect(() => {
     if (!isCloudflareIframe) return;
@@ -88,6 +232,7 @@ export default function CourseVideoPlayer({
       if (eventType && (eventType.includes("ended") || eventType.includes("complete") || eventType.includes("finished"))) {
         if (!isCompleted) {
           setIsCompleted(true);
+          onProgressPosition?.(0);
           await updateProgress(true);
         }
       }
@@ -97,45 +242,88 @@ export default function CourseVideoPlayer({
     return () => window.removeEventListener("message", handleMessage);
   }, [isCloudflareIframe, videoUrl, isCompleted]);
 
+  const handleNativeTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    void savePlaybackPosition(video.currentTime, video.duration);
+  };
+
+  const handleNativePause = () => {
+    const video = videoRef.current;
+    if (!video || video.ended) return;
+    void savePlaybackPosition(video.currentTime, video.duration, true);
+  };
+
+  const handleStreamTimeUpdate = () => {
+    const player = streamRef.current;
+    if (!player) return;
+    void savePlaybackPosition(player.currentTime, player.duration);
+  };
+
+  const handleStreamPause = () => {
+    const player = streamRef.current;
+    if (!player || player.ended) return;
+    void savePlaybackPosition(player.currentTime, player.duration, true);
+  };
+
+  const handleStreamReadyToSeek = () => {
+    const player = streamRef.current;
+    if (
+      !player ||
+      initialSeekAppliedRef.current ||
+      startPosition <= 0 ||
+      !Number.isFinite(player.duration) ||
+      startPosition >= player.duration - 2
+    ) {
+      return;
+    }
+
+    player.currentTime = startPosition;
+    initialSeekAppliedRef.current = true;
+  };
+
+  const handleStreamEnded = async () => {
+    if (isCompleted) return;
+    setIsCompleted(true);
+    onProgressPosition?.(0);
+    await updateProgress(true);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       <div className="relative rounded-[1.5rem] overflow-hidden shadow-xl bg-black">
-        {!hasStarted ? (
-          <button
-            type="button"
-            onClick={() => setHasStarted(true)}
-            className="relative w-full aspect-video bg-black"
-            aria-label="Play module video"
-          >
-            {thumbnailUrl ? (
-              <img
-                src={thumbnailUrl}
-                alt="Module video thumbnail"
-                className="w-full h-full object-cover"
-              />
-            ) : null}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-              <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                <div className="w-0 h-0 border-t-[12px] border-b-[12px] border-l-[20px] border-t-transparent border-b-transparent border-l-black ml-1" />
-              </div>
-            </div>
-          </button>
-        ) : isCloudflareIframe ? (
+        {isCloudflareIframe && streamSource ? (
           <div className="aspect-video bg-[#111827]">
-            <iframe
-              src={videoUrl}
+            <Stream
+              streamRef={streamRef}
+              src={streamSource}
               title="Course video player"
-              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+              controls
+              autoplay={autoPlay}
+              poster={thumbnailUrl || undefined}
+              startTime={startPosition > 0 ? startPosition : undefined}
+              width="100%"
+              height="100%"
+              responsive={false}
+              className="w-full h-full"
+              onLoadedMetaData={handleStreamReadyToSeek}
+              onCanPlay={handleStreamReadyToSeek}
+              onTimeUpdate={handleStreamTimeUpdate}
+              onPause={handleStreamPause}
+              onEnded={() => {
+                void handleStreamEnded();
+              }}
             />
           </div>
         ) : (
           <video
             ref={videoRef}
             src={videoUrl}
+            poster={thumbnailUrl || undefined}
             controls
-            autoPlay
+            autoPlay={autoPlay}
+            onTimeUpdate={handleNativeTimeUpdate}
+            onPause={handleNativePause}
             onEnded={handleEnded}
             className="w-full h-auto bg-black"
           />

@@ -49,7 +49,37 @@ interface Insight {
 
 export default function Dashboard() {
   const normalizeProgressId = (value: unknown) =>
-    String(value ?? "").trim().replaceAll("-", "");
+    String(value ?? "").trim().replaceAll("-", "").toLowerCase();
+
+  const resolveModuleCompletion = (modules: any[] = [], progressRows: any[] = []) => {
+    const completionByModuleId = new Map<string, boolean>();
+    const updatedAtByModuleId = new Map<string, string>();
+
+    for (const progress of progressRows) {
+      const normalizedProgressId = normalizeProgressId(progress.video_id);
+      if (!normalizedProgressId) continue;
+
+      const matchedModule = modules.find((module: any) => {
+        return (
+          normalizeProgressId(module.id) === normalizedProgressId ||
+          normalizeProgressId(module.video_cf_id) === normalizedProgressId
+        );
+      });
+
+      if (!matchedModule) continue;
+
+      const moduleId = String(matchedModule.id);
+      const updatedAt = String(progress.updated_at || "");
+      const previousUpdatedAt = updatedAtByModuleId.get(moduleId);
+
+      if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
+        completionByModuleId.set(moduleId, Boolean(progress.completed));
+        updatedAtByModuleId.set(moduleId, updatedAt);
+      }
+    }
+
+    return completionByModuleId;
+  };
 
   const router = useRouter();
   const { setLoading: setGlobalLoading } = useLoading();
@@ -211,54 +241,27 @@ export default function Dashboard() {
           setNextModule(modulesData[0]);
           setAllCourseModules(modulesData);
 
-          //for progress calculation
-          const fetchCompletedVideos = async () => {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-
-            if (!user) return;
-
-            const { data, error } = await supabase
-              .from("user_video_progress")
-              .select("video_id")
-              .eq("user_id", user.id)
-              .eq("completed", true);
-
-            if (error) {
-              console.error("Progress fetch error:", error);
-              return;
-            }
-
-            setCompletedVideoIds(
-              data.map((item) => normalizeProgressId(item.video_id))
-            );
-
-          };
-          fetchCompletedVideos();
-
           // Fetch user_video_progress for this course to check completion
           const { data: progressData } = await supabase
             .from("user_video_progress")
-            .select("video_id, completed")
+            .select("video_id, completed, updated_at")
             .eq("user_id", user.id)
             .eq("course_id", mostRecentCourse.id);
 
-          // Build a set of completed module IDs
-          const completedSet = new Set<string>();
-          if (progressData) {
-            for (const p of progressData) {
-              if (p.completed) {
-                completedSet.add(normalizeProgressId(p.video_id));
-              }
-            }
-          }
+          const moduleCompletion = resolveModuleCompletion(
+            modulesData,
+            progressData ?? [],
+          );
+
+          setCompletedVideoIds(
+            modulesData
+              .filter((module: any) => moduleCompletion.get(String(module.id)))
+              .map((module: any) => String(module.id)),
+          );
 
           // Find the first incomplete module as the "next" module
           const firstIncomplete = modulesData.find(
-            (m: any) =>
-              !completedSet.has(normalizeProgressId(m.id)) &&
-              !completedSet.has(normalizeProgressId(m.video_cf_id))
+            (m: any) => !moduleCompletion.get(String(m.id))
           );
           if (firstIncomplete) {
             setNextModule(firstIncomplete);
@@ -267,9 +270,7 @@ export default function Dashboard() {
           // Sum durations of all incomplete modules
           let totalSeconds = 0;
           for (const mod of modulesData) {
-            const isCompleted =
-              completedSet.has(normalizeProgressId(mod.id)) ||
-              completedSet.has(normalizeProgressId(mod.video_cf_id));
+            const isCompleted = moduleCompletion.get(String(mod.id));
             if (!isCompleted && mod.duration) {
               const parts = mod.duration.split(":").map(Number);
               if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -402,12 +403,7 @@ export default function Dashboard() {
   const totalModules = allCourseModules.length;
 
   const completedModules = allCourseModules.filter((module: any) => {
-    const normalizedModuleId = normalizeProgressId(module.id);
-    const normalizedVideoId = normalizeProgressId(module.video_cf_id);
-    return (
-      completedVideoIds.includes(normalizedModuleId) ||
-      completedVideoIds.includes(normalizedVideoId)
-    );
+    return completedVideoIds.includes(String(module.id));
   }).length;
 
   const progressPercentage =

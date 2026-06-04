@@ -57,6 +57,34 @@ const ARTIFACT_STORAGE_BUCKET =
   process.env.NEXT_PUBLIC_SUPABASE_ARTIFACTS_BUCKET || "course-artifacts";
 const ARTIFACT_BUCKET_FALLBACKS = ["course-artifacts", "course_artifacts"];
 
+const normalizeModuleLookupId = (value: unknown) =>
+  String(value ?? "").trim().replaceAll("-", "").toLowerCase();
+
+const getModuleKey = (module: Pick<Module, "id">) => String(module.id);
+
+const findModuleByLookupId = (moduleList: Module[], value: unknown) => {
+  const normalizedValue = normalizeModuleLookupId(value);
+  if (!normalizedValue) return null;
+
+  return (
+    moduleList.find((module) => {
+      return (
+        normalizeModuleLookupId(module.id) === normalizedValue ||
+        normalizeModuleLookupId(module.video_cf_id) === normalizedValue
+      );
+    }) ?? null
+  );
+};
+
+const getModuleProgressIds = (module?: Module | null) =>
+  Array.from(
+    new Set(
+      [module?.id, module?.video_cf_id]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -122,6 +150,8 @@ export default function CoursePlayerPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
+  const [moduleCompletedAt, setModuleCompletedAt] = useState<Record<string, string>>({});
+  const [playbackPositions, setPlaybackPositions] = useState<Record<string, number>>({});
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [modulePlaybackFinished, setModulePlaybackFinished] = useState<
     Record<string, boolean>
@@ -135,6 +165,7 @@ export default function CoursePlayerPage() {
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [studentName, setStudentName] = useState("Learner");
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
+  const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
 
   // --- QUIZZES & ARTIFACTS INTEGRATION STATE ---
   const [activeTab, setActiveTab] = useState<
@@ -159,6 +190,9 @@ export default function CoursePlayerPage() {
 
   const getProgressStorageKey = (uid: string, courseId: string) =>
     `course_progress_${uid}_${courseId}`;
+
+  const getPlaybackPositionStorageKey = (uid: string, courseId: string) =>
+    `course_playback_positions_${uid}_${courseId}`;
 
   useEffect(() => {
     if (id) {
@@ -411,39 +445,64 @@ export default function CoursePlayerPage() {
 
       if (orderedModules.length > 0) {
         const requestedModuleId = searchParams.get("module");
-        const requestedModule = requestedModuleId
-          ? orderedModules.find(
-              (m) => String(m.id) === String(requestedModuleId),
-            ) || null
-          : null;
+        const requestedModule = findModuleByLookupId(
+          orderedModules,
+          requestedModuleId,
+        );
 
-        setActiveModuleId(String(requestedModule?.id ?? orderedModules[0].id));
+        setActiveModuleId(getModuleKey(requestedModule ?? orderedModules[0]));
       }
 
-      const { data: progressData, error: progressError } = await supabase
+      let { data: progressData, error: progressError }: {
+        data: any[] | null;
+        error: any;
+      } = await supabase
         .from("user_video_progress")
-        .select("video_id, completed")
+        .select("video_id, completed, completed_at, updated_at, last_position_seconds")
         .eq("user_id", user.id)
         .eq("course_id", id);
+
+      if (
+        progressError &&
+        String(progressError.message || "")
+          .toLowerCase()
+          .includes("last_position_seconds")
+      ) {
+        const fallbackResult = await supabase
+          .from("user_video_progress")
+          .select("video_id, completed, completed_at, updated_at")
+          .eq("user_id", user.id)
+          .eq("course_id", id);
+        progressData = fallbackResult.data;
+        progressError = fallbackResult.error;
+      }
 
       if (progressError) throw progressError;
 
       const progressMap: Record<string, boolean> = {};
+      const completedAtMap: Record<string, string> = {};
+      const positionMap: Record<string, number> = {};
+      const progressUpdatedAt: Record<string, string> = {};
       progressData?.forEach((p: any) => {
-        const directModule = orderedModules.find(
-          (m) => String(m.id) === String(p.video_id),
-        );
-        if (directModule) {
-          progressMap[String(directModule.id)] = p.completed;
-          return;
-        }
+        const matchedModule = findModuleByLookupId(orderedModules, p.video_id);
+        if (!matchedModule) return;
 
-        const byCloudflareId = orderedModules.find(
-          (m) =>
-            String(m.video_cf_id || "").trim() === String(p.video_id).trim(),
-        );
-        if (byCloudflareId) {
-          progressMap[String(byCloudflareId.id)] = p.completed;
+        const moduleKey = getModuleKey(matchedModule);
+        const updatedAt = String(p.updated_at || "");
+        if (
+          !progressUpdatedAt[moduleKey] ||
+          updatedAt >= progressUpdatedAt[moduleKey]
+        ) {
+          progressMap[moduleKey] = Boolean(p.completed);
+          if (p.completed) {
+            completedAtMap[moduleKey] = String(p.completed_at || p.updated_at || "");
+          } else {
+            delete completedAtMap[moduleKey];
+          }
+          positionMap[moduleKey] = p.completed
+            ? 0
+            : Math.max(0, Number(p.last_position_seconds || 0));
+          progressUpdatedAt[moduleKey] = updatedAt;
         }
       });
 
@@ -468,7 +527,34 @@ export default function CoursePlayerPage() {
         );
       }
 
+      try {
+        const localPositionsRaw = localStorage.getItem(
+          getPlaybackPositionStorageKey(user.id, String(id)),
+        );
+        if (localPositionsRaw) {
+          const localPositions = JSON.parse(localPositionsRaw) as Record<
+            string,
+            number
+          >;
+          Object.entries(localPositions).forEach(([moduleId, position]) => {
+            const module = findModuleByLookupId(orderedModules, moduleId);
+            if (!module) return;
+            const moduleKey = getModuleKey(module);
+            if (!progressMap[moduleKey] && Number(position) > 0) {
+              positionMap[moduleKey] = Math.max(0, Number(position));
+            }
+          });
+        }
+      } catch (localPositionError) {
+        console.warn(
+          "Failed to read local playback position fallback:",
+          localPositionError,
+        );
+      }
+
       setUserProgress(progressMap);
+      setModuleCompletedAt(completedAtMap);
+      setPlaybackPositions(positionMap);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -498,7 +584,7 @@ export default function CoursePlayerPage() {
   };
 
   const activeModule = useMemo(
-    () => modules.find((m) => m.id === activeModuleId) || null,
+    () => findModuleByLookupId(modules, activeModuleId),
     [modules, activeModuleId],
   );
 
@@ -532,13 +618,23 @@ export default function CoursePlayerPage() {
 
     const moduleKey = String(moduleId);
     const nextCompletedState = !Boolean(userProgress[moduleKey]);
-    const module = modules.find((m) => String(m.id) === moduleKey);
-    const persistenceVideoId = String(module?.video_cf_id || moduleKey).trim();
+    const module = findModuleByLookupId(modules, moduleKey);
+    const persistenceIds = getModuleProgressIds(module);
+    const persistenceVideoId = persistenceIds[0] || moduleKey;
     try {
       setIsMarkingCompleted(true);
       setCompletionError("");
       // Optimistic UI update so progress bar reflects completion immediately.
       setUserProgress((prev) => ({ ...prev, [moduleKey]: nextCompletedState }));
+      setModuleCompletedAt((prev) => {
+        const next = { ...prev };
+        if (nextCompletedState) {
+          next[moduleKey] = new Date().toISOString();
+        } else {
+          delete next[moduleKey];
+        }
+        return next;
+      });
       setModulePlaybackFinished((prev) => ({
         ...prev,
         [moduleKey]: nextCompletedState,
@@ -556,7 +652,24 @@ export default function CoursePlayerPage() {
           ? (JSON.parse(existing) as Record<string, boolean>)
           : {};
         parsed[moduleKey] = nextCompletedState;
+        persistenceIds.forEach((progressId) => {
+          parsed[progressId] = nextCompletedState;
+        });
         localStorage.setItem(key, JSON.stringify(parsed));
+
+        if (nextCompletedState) {
+          const positionKey = getPlaybackPositionStorageKey(userId, String(id));
+          const existingPositions = localStorage.getItem(positionKey);
+          const parsedPositions = existingPositions
+            ? (JSON.parse(existingPositions) as Record<string, number>)
+            : {};
+          parsedPositions[moduleKey] = 0;
+          persistenceIds.forEach((progressId) => {
+            parsedPositions[progressId] = 0;
+          });
+          localStorage.setItem(positionKey, JSON.stringify(parsedPositions));
+          setPlaybackPositions((prev) => ({ ...prev, [moduleKey]: 0 }));
+        }
       } catch (localProgressError) {
         console.warn(
           "Failed to save local progress fallback:",
@@ -570,6 +683,7 @@ export default function CoursePlayerPage() {
         persistenceVideoId,
         nextCompletedState ? 100 : 0,
         nextCompletedState,
+        persistenceIds,
       );
     } catch (error) {
       console.error("Failed to mark module as completed:", error);
@@ -587,6 +701,10 @@ export default function CoursePlayerPage() {
     const moduleKey = String(moduleId);
     setCompletionError("");
     setUserProgress((prev) => ({ ...prev, [moduleKey]: true }));
+    setModuleCompletedAt((prev) => ({
+      ...prev,
+      [moduleKey]: new Date().toISOString(),
+    }));
     setModulePlaybackFinished((prev) => ({
       ...prev,
       [moduleKey]: true,
@@ -595,6 +713,41 @@ export default function CoursePlayerPage() {
       ...prev,
       [moduleKey]: true,
     }));
+    setPlaybackPositions((prev) => ({ ...prev, [moduleKey]: 0 }));
+  };
+
+  const saveLocalPlaybackPosition = (
+    moduleId: string,
+    positionSeconds: number,
+    updateState = true,
+  ) => {
+    if (!userId || !id) return;
+    const module = findModuleByLookupId(modules, moduleId);
+    const moduleKey = getModuleKey(module ?? { id: moduleId });
+    const progressIds = getModuleProgressIds(module);
+    const safePosition = Math.max(0, Math.floor(positionSeconds));
+
+    if (updateState) {
+      setPlaybackPositions((prev) => ({ ...prev, [moduleKey]: safePosition }));
+    }
+
+    try {
+      const key = getPlaybackPositionStorageKey(userId, String(id));
+      const existing = localStorage.getItem(key);
+      const parsed = existing
+        ? (JSON.parse(existing) as Record<string, number>)
+        : {};
+      parsed[moduleKey] = safePosition;
+      progressIds.forEach((progressId) => {
+        parsed[progressId] = safePosition;
+      });
+      localStorage.setItem(key, JSON.stringify(parsed));
+    } catch (localPositionError) {
+      console.warn(
+        "Failed to save local playback position fallback:",
+        localPositionError,
+      );
+    }
   };
 
   const isCurrentModuleComplete = activeModuleId
@@ -615,10 +768,31 @@ export default function CoursePlayerPage() {
     return Math.round((completedCount / modules.length) * 100);
   }, [modules, userProgress]);
 
-  // Auto-generate certificate in DB when progress reaches 100%
+  const hasCompletedAllModulesInOrder = useMemo(() => {
+    if (modules.length === 0) return false;
+
+    let previousCompletedAt = 0;
+    for (const module of modules) {
+      const moduleKey = String(module.id);
+      if (!userProgress[moduleKey]) return false;
+
+      const completedAt = Date.parse(moduleCompletedAt[moduleKey] || "");
+      if (!Number.isFinite(completedAt) || completedAt < previousCompletedAt) {
+        return false;
+      }
+
+      previousCompletedAt = completedAt;
+    }
+
+    return true;
+  }, [moduleCompletedAt, modules, userProgress]);
+
+  const canViewCertificate = hasCertificate && hasCompletedAllModulesInOrder;
+
+  // Auto-generate certificate in DB only after ordered module completion.
   useEffect(() => {
     const generateCertificateInDb = async () => {
-      if (progressPercentage === 100 && !hasCertificate && !loading && userId && id) {
+      if (hasCompletedAllModulesInOrder && !hasCertificate && !loading && userId && id) {
         try {
           setIsGeneratingCertificate(true);
           const { error } = await supabase
@@ -642,7 +816,7 @@ export default function CoursePlayerPage() {
       }
     };
     generateCertificateInDb();
-  }, [progressPercentage, hasCertificate, loading, userId, id]);
+  }, [hasCompletedAllModulesInOrder, hasCertificate, loading, userId, id]);
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
     modules.forEach((mod) => {
@@ -667,7 +841,7 @@ export default function CoursePlayerPage() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider border border-blue-100">
-                Module {modules.findIndex((m) => m.id === activeModuleId) + 1}
+                Module {modules.findIndex((m) => getModuleKey(m) === activeModuleId) + 1}
               </span>
               {userProgress[String(activeModuleId || "")] && (
                 <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider border border-emerald-100 flex items-center gap-1">
@@ -732,7 +906,7 @@ export default function CoursePlayerPage() {
           </p>
         </div>
 
-        {hasCertificate && (
+        {canViewCertificate && (
           <div className="p-5 sm:p-8 bg-amber-50/50 rounded-xl sm:rounded-[2rem] border border-amber-200/50 space-y-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2">
@@ -773,14 +947,16 @@ export default function CoursePlayerPage() {
         </div>
 
         {modules.map((mod, index) => {
-          const isActive = mod.id === activeModuleId;
-          const isCompleted = userProgress[mod.id];
+          const moduleKey = getModuleKey(mod);
+          const isActive = moduleKey === activeModuleId;
+          const isCompleted = userProgress[moduleKey];
 
           return (
             <button
               key={mod.id}
               onClick={() => {
-                setActiveModuleId(mod.id);
+                setAutoPlayModuleId(null);
+                setActiveModuleId(moduleKey);
                 if (typeof window !== "undefined") {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }
@@ -1032,7 +1208,7 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex items-center gap-6">
-            {hasCertificate && (
+            {canViewCertificate && (
               <Button
                 onClick={() => setShowCertificateModal(true)}
                 className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm border border-amber-600/10 transition-all cursor-pointer"
@@ -1068,14 +1244,32 @@ export default function CoursePlayerPage() {
             <div className="relative aspect-video bg-black rounded-xl sm:rounded-[2rem] overflow-hidden shadow-2xl group border-4 sm:border-[8px] border-white ring-1 ring-gray-100">
               {activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
+                  key={`${activeModule.id}-${videoEmbedUrl}`}
                   userId={userId}
                   courseId={id as string}
                   moduleId={String(activeModule.video_cf_id || activeModule.id)}
                   videoUrl={videoEmbedUrl}
                   thumbnailUrl={playerThumbnailUrl}
+                  autoPlay={autoPlayModuleId === String(activeModule.id)}
+                  initialPositionSeconds={
+                    playbackPositions[String(activeModule.id)] || 0
+                  }
+                  progressAliasIds={getModuleProgressIds(activeModule)}
+                  onProgressPosition={(positionSeconds) => {
+                    saveLocalPlaybackPosition(
+                      String(activeModule.id),
+                      positionSeconds,
+                      false,
+                    );
+                  }}
                   onCompleted={() => {
                     const moduleKey = String(activeModule.id);
                     applyAutoCompletionState(moduleKey);
+                    const currentIndex = modules.findIndex(
+                      (module) => String(module.id) === moduleKey,
+                    );
+                    const nextModule =
+                      currentIndex >= 0 ? modules[currentIndex + 1] : null;
                     if (userId && id) {
                       try {
                         const key = getProgressStorageKey(userId, String(id));
@@ -1085,12 +1279,24 @@ export default function CoursePlayerPage() {
                           : {};
                         parsed[moduleKey] = true;
                         localStorage.setItem(key, JSON.stringify(parsed));
+                        saveLocalPlaybackPosition(moduleKey, 0);
                       } catch (localProgressError) {
                         console.warn(
                           "Failed to save local progress fallback:",
                           localProgressError,
                         );
                       }
+                    }
+                    if (nextModule) {
+                      const nextModuleKey = String(nextModule.id);
+                      saveLocalPlaybackPosition(nextModuleKey, 0);
+                      setAutoPlayModuleId(nextModuleKey);
+                      setActiveModuleId(nextModuleKey);
+                      if (typeof window !== "undefined") {
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }
+                    } else {
+                      setAutoPlayModuleId(null);
                     }
                   }}
                 />
@@ -1540,7 +1746,7 @@ export default function CoursePlayerPage() {
         </div>
       )}
 
-      {showCertificateModal && (
+      {showCertificateModal && canViewCertificate && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">

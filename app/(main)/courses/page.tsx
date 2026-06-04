@@ -89,7 +89,37 @@ interface UpcomingWebinarCard {
 }
 
 const normalizeId = (id: string | null | undefined) =>
-  String(id || "").replace(/-/g, "").trim();
+  String(id || "").replace(/-/g, "").trim().toLowerCase();
+
+function resolveModuleCompletion(modules: any[] = [], progressRows: any[] = []) {
+  const completionByModuleId = new Map<string, boolean>();
+  const updatedAtByModuleId = new Map<string, string>();
+
+  for (const progress of progressRows) {
+    const normalizedProgressId = normalizeId(progress.video_id);
+    if (!normalizedProgressId) continue;
+
+    const matchedModule = modules.find((module: any) => {
+      return (
+        normalizeId(module.id) === normalizedProgressId ||
+        normalizeId(module.video_cf_id) === normalizedProgressId
+      );
+    });
+
+    if (!matchedModule) continue;
+
+    const moduleId = String(matchedModule.id);
+    const updatedAt = String(progress.updated_at || "");
+    const previousUpdatedAt = updatedAtByModuleId.get(moduleId);
+
+    if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
+      completionByModuleId.set(moduleId, Boolean(progress.completed));
+      updatedAtByModuleId.set(moduleId, updatedAt);
+    }
+  }
+
+  return completionByModuleId;
+}
 
 export default function MyLearningDashboard() {
   const { setLoading: setGlobalLoading } = useLoading();
@@ -246,7 +276,7 @@ async function loadDashboardData() {
     // --------------------------------------------------
     const { data: progressData } = await supabase
       .from("user_video_progress")
-      .select("course_id, video_id, completed")
+      .select("course_id, video_id, completed, updated_at")
       .eq("user_id", session.user.id);
 
     // --------------------------------------------------
@@ -311,25 +341,16 @@ async function loadDashboardData() {
             String(p.course_id) === String(course.id)
         ) || [];
 
-      // ------------------------------------------
-      // COMPLETED VIDEO IDS
-      // ------------------------------------------
-      const completedVideoSet = new Set(
-        courseProgressRows
-          .filter((p: any) => p.completed)
-          .map((p: any) => normalizeId(p.video_id))
+      const moduleCompletion = resolveModuleCompletion(
+        modules,
+        courseProgressRows,
       );
 
       // ------------------------------------------
       // COMPLETED MODULES
       // ------------------------------------------
       const completedModules = modules.filter((m: any) => {
-        const moduleId = normalizeId(m.id);
-        const cloudflareId = normalizeId(m.video_cf_id);
-        return (
-          completedVideoSet.has(moduleId) ||
-          completedVideoSet.has(cloudflareId)
-        );
+        return moduleCompletion.get(String(m.id));
       }).length;
 
       // ------------------------------------------
@@ -610,8 +631,8 @@ console.log("COURSE PROGRESS", courseProgress);
 </div>
 
 {/*Completed courses */}
-<section className="mt-12">
-  <h2 className="text-2xl font-bold mb-6">
+<section className="mt-12 text-gray-900">
+  <h2 className="text-2xl font-bold text-[#2283FF]">
     Completed Courses
   </h2>
 
@@ -619,9 +640,9 @@ console.log("COURSE PROGRESS", courseProgress);
     {completedCourses.map((course) => (
       <div
         key={course.id}
-        className="bg-white rounded-xl border p-6 shadow-sm"
+        className="bg-white rounded-xl border p-6 shadow-sm text-gray-900"
       >
-        <h3 className="font-semibold text-lg">
+        <h3 className="font-bold text-[#2283FF]">
           {course.title}
         </h3>
 
@@ -666,7 +687,7 @@ console.log("COURSE PROGRESS", courseProgress);
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
-                  <p className="text-[11px] text-gray-500 font-bold mt-4 tracking-wider uppercase">
+                  <p className="text-[11px] text-gray-800 font-bold mt-4 tracking-wider uppercase">
                     &mdash; {currentInsight.author}
                   </p>
                 )}
