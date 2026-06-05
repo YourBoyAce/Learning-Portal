@@ -54,6 +54,7 @@ export default function GlobalLoader({ isLoading }: GlobalLoaderProps) {
                   src="/loader.png" // Replace with your actual filename in /public
                   alt="Loading..."
                   fill
+                  sizes="(max-width: 768px) 128px, 160px"
                   className="object-contain"
                   priority
                 />

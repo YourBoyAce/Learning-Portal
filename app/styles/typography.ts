@@ -5,6 +5,12 @@ export const TYPOGRAPHY = {
     fontWeight: 700,
   },
 
+  MAIN_HEADING: {
+    fontSize: "44px",
+    lineHeight: "52px",
+    fontWeight: 700,
+  },
+
   H1: {
     fontSize: "24px",
     lineHeight: "32px",
@@ -37,6 +43,10 @@ export const TYPOGRAPHY_CSS_VARIABLES = {
   "--typography-xl-line-height": TYPOGRAPHY.XL.lineHeight,
   "--typography-xl-font-weight": TYPOGRAPHY.XL.fontWeight,
 
+  "--typography-main-heading-font-size": TYPOGRAPHY.MAIN_HEADING.fontSize,
+  "--typography-main-heading-line-height": TYPOGRAPHY.MAIN_HEADING.lineHeight,
+  "--typography-main-heading-font-weight": TYPOGRAPHY.MAIN_HEADING.fontWeight,
+
   "--typography-h1-font-size": TYPOGRAPHY.H1.fontSize,
   "--typography-h1-line-height": TYPOGRAPHY.H1.lineHeight,
   "--typography-h1-font-weight": TYPOGRAPHY.H1.fontWeight,
@@ -55,3 +65,12 @@ export const TYPOGRAPHY_CSS_VARIABLES = {
 } satisfies Record<`--${string}`, string | number>;
 
 export type TypographyRole = keyof TypographyScale;
+
+export const TYPOGRAPHY_CLASSES = {
+  MAIN_HEADING:
+    "text-4xl md:text-main-heading font-bold text-brand-heading mb-4 tracking-tight leading-tight",
+  SUBHEADING:
+    "text-2xl font-bold text-brand-heading tracking-tight",
+  PRIMARY_BUTTON:
+    "justify-center bg-brand-primary hover:bg-brand-hover",
+} as const;

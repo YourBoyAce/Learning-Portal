@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   FileText,
@@ -584,12 +585,12 @@ const stats = [
 ];
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Artifacts Management
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -628,7 +629,7 @@ const stats = [
         />
       </div>
 
-      <h3 className="text-2xl font-bold text-[var(--color-primary)]">
+      <h3 className="text-2xl font-bold text-brand-primary">
         {stat.value}
       </h3>
     </div>
@@ -651,7 +652,7 @@ const stats = [
               placeholder="Search resource name or details..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2.5 text-gray-500 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+              className="pl-9 pr-4 py-2.5 text-gray-500 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
           </div>
         </div>
@@ -831,9 +832,9 @@ const stats = [
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-[#2283FF] hover:bg-blue-50/20 transition-all group p-4">
-                      <DownloadCloud className="w-10 h-10 text-gray-300 group-hover:text-[#2283FF] transition-colors mb-2" />
-                      <span className="text-sm text-gray-700 font-semibold group-hover:text-[#2283FF] text-center">
+                    <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-brand-primary hover:bg-blue-50/20 transition-all group p-4">
+                      <DownloadCloud className="w-10 h-10 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
+                      <span className="text-sm text-gray-700 font-semibold group-hover:text-brand-primary text-center">
                         Click or drag file to upload
                       </span>
                       <span className="text-xs text-gray-400 text-center mt-1">
@@ -860,7 +861,7 @@ const stats = [
                   placeholder="e.g. Playwright Setup Cheat Sheet"
                   value={artName}
                   onChange={(e) => setArtName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                 />
               </div>
 
@@ -879,7 +880,7 @@ const stats = [
                       setCourseName(courseObj.title);
                     }
                   }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                 >
                   {dbCourses.length > 0 ? (
                     dbCourses.map((c) => (
@@ -908,7 +909,7 @@ const stats = [
                     onChange={(e) =>
                       setArtType(e.target.value as Artifact["type"])
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     <option value="PDF">PDF Document</option>
                     <option value="ZIP">ZIP Archive</option>
@@ -927,7 +928,7 @@ const stats = [
                     onChange={(e) =>
                       setStatus(e.target.value as "Published" | "Draft")
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     <option value="Published">Published (Public)</option>
                     <option value="Draft">Draft (Hidden)</option>
@@ -945,7 +946,7 @@ const stats = [
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
                 />
               </div>
             </div>

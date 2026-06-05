@@ -6,6 +6,7 @@ import { supabase } from "@/app/lib/supabase";
 import CourseCard from "@/app/components/course/CourseCard";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
 type Course = {
@@ -24,10 +25,6 @@ type Module = {
 };
 
 export default function UploadPage() {
-  const textPrimary = "#0f172a";
-  const textSecondary = "#334155";
-  const inputBorder = "#cbd5e1";
-  const inputBackground = "#ffffff";
   const searchParams = useSearchParams();
   const preselectedCourseId = searchParams.get("courseId") || "";
 
@@ -412,10 +409,10 @@ export default function UploadPage() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
             ADMIN PORTAL / CONTENT MANAGEMENT
           </p>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
             Video Asset Upload
           </h1>
-          <p style={{ color: textSecondary }}>
+          <p className="text-[var(--color-text-secondary)]">
             Upload high-fidelity instructional media to your course modules.
           </p>
         </div>
@@ -470,7 +467,7 @@ export default function UploadPage() {
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] cursor-pointer"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer"
                   >
                     <option value="">Select curriculum...</option>
                     {courses.map((course) => (
@@ -489,7 +486,7 @@ export default function UploadPage() {
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
                     disabled={!selectedCurriculum || isModulesLoading}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {isModulesLoading
@@ -513,7 +510,7 @@ export default function UploadPage() {
                     placeholder="e.g. Intro to Variables"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF]"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   />
                 </div>
 
@@ -531,7 +528,7 @@ export default function UploadPage() {
                         file ? URL.createObjectURL(file) : "",
                       );
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-blue-50 file:text-[#174778] file:font-semibold hover:file:bg-blue-100"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-blue-50 file:text-brand-heading file:font-semibold hover:file:bg-blue-100"
                   />
                   {moduleThumbnailPreview && (
                     <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
@@ -551,7 +548,7 @@ export default function UploadPage() {
                   onDrop={handleDrop}
                   className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
                     isDragging
-                      ? "border-[#2283FF] bg-blue-50"
+                      ? "border-brand-primary bg-blue-50"
                       : "border-dashed border-gray-300 hover:border-gray-400"
                   }`}
                   onClick={() => document.getElementById("file-input")?.click()}
@@ -650,9 +647,9 @@ export default function UploadPage() {
                 {!showAllCourses && courses.length > 4 && (
                   <div
                     onClick={() => setShowAllCourses(true)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#2283FF] hover:bg-gray-50 transition-all cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-brand-primary hover:bg-gray-50 transition-all cursor-pointer"
                   >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#2283FF]">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-brand-primary">
                       <svg
                         className="w-6 h-6"
                         fill="none"
@@ -678,9 +675,9 @@ export default function UploadPage() {
                 {showAllCourses && courses.length > 4 && (
                   <div
                     onClick={() => setShowAllCourses(false)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-[#2283FF] hover:bg-gray-50 transition-all cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-brand-primary hover:bg-gray-50 transition-all cursor-pointer"
                   >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-[#2283FF]">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-brand-primary">
                       <svg
                         className="w-6 h-6"
                         fill="none"

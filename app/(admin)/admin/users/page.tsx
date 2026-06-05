@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   createUser,
@@ -214,10 +215,10 @@ export default function AdminUsers() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 lg:p-10 font-sans text-gray-900">
+    <div className="min-h-screen bg-surface-subtle p-4 sm:p-6 lg:p-10 font-sans text-gray-900">
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
+          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
             User Management
           </h1>
           <p className="text-gray-500 mt-1">
@@ -230,7 +231,7 @@ export default function AdminUsers() {
           <div className="flex flex-col gap-6">
             {/* ADD NEW USER FORM */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-lg font-bold text-[#0f172a] mb-6">Add New User</h2>
+              <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-6`}>Add New User</h2>
 
               <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
@@ -243,7 +244,7 @@ export default function AdminUsers() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="user@example.com"
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all"
                   />
                 </div>
 
@@ -258,7 +259,7 @@ export default function AdminUsers() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Min. 8 characters"
-                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all pr-10"
+                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all pr-10"
                     />
                     <button
                       type="button"
@@ -277,7 +278,7 @@ export default function AdminUsers() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all appearance-none"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all appearance-none"
                   >
                     {ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
@@ -304,20 +305,20 @@ export default function AdminUsers() {
             </div>
 
             {/* ACTIVE USERS WIDGET */}
-            <div className="bg-[#174778]/10 backdrop-blur-md border border-[#174778]/15 rounded-2xl shadow-sm p-6 flex items-center justify-between text-[#174778] relative overflow-hidden">
+            <div className="bg-brand-heading/10 backdrop-blur-md border border-brand-heading/15 rounded-2xl shadow-sm p-6 flex items-center justify-between text-brand-heading relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500 opacity-10 rounded-full blur-2xl"></div>
 
               <div className="relative z-10">
                 <div className="flex items-center gap-2.5 mb-1.5">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#174778] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#174778]"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-heading opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-heading"></span>
                   </span>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Users logged in today
                   </p>
                 </div>
-                <p className="text-4xl font-bold mt-2 text-[#174778]">
+                <p className="text-4xl font-bold mt-2 text-brand-heading">
                   {loading ? "-" : activeUsersCount}
                 </p>
               </div>
@@ -336,7 +337,7 @@ export default function AdminUsers() {
           {/* RIGHT COLUMN: USER REGISTRY TABLE */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-lg font-bold text-[#0f172a]">User Registry</h2>
+              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>User Registry</h2>
 
               <div className="flex items-center gap-3">
                 <div className="relative flex items-center">
@@ -348,7 +349,7 @@ export default function AdminUsers() {
                     placeholder={`Search by ${filterType}...`}
                     value={filterQuery}
                     onChange={(e) => setFilterQuery(e.target.value)}
-                    className="w-full sm:w-[200px] pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#2283FF]"
+                    className="w-full sm:w-[200px] pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-primary"
                   />
                 </div>
 
@@ -368,7 +369,7 @@ export default function AdminUsers() {
                           setFilterType("email");
                           setShowFilterDropdown(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "email" ? "text-[#2283FF] font-semibold" : "text-gray-600"}`}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "email" ? "text-brand-primary font-semibold" : "text-gray-600"}`}
                       >
                         {filterType === "email" && <CheckCircle2 size={14} />}
                         Email
@@ -378,7 +379,7 @@ export default function AdminUsers() {
                           setFilterType("role");
                           setShowFilterDropdown(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "role" ? "text-[#2283FF] font-semibold" : "text-gray-600"}`}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "role" ? "text-brand-primary font-semibold" : "text-gray-600"}`}
                       >
                         {filterType === "role" && <CheckCircle2 size={14} />}
                         Role
@@ -440,7 +441,7 @@ export default function AdminUsers() {
                         {/* User */}
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#2283FF]/10 text-[#2283FF] flex items-center justify-center font-bold text-sm shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm shrink-0">
                               {user.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
@@ -454,7 +455,7 @@ export default function AdminUsers() {
 
                         {/* Role */}
                         <td className="py-4 px-4">
-                          <span className="inline-flex px-2.5 py-1 rounded-md bg-blue-50 text-[#2283FF] text-[11px] font-bold tracking-wide capitalize border border-blue-100">
+                          <span className="inline-flex px-2.5 py-1 rounded-md bg-blue-50 text-brand-primary text-[11px] font-bold tracking-wide capitalize border border-blue-100">
                             {user.role}
                           </span>
                         </td>

@@ -83,3 +83,11 @@
   font-weight: var(--typography-button-font-weight);
   border-radius: var(--radius-default);
 }
+
+.card-description {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  line-height: 24px;
+  font-weight: 300;
+  color: var(--color-text-secondary);
+}

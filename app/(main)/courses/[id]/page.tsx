@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
@@ -840,7 +841,7 @@ export default function CoursePlayerPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#174778] text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+              <span className="px-2.5 py-1 rounded-md bg-blue-50 text-brand-heading text-[10px] font-bold uppercase tracking-wider border border-blue-100">
                 Module {modules.findIndex((m) => getModuleKey(m) === activeModuleId) + 1}
               </span>
               {userProgress[String(activeModuleId || "")] && (
@@ -849,7 +850,7 @@ export default function CoursePlayerPage() {
                 </span>
               )}
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
               {activeModule?.title || "Module Selection"}
             </h2>
           </div>
@@ -857,25 +858,34 @@ export default function CoursePlayerPage() {
           <div className="flex items-center gap-3">
             {/* Kept as a fallback / visual acknowledgement badge! */}
             {activeModuleId && (
-              <Button
-                onClick={() => handleMarkAsCompleted(activeModuleId)}
-                disabled={isMarkingCompleted}
-                className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
-                  isCurrentModuleComplete
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : !isMarkingCompleted
-                      ? "bg-[#174778] hover:bg-[#113a63] text-white"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {isMarkingCompleted
-                  ? "Saving..."
-                  : isCurrentModuleComplete
-                    ? "Mark as Incomplete(Revert)"
-                    : isCurrentModuleAcknowledged
-                      ? "Mark as Complete"
-                      : "Mark as Complete"}
-              </Button>
+              <div className="flex flex-col items-end gap-2">
+                <Button
+                  onClick={() => handleMarkAsCompleted(activeModuleId)}
+                  disabled={isMarkingCompleted || !activeModule?.video_cf_id}
+                  className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
+                    !activeModule?.video_cf_id
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : isCurrentModuleComplete
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : !isMarkingCompleted
+                          ? "bg-brand-heading hover:bg-brand-heading-hover text-white"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {isMarkingCompleted
+                    ? "Saving..."
+                    : isCurrentModuleComplete
+                      ? "Mark as Incomplete(Revert)"
+                      : isCurrentModuleAcknowledged
+                        ? "Mark as Complete"
+                        : "Mark as Complete"}
+                </Button>
+                {!activeModule?.video_cf_id && (
+                  <span className="text-[10px] font-semibold text-red-600 bg-red-50 px-2 py-1 rounded whitespace-nowrap">
+                    No video uploaded
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -895,14 +905,14 @@ export default function CoursePlayerPage() {
 
         <div className="p-5 sm:p-8 bg-gray-50 rounded-xl sm:rounded-[2rem] border border-gray-100 space-y-4">
           <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <BookOpen size={16} className="text-[#174778]" />
+            <BookOpen size={16} className="text-brand-heading" />
             Instructional Context
           </h4>
           <p className="text-sm text-gray-500 leading-relaxed">
             As you progress through this curated video curriculum, ensure you
             take notes on key conceptual shifts. The material presented here is
             part of the core intellectual framework of{" "}
-            <span className="font-bold text-[#174778]">{course?.title}</span>.
+            <span className="font-bold text-brand-heading">{course?.title}</span>.
           </p>
         </div>
 
@@ -963,7 +973,7 @@ export default function CoursePlayerPage() {
               }}
               className={`w-full text-left p-5 transition-all flex items-start gap-4 group ${
                 isActive
-                  ? "bg-blue-50/50 border-r-4 border-[#174778]"
+                  ? "bg-blue-50/50 border-r-4 border-brand-heading"
                   : "hover:bg-gray-50"
               }`}
             >
@@ -972,8 +982,8 @@ export default function CoursePlayerPage() {
                   isCompleted
                     ? "bg-emerald-500 border-emerald-500 text-white"
                     : isActive
-                      ? "bg-[#174778] border-[#174778] text-white"
-                      : "bg-white border-gray-200 text-gray-400 group-hover:border-[#174778] group-hover:text-[#174778]"
+                      ? "bg-brand-heading border-brand-heading text-white"
+                      : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
                 }`}
               >
                 {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
@@ -983,8 +993,8 @@ export default function CoursePlayerPage() {
                 <h4
                   className={`text-sm font-bold mb-1 leading-snug transition-colors ${
                     isActive
-                      ? "text-[#174778]"
-                      : "text-gray-900 group-hover:text-[#174778]"
+                      ? "text-brand-heading"
+                      : "text-gray-900 group-hover:text-brand-heading"
                   }`}
                 >
                   {mod.title}
@@ -1042,11 +1052,11 @@ export default function CoursePlayerPage() {
               className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
             >
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-blue-50 text-[#174778] group-hover:bg-[#174778] group-hover:text-white transition-all">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-blue-50 text-brand-heading group-hover:bg-brand-heading group-hover:text-white transition-all">
                   <HelpCircle size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-[#174778] transition-colors leading-snug mb-1">
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand-heading transition-colors leading-snug mb-1">
                     {quiz.title}
                   </h4>
                   <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -1075,8 +1085,8 @@ export default function CoursePlayerPage() {
                 onClick={() => handleStartQuiz(quiz)}
                 className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${
                   hasAttempted
-                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-[#174778] hover:text-[#174778]"
-                    : "bg-[#174778] text-white hover:bg-[#113a63]"
+                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-brand-heading hover:text-brand-heading"
+                    : "bg-brand-heading text-white hover:bg-brand-heading-hover"
                 }`}
               >
                 {hasAttempted ? "Retake Quiz" : "Start Quiz"}
@@ -1165,10 +1175,10 @@ export default function CoursePlayerPage() {
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-surface-subtle flex items-center justify-center p-6">
         <div className="text-center bg-white p-10 rounded-3xl shadow-sm border border-gray-100 max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-2`}>
             Course Unavailable
           </h2>
           <p className="text-gray-500 mb-6">
@@ -1177,7 +1187,7 @@ export default function CoursePlayerPage() {
           </p>
           <Button
             onClick={() => router.push("/courses")}
-            className="bg-[#174778] hover:bg-[#113a63]"
+            className="bg-brand-heading hover:bg-brand-heading-hover"
           >
             Return to Curriculum
           </Button>
@@ -1187,13 +1197,13 @@ export default function CoursePlayerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans text-gray-900">
+    <div className="min-h-screen bg-surface-subtle font-sans text-gray-900">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/courses")}
-              className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-[#174778]"
+              className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-brand-heading"
             >
               <ChevronLeft size={20} />
             </button>
@@ -1224,11 +1234,11 @@ export default function CoursePlayerPage() {
               <div className="flex items-center gap-3">
                 <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#174778] transition-all duration-700 ease-out"
+                    className="h-full bg-brand-heading transition-all duration-700 ease-out"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
-                <span className="text-xs font-bold text-[#174778]">
+                <span className="text-xs font-bold text-brand-heading">
                   {progressPercentage}%
                 </span>
               </div>
@@ -1301,7 +1311,7 @@ export default function CoursePlayerPage() {
                   }}
                 />
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-gradient-to-br from-gray-900 to-[#0f172a]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-gradient-to-br from-gray-900 to-copy-dark">
                   <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-6 backdrop-blur-md border border-white/10">
                     <PlayCircle
                       size={40}
@@ -1317,7 +1327,7 @@ export default function CoursePlayerPage() {
                     will be available soon.
                   </p>
 
-                  <div className="absolute top-10 left-10 w-32 h-32 bg-[#174778] rounded-full blur-[100px] opacity-20" />
+                  <div className="absolute top-10 left-10 w-32 h-32 bg-brand-heading rounded-full blur-[100px] opacity-20" />
                   <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-500 rounded-full blur-[100px] opacity-10" />
                 </div>
               )}
@@ -1330,7 +1340,7 @@ export default function CoursePlayerPage() {
                   onClick={() => setActiveTab("overview")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                     activeTab === "overview"
-                      ? "border-[#174778] text-[#174778] bg-white"
+                      ? "border-brand-heading text-brand-heading bg-white"
                       : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                   }`}
                 >
@@ -1341,7 +1351,7 @@ export default function CoursePlayerPage() {
                   onClick={() => setActiveTab("modules")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                     activeTab === "modules"
-                      ? "border-[#174778] text-[#174778] bg-white"
+                      ? "border-brand-heading text-brand-heading bg-white"
                       : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                   }`}
                 >
@@ -1352,7 +1362,7 @@ export default function CoursePlayerPage() {
                   onClick={() => setActiveTab("quizzes")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
                     activeTab === "quizzes"
-                      ? "border-[#174778] text-[#174778] bg-white"
+                      ? "border-brand-heading text-brand-heading bg-white"
                       : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                   }`}
                 >
@@ -1361,7 +1371,7 @@ export default function CoursePlayerPage() {
                   {courseQuizzes.length > 0 && (
                     <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#2283FF]"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>
                     </span>
                   )}
                 </button>
@@ -1369,7 +1379,7 @@ export default function CoursePlayerPage() {
                   onClick={() => setActiveTab("artifacts")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
                     activeTab === "artifacts"
-                      ? "border-[#174778] text-[#174778] bg-white"
+                      ? "border-brand-heading text-brand-heading bg-white"
                       : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                   }`}
                 >
@@ -1406,7 +1416,7 @@ export default function CoursePlayerPage() {
               onClick={() => setActiveTab("modules")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "modules" || activeTab === "overview"
-                  ? "border-[#174778] text-[#174778] bg-white"
+                  ? "border-brand-heading text-brand-heading bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
               }`}
             >
@@ -1417,7 +1427,7 @@ export default function CoursePlayerPage() {
               onClick={() => setActiveTab("quizzes")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
                 activeTab === "quizzes"
-                  ? "border-[#174778] text-[#174778] bg-white"
+                  ? "border-brand-heading text-brand-heading bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
               }`}
             >
@@ -1426,7 +1436,7 @@ export default function CoursePlayerPage() {
               {courseQuizzes.length > 0 && (
                 <span className="absolute top-2 right-2 flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#2283FF]"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>
                 </span>
               )}
             </button>
@@ -1434,7 +1444,7 @@ export default function CoursePlayerPage() {
               onClick={() => setActiveTab("artifacts")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
                 activeTab === "artifacts"
-                  ? "border-[#174778] text-[#174778] bg-white"
+                  ? "border-brand-heading text-brand-heading bg-white"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
               }`}
             >
@@ -1470,7 +1480,7 @@ export default function CoursePlayerPage() {
             <div className="h-2 w-full bg-gray-100 relative">
               {quizStep === "questions" && (
                 <div
-                  className="absolute top-0 left-0 h-full bg-[#174778] transition-all duration-500"
+                  className="absolute top-0 left-0 h-full bg-brand-heading transition-all duration-500"
                   style={{
                     width: `${(currentQuestionIndex / activeQuiz.questions.length) * 100}%`,
                   }}
@@ -1488,10 +1498,10 @@ export default function CoursePlayerPage() {
 
               {quizStep === "intro" && (
                 <div className="text-center py-10">
-                  <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#174778]">
+                  <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-heading">
                     <HelpCircle size={40} />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                  <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-3`}>
                     {activeQuiz.title}
                   </h2>
                   <p className="text-gray-500 mb-8 max-w-md mx-auto">
@@ -1500,7 +1510,7 @@ export default function CoursePlayerPage() {
 
                   <div className="flex items-center justify-center gap-8 mb-10">
                     <div className="text-center">
-                      <span className="block text-2xl font-bold text-[#174778]">
+                      <span className="block text-2xl font-bold text-brand-heading">
                         {activeQuiz.questionsCount}
                       </span>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -1509,7 +1519,7 @@ export default function CoursePlayerPage() {
                     </div>
                     <div className="w-px h-10 bg-gray-200"></div>
                     <div className="text-center">
-                      <span className="block text-2xl font-bold text-[#174778]">
+                      <span className="block text-2xl font-bold text-brand-heading">
                         {activeQuiz.passingScore}%
                       </span>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -1520,7 +1530,7 @@ export default function CoursePlayerPage() {
 
                   <Button
                     onClick={() => setQuizStep("questions")}
-                    className="w-full sm:w-auto px-10 py-6 rounded-full bg-[#174778] hover:bg-[#113a63] text-white font-bold tracking-wide shadow-lg shadow-blue-900/20"
+                    className="w-full sm:w-auto px-10 py-6 rounded-full bg-brand-heading hover:bg-brand-heading-hover text-white font-bold tracking-wide shadow-lg shadow-blue-900/20"
                   >
                     Begin Assessment
                   </Button>
@@ -1535,7 +1545,7 @@ export default function CoursePlayerPage() {
                         Question {currentQuestionIndex + 1} of{" "}
                         {activeQuiz.questions.length}
                       </span>
-                      <span className="px-3 py-1 rounded-full bg-blue-50 text-[#174778] text-[10px] font-bold">
+                      <span className="px-3 py-1 rounded-full bg-blue-50 text-brand-heading text-[10px] font-bold">
                         {activeQuiz.questions[currentQuestionIndex].type ||
                           "Multiple Choice"}
                       </span>
@@ -1554,7 +1564,7 @@ export default function CoursePlayerPage() {
                               .correctAnswer === idx;
 
                           let optionClass =
-                            "border-gray-200 hover:border-[#174778] hover:bg-blue-50/50";
+                            "border-gray-200 hover:border-brand-heading hover:bg-blue-50/50";
 
                           if (isAnswerSubmitted) {
                             if (isCorrectAnswer) {
@@ -1568,7 +1578,7 @@ export default function CoursePlayerPage() {
                             }
                           } else if (isSelected) {
                             optionClass =
-                              "border-[#174778] bg-blue-50 ring-1 ring-[#174778]";
+                              "border-brand-heading bg-blue-50 ring-1 ring-brand-heading";
                           }
 
                           return (
@@ -1587,7 +1597,7 @@ export default function CoursePlayerPage() {
                                         !isCorrectAnswer
                                       ? "bg-red-500 border-red-500 text-white"
                                       : isSelected
-                                        ? "border-[#174778] bg-[#174778] text-white"
+                                        ? "border-brand-heading bg-brand-heading text-white"
                                         : "border-gray-300"
                                 }`}
                               >
@@ -1616,7 +1626,7 @@ export default function CoursePlayerPage() {
                         <div className="mt-6 p-5 rounded-2xl bg-gray-50 border border-gray-100 flex items-start gap-3">
                           <HelpCircle
                             size={20}
-                            className="text-[#174778] shrink-0 mt-0.5"
+                            className="text-brand-heading shrink-0 mt-0.5"
                           />
                           <div>
                             <span className="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wider">
@@ -1637,7 +1647,7 @@ export default function CoursePlayerPage() {
                         <Button
                           onClick={handleVerifyAnswer}
                           disabled={selectedAnswer === null}
-                          className="px-8 py-6 rounded-xl bg-[#174778] hover:bg-[#113a63] text-white font-bold"
+                          className="px-8 py-6 rounded-xl bg-brand-heading hover:bg-brand-heading-hover text-white font-bold"
                         >
                           Submit Answer
                         </Button>
@@ -1711,7 +1721,7 @@ export default function CoursePlayerPage() {
                           </div>
                         </div>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-2`}>
                           {isPassed
                             ? "Assessment Passed!"
                             : "Needs Improvement"}
@@ -1731,7 +1741,7 @@ export default function CoursePlayerPage() {
                           </Button>
                           <Button
                             onClick={() => setShowQuizModal(false)}
-                            className="w-full sm:w-auto px-8 py-6 rounded-xl bg-[#174778] hover:bg-[#113a63] text-white font-bold"
+                            className="w-full sm:w-auto px-8 py-6 rounded-xl bg-brand-heading hover:bg-brand-heading-hover text-white font-bold"
                           >
                             Return to Course
                           </Button>

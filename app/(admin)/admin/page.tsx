@@ -6,6 +6,7 @@ import { supabase } from "@/app/lib/supabase";
 import { Users, BookOpen, Search, Loader2, Clock, LogIn, Timer } from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
 interface LoginLog {
@@ -140,7 +141,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Management Console
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -196,7 +197,7 @@ export default function AdminDashboard() {
           {/* User Management Section */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 Recent Users
               </h2>
             </div>
@@ -240,7 +241,7 @@ export default function AdminDashboard() {
                       >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center text-white text-sm font-semibold uppercase">
+                            <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center text-white text-sm font-semibold uppercase">
                               {(user.full_name || user.email || "U")
                                 .charAt(0)}
                             </div>
@@ -277,7 +278,7 @@ export default function AdminDashboard() {
             {totalStudents > 5 && (
               <Button
                 onClick={() => router.push("/admin/users")}
-                className="mt-6 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-100 hover:text-[#2283FF] transition-colors"
+                className="mt-6 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-semibold hover:bg-gray-100 hover:text-brand-primary transition-colors"
               >
                 View all {totalStudents} scholars
               </Button>
@@ -287,12 +288,12 @@ export default function AdminDashboard() {
           {/* Course Management Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 Recently Added Courses
               </h2>
               <button
                 onClick={() => router.push("/admin/courses")}
-                className="text-sm text-[#2283FF] font-medium hover:underline"
+                className="text-sm text-brand-primary font-medium hover:underline"
               >
                 View Catalog
               </button>
@@ -314,16 +315,16 @@ export default function AdminDashboard() {
                   <div
                     key={course.id}
                     onClick={() => router.push("/admin/courses")}
-                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-[#2283FF] hover:shadow-md transition-all cursor-pointer group"
+                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-brand-primary hover:shadow-md transition-all cursor-pointer group"
                   >
-                    <div className="h-20 bg-gradient-to-br from-[#2283FF] to-[#2563eb] relative overflow-hidden">
+                    <div className="h-20 bg-gradient-to-br from-brand-primary to-[#2563eb] relative overflow-hidden">
                       <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:12px_12px]"></div>
                       <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
                         <BookOpen className="w-8 h-8 text-white" />
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-[#2283FF] transition-colors">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-brand-primary transition-colors">
                         {course.title}
                       </h3>
                       <div className="flex items-center justify-between mt-2">
@@ -342,17 +343,17 @@ export default function AdminDashboard() {
         <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#2283FF]/10 rounded-lg flex items-center justify-center">
-                <LogIn className="w-5 h-5 text-[#2283FF]" />
+              <div className="w-10 h-10 bg-brand-primary/10 rounded-lg flex items-center justify-center">
+                <LogIn className="w-5 h-5 text-brand-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Today&apos;s Login Analytics</h2>
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Today&apos;s Login Analytics</h2>
                 <p className="text-xs text-gray-500">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 sm:flex sm:items-center">
               <div className="text-center">
-                <p className="text-2xl font-bold text-[#2283FF]">{loginLogs.length}</p>
+                <p className="text-2xl font-bold text-brand-primary">{loginLogs.length}</p>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Users Today</p>
               </div>
               <div className="text-center">
@@ -383,7 +384,7 @@ export default function AdminDashboard() {
                   <tr key={log.userId} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#2283FF]/10 text-[#2283FF] flex items-center justify-center font-bold text-sm">
+                        <div className="w-9 h-9 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm">
                           {log.userName.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -395,7 +396,7 @@ export default function AdminDashboard() {
                     <td className="py-4 px-4">
                       <div className="flex flex-wrap gap-1.5">
                         {log.loginTimes.slice(0, 5).map((t, i) => (
-                          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-[#2283FF] text-[10px] font-bold rounded-md border border-blue-100">
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-brand-primary text-[10px] font-bold rounded-md border border-blue-100">
                             <Clock className="w-3 h-3" />
                             {new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </span>

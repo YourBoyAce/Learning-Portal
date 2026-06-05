@@ -12,6 +12,7 @@ import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   Carousel,
@@ -530,24 +531,24 @@ console.log("ACTIVE COURSES", activeCourses);
 console.log("COURSE PROGRESS", courseProgress);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-subtle p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
         {/* â”€â”€â”€ TOP SECTION: Header + Weekly Progress â”€â”€â”€ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Heading & Stats */}
           <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
-            <h1 className="text-4xl md:text-[44px] font-bold text-[#174778] mb-4 tracking-tight leading-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Continuing Your Journey
             </h1>
             <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
               Welcome back to{" "}
-              <span className="font-bold text-[#1682F1]">The Automate</span>.
+              <span className="font-bold text-brand-primary">The Automate</span>.
               You have{" "}
-              <span className="font-semibold text-[#1E9CD7] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
                 {stats.liveSessions} upcoming webinars
               </span>{" "}
               and{" "}
-              <span className="font-semibold text-[#25C8E5] underline decoration-dotted underline-offset-4">
+              <span className="font-semibold text-brand-success underline decoration-dotted underline-offset-4">
                 {stats.pendingModules} pending module
                 {stats.pendingModules !== 1 ? "s" : ""}
               </span>{" "}
@@ -557,7 +558,7 @@ console.log("COURSE PROGRESS", courseProgress);
 
           {/* Right: Weekly Progress Widget */}
           <div className="lg:col-span-1">
-            <section className="bg-gradient-to-br from-[#174778] to-[#1682F1] text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
+            <section className="bg-gradient-to-br from-brand-heading to-brand-primary text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
               <div className="relative z-10 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-blue-100 mb-2">
@@ -607,32 +608,86 @@ console.log("COURSE PROGRESS", courseProgress);
             </section>
           </div>
         </div>
+                    {/* Course Carousel */}
+       <div className="relative">
+  <Carousel
+    opts={{
+      align: "start",
+      loop: false,
+      dragFree: true,
+    }}
+    className="w-full"
+  >
+    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+      {activeCourses.map((course) => (
+        <CarouselItem
+          key={course.id}
+          className="
+            pl-4
+            sm:pl-6
+            basis-[85vw]
+            sm:basis-1/2
+            lg:basis-1/3
+          "
+        >
+          <CourseCard
+            id={course.id}
+            title={course.title}
+            description={course.description}
+            thumbnail={course.thumbnail_url}
+            category={course.module_label}
+            duration={course.duration}
+            progressPercentage={
+              courseProgress[String(course.id)]
+                ?.progressPercentage || 0
+            }
+            showProgress
+            variant="user"
+            onClick={() =>
+              router.push(`/courses/${course.id}`)
+            }
+          />
+        </CarouselItem>
+      ))}
+    </CarouselContent>
 
-        {/* â”€â”€â”€ MY ACTIVE COURSES â”€â”€â”€ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-  {activeCourses.map((course) => (
-    <CourseCard
-    key={course.id}
-    id={course.id}
-  title={course.title}
-  description={course.description}
-  thumbnail={course.thumbnail_url}
-  category={course.module_label}
-  duration={course.duration}
-  progressPercentage={
-    courseProgress[String(course.id)]
-      ?.progressPercentage || 0
-  }
-  showProgress={true}
-  variant="detailed"
-  onClick={() => router.push(`/courses/${course.id}`)}
-/>
-  ))}
+    {activeCourses.length > 3 && (
+      <>
+        <CarouselPrevious
+          className="
+            hidden
+            lg:flex
+            -left-5
+            bg-white
+            shadow-lg
+            border
+            border-gray-100
+            text-brand-primary
+            hover:bg-gray-50
+          "
+        />
+
+        <CarouselNext
+          className="
+            hidden
+            lg:flex
+            -right-5
+            bg-white
+            shadow-lg
+            border
+            border-gray-100
+            text-brand-primary
+            hover:bg-gray-50
+          "
+        />
+      </>
+    )}
+  </Carousel>
 </div>
 
 {/*Completed courses */}
 <section className="mt-12 text-gray-900">
-  <h2 className="text-2xl font-bold text-[#1682F1]">
+  <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
     Completed Courses
   </h2>
 
@@ -640,13 +695,13 @@ console.log("COURSE PROGRESS", courseProgress);
     {completedCourses.map((course) => (
       <div
         key={course.id}
-        className="bg-white rounded-xl border border-[#D0E8F2] p-6 shadow-sm text-gray-900 hover:border-[#1E9CD7] transition-colors"
+        className="bg-white rounded-xl border border-brand-border p-6 shadow-sm text-gray-900 hover:border-brand-info transition-colors"
       >
-        <h3 className="font-bold text-[#174778]">
+        <h3 className="font-bold text-brand-heading">
           {course.title}
         </h3>
 
-        <p className="text-[#25C8E5] font-medium mt-2">
+        <p className="text-brand-success font-medium mt-2">
           ✓ Completed
         </p>
 
@@ -666,16 +721,16 @@ console.log("COURSE PROGRESS", courseProgress);
 </section>
 
         {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
-        <section className="bg-gradient-to-r from-[#E8F2FF] to-[#F0F8FF] border-l-[6px] border-[#1682F1] p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-[#1682F1]/10">
+        <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-brand-primary/10">
             <BookOpen size={80} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-[#1682F1] rounded-full flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-white" />
             </div>
-            <h3 className="font-bold text-[#174778] text-base">
+            <h3 className="font-bold text-brand-heading text-base">
               The Automate Insight
             </h3>
           </div>
@@ -687,7 +742,7 @@ console.log("COURSE PROGRESS", courseProgress);
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
-                  <p className="text-[11px] text-[#0050DE] font-bold mt-4 tracking-wider uppercase">
+                  <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
                     &mdash; {currentInsight.author}
                   </p>
                 )}
@@ -703,7 +758,7 @@ console.log("COURSE PROGRESS", courseProgress);
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="w-1/6 justify-center bg-[#1682F1] hover:bg-[#0050DE]"
+              className={`w-1/6 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
             > Mark as Read
             </Button>
           </div>

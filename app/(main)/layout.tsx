@@ -161,7 +161,7 @@ export default function MainLayout({
 ];
 
   return (
-    <div className="flex flex-col h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col h-screen bg-surface-subtle">
       <div className="flex flex-1 overflow-hidden relative">
         
         {isSidebarOpen && (
@@ -172,7 +172,7 @@ export default function MainLayout({
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#F8FAFC] border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -256,7 +256,7 @@ export default function MainLayout({
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-[#F5F7FA]">
+          <main className="flex-1 overflow-y-auto bg-surface-page">
             {children}
           </main>
         </div>

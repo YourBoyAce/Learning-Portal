@@ -5,6 +5,7 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { BookOpen, CheckCircle2, FolderOpen, Users } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
@@ -52,7 +53,7 @@ export default function Dashboard() {
     String(value ?? "").trim().replaceAll("-", "").toLowerCase();
 
   const resolveModuleCompletion = (modules: any[] = [], progressRows: any[] = []) => {
-    const completionByModuleId = new Map<string, boolean>();
+    const completionByModuleId = new Map<string, { completed: boolean; progressPercentage: number }>();
     const updatedAtByModuleId = new Map<string, string>();
 
     for (const progress of progressRows) {
@@ -73,7 +74,10 @@ export default function Dashboard() {
       const previousUpdatedAt = updatedAtByModuleId.get(moduleId);
 
       if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
-        completionByModuleId.set(moduleId, Boolean(progress.completed));
+        completionByModuleId.set(moduleId, {
+          completed: Boolean(progress.completed),
+          progressPercentage: Number(progress.progress_percentage || 0)
+        });
         updatedAtByModuleId.set(moduleId, updatedAt);
       }
     }
@@ -228,8 +232,47 @@ export default function Dashboard() {
         const mostRecentCourse = mappedCourses[0];
         setNextCourse(mostRecentCourse);
 
-        // Fetch ALL modules for the most recent course
-        const { data: modulesData } = await supabase
+        // Fetch ALL modules from ALL enrolled courses (for learning progress)
+        let allModules: any[] = [];
+        let allCompletedVideoIds: string[] = [];
+
+        for (const course of mappedCourses) {
+          const { data: courseModules } = await supabase
+            .from("coursemodules")
+            .select("*")
+            .eq("maincourse_id", course.id)
+            .order("order_index", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
+
+          if (courseModules && courseModules.length > 0) {
+            allModules = [...allModules, ...courseModules];
+
+            // Fetch user_video_progress for this course
+            const { data: progressData } = await supabase
+              .from("user_video_progress")
+              .select("video_id, completed, updated_at, progress_percentage")
+              .eq("user_id", user.id)
+              .eq("course_id", course.id);
+
+            const moduleCompletion = resolveModuleCompletion(
+              courseModules,
+              progressData ?? [],
+            );
+
+            const completedIds = courseModules
+              .filter((module: any) => moduleCompletion.get(String(module.id))?.completed)
+              .map((module: any) => String(module.id));
+
+            allCompletedVideoIds = [...allCompletedVideoIds, ...completedIds];
+          }
+        }
+
+        setAllCourseModules(allModules);
+        setCompletedVideoIds(allCompletedVideoIds);
+
+        // Fetch modules for the most recent course separately for "next module" display
+        const { data: mostRecentModules } = await supabase
           .from("coursemodules")
           .select("*")
           .eq("maincourse_id", mostRecentCourse.id)
@@ -237,61 +280,63 @@ export default function Dashboard() {
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
 
-        if (modulesData && modulesData.length > 0) {
-          setNextModule(modulesData[0]);
-          setAllCourseModules(modulesData);
-
-          // Fetch user_video_progress for this course to check completion
+        if (mostRecentModules && mostRecentModules.length > 0) {
+          // Fetch user_video_progress for most recent course to find next uncompleted module
           const { data: progressData } = await supabase
             .from("user_video_progress")
-            .select("video_id, completed, updated_at")
+            .select("video_id, completed, updated_at, progress_percentage")
             .eq("user_id", user.id)
             .eq("course_id", mostRecentCourse.id);
 
           const moduleCompletion = resolveModuleCompletion(
-            modulesData,
+            mostRecentModules,
             progressData ?? [],
           );
 
-          setCompletedVideoIds(
-            modulesData
-              .filter((module: any) => moduleCompletion.get(String(module.id)))
-              .map((module: any) => String(module.id)),
-          );
-
           // Find the first incomplete module as the "next" module
-          const firstIncomplete = modulesData.find(
-            (m: any) => !moduleCompletion.get(String(m.id))
+          const firstIncomplete = mostRecentModules.find(
+            (m: any) => !moduleCompletion.get(String(m.id))?.completed
           );
           if (firstIncomplete) {
             setNextModule(firstIncomplete);
+          } else {
+            // Show only unfinished course modules only
+            setNextModule(null);
           }
 
-          // Sum durations of all incomplete modules
-          let totalSeconds = 0;
-          for (const mod of modulesData) {
-            const isCompleted = moduleCompletion.get(String(mod.id));
+          // Calculate remaining time: sum remaining durations of all incomplete modules only
+          let remainingSeconds = 0;
+          for (const mod of mostRecentModules) {
+            const progressInfo = moduleCompletion.get(String(mod.id));
+            const isCompleted = progressInfo?.completed;
+            const progressPercentage = progressInfo?.progressPercentage || 0;
+            
             if (!isCompleted && mod.duration) {
-              const parts = mod.duration.split(":").map(Number);
-              if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
-              else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
-            }
-          }
-
-          // If no durations found on modules, sum all module durations as total
-          if (totalSeconds === 0) {
-            for (const mod of modulesData) {
-              if (mod.duration) {
-                const parts = mod.duration.split(":").map(Number);
-                if (parts.length === 3) totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
-                else if (parts.length === 2) totalSeconds += parts[0] * 60 + parts[1];
+              const durationStr = String(mod.duration).toLowerCase().trim();
+              let durationSec = 0;
+              
+              if (durationStr.includes('h') || durationStr.includes('m') || durationStr.includes('s')) {
+                const hMatch = durationStr.match(/(\d+)\s*h/);
+                const mMatch = durationStr.match(/(\d+)\s*m/);
+                const sMatch = durationStr.match(/(\d+)\s*s/);
+                durationSec += hMatch ? parseInt(hMatch[1]) * 3600 : 0;
+                durationSec += mMatch ? parseInt(mMatch[1]) * 60 : 0;
+                durationSec += sMatch ? parseInt(sMatch[1]) : 0;
+              } else {
+                const parts = durationStr.replace(/[;.]/g, ":").split(":").map(Number);
+                if (parts.length === 3) durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+                else if (parts.length === 2) durationSec = (parts[0] || 0) * 60 + (parts[1] || 0);
+                else if (parts.length === 1 && !isNaN(parts[0])) durationSec = parts[0] || 0;
               }
+              
+              const watchedSec = Math.floor(durationSec * (progressPercentage / 100));
+              remainingSeconds += Math.max(0, durationSec - watchedSec);
             }
           }
 
-          const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-          const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-          const secs = String(totalSeconds % 60).padStart(2, "0");
+          const hrs = String(Math.floor(remainingSeconds / 3600)).padStart(2, "0");
+          const mins = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, "0");
+          const secs = String(remainingSeconds % 60).padStart(2, "0");
           setTotalTime(`${hrs}:${mins}:${secs}`);
         }
       }
@@ -418,8 +463,8 @@ export default function Dashboard() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Welcome Banner - Dark Blue */}
-        <div className="bg-gradient-to-r from-[#174778] to-[#1682F1] rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+        <div className="bg-gradient-to-r from-brand-heading to-brand-primary rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
+          <h1 className="text-4xl md:text-[44px] font-bold text-white mb-4 tracking-tight leading-tight">
             Welcome back to The Automate, {userName}.
           </h1>
           <p className="text-blue-200 text-base mb-6 max-w-2xl">
@@ -431,7 +476,7 @@ export default function Dashboard() {
             <div className="flex gap-3">
               <button
                 onClick={handlePlayModule}
-                className="bg-white text-[#174778] px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors"
+                className="bg-white text-brand-heading px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors"
               >
                 Resume Last Lesson
                 <svg
@@ -458,18 +503,18 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
           
           {/* 1. Upcoming Webinars Widget */}
-          <div className="bg-[#F0F7FF] rounded-2xl p-6 md:p-7 border border-[#1682F1]/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
+          <div className="bg-surface-accent rounded-2xl p-6 md:p-7 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
 
             <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-xs font-bold text-[#1682F1] uppercase tracking-[0.2em]">
+              <span className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em]">
                 Live Sessions
               </span>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-[#1682F1] rounded-md border border-[#1682F1]/20">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-brand-primary rounded-md border border-brand-primary/20">
                 {upcomingEvents.length} UPCOMING
               </span>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-1 relative z-10">
+            <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-1 relative z-10`}>
               Upcoming Webinars
             </h2>
             <p className="text-sm text-gray-600 mb-5 relative z-10">
@@ -479,8 +524,8 @@ export default function Dashboard() {
             <div className="flex-1 flex flex-col">
               {upcomingEvents.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 bg-[#F8FAFC] rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                    <svg className="w-8 h-8 text-[#1682F1]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-14 h-14 bg-surface-subtle rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                    <svg className="w-8 h-8 text-brand-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
@@ -495,9 +540,9 @@ export default function Dashboard() {
                       className="min-w-[270px] sm:min-w-[300px] bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-all duration-300 relative group"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="w-12 h-12 bg-[#F8FAFC] rounded-xl flex items-center justify-center shrink-0 border border-[#1682F1]/10 group-hover:scale-105 transition-transform duration-300">
+                        <div className="w-12 h-12 bg-surface-subtle rounded-xl flex items-center justify-center shrink-0 border border-brand-primary/10 group-hover:scale-105 transition-transform duration-300">
                           <svg
-                            className="w-7 h-7 text-[#1682F1]"
+                            className="w-7 h-7 text-brand-primary"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -510,13 +555,13 @@ export default function Dashboard() {
                             />
                           </svg>
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#1682F1]/60 bg-[#F0F7FF] px-2 py-1 rounded-md">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/60 bg-surface-accent px-2 py-1 rounded-md">
                           {event.event_type}
                         </span>
                       </div>
 
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#1682F1] transition-colors mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand-primary transition-colors mb-2">
                           {event.title}
                         </h3>
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
@@ -524,14 +569,14 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-[#1682F1]/10 flex items-center justify-between mt-auto">
+                      <div className="pt-4 border-t border-brand-primary/10 flex items-center justify-between mt-auto">
                         <div className="space-y-0.5">
                           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
-                          <p className="text-xs font-black text-[#1682F1]">
+                          <p className="text-xs font-black text-brand-primary">
                             {formatEventLabel(event.event_date, event.event_time)}
                           </p>
                         </div>
-                        <button className="w-9 h-9 bg-[#1682F1] rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all hover:bg-[#0050DE]">
+                        <button className={`w-9 h-9 rounded-lg flex items-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}>
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
@@ -549,14 +594,14 @@ export default function Dashboard() {
             
             <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#1682F1]/10 rounded-xl flex items-center justify-center">
-                  <Users size={20} className="text-[#1682F1]" />
+                <div className="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center">
+                  <Users size={20} className="text-brand-primary" />
                 </div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                   Batch Allocations
                 </h2>
               </div>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-[#F0F7FF] text-[#1682F1] rounded-md uppercase tracking-widest border border-[#1682F1]/10">
+              <span className="text-[10px] font-bold px-3 py-1.5 bg-surface-accent text-brand-primary rounded-md uppercase tracking-widest border border-brand-primary/10">
                 {enrollments.length} Active
               </span>
             </div>
@@ -577,19 +622,19 @@ export default function Dashboard() {
                   {enrollments.map((item) => (
                     <div
                       key={`${item.batchId}-${item.courseId}`}
-                      className="bg-[#F8FAFC] hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-[#1682F1]/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
+                      className="bg-surface-subtle hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-brand-primary/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
                     >
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-[#1682F1]/5 to-[#25C8E5]/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-brand-primary/5 to-brand-success/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
 
                       <div className="flex items-start gap-4 mb-4 relative z-10">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#1682F1] to-[#25C8E5] rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-[#1682F1]/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
+                        <div className="w-12 h-12 bg-gradient-to-br from-brand-primary to-brand-success rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-primary/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
                           {item.courseTitle.charAt(0)}
                         </div>
                         <div className="min-w-0 pt-1 flex-1">
-                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-[#1682F1] transition-colors" title={item.courseTitle}>
+                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-brand-primary transition-colors" title={item.courseTitle}>
                             {item.courseTitle}
                           </p>
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-[#1682F1] text-[10px] font-bold uppercase tracking-widest mt-2 border border-[#1682F1]/20 shadow-sm truncate max-w-full" title={item.batchName}>
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-brand-primary text-[10px] font-bold uppercase tracking-widest mt-2 border border-brand-primary/20 shadow-sm truncate max-w-full" title={item.batchName}>
                             {item.batchName}
                           </span>
                         </div>
@@ -622,7 +667,7 @@ export default function Dashboard() {
 
               {/* Header row */}
               <div className="flex items-start justify-between mb-5">
-                <span className="text-[10px] font-black text-white bg-[#174778] px-3 py-1.5 rounded-md uppercase tracking-widest">
+                <span className="text-[10px] font-black text-white bg-brand-heading px-3 py-1.5 rounded-md uppercase tracking-widest">
                   Up Next
                 </span>
 
@@ -631,14 +676,14 @@ export default function Dashboard() {
                     Total Time
                   </p>
 
-                  <p className="text-2xl sm:text-3xl font-black text-[#1682F1] tracking-tight font-mono">
+                  <p className="text-2xl sm:text-3xl font-black text-brand-primary tracking-tight font-mono">
                     {totalTime}
                   </p>
                 </div>
               </div>
 
               {/* Course title */}
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 leading-tight max-w-xl">
+              <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-6 max-w-xl`}>
                 {nextCourse?.title || "Your next course"}
               </h2>
 
@@ -646,10 +691,10 @@ export default function Dashboard() {
               {nextModule ? (
                 <div
                   onClick={handlePlayModule}
-                  className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-[#1682F1]/30 transition-all cursor-pointer group"
+                  className="bg-surface-subtle border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-brand-primary/30 transition-all cursor-pointer group"
                 >
                   {/* Instructor image */}
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-[#1682F1]/30 transition-colors">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-brand-primary/30 transition-colors">
                     <img
                       src="/images/instructor.png"
                       alt="Instructor"
@@ -659,7 +704,7 @@ export default function Dashboard() {
 
                   {/* Module info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-gray-900 group-hover:text-[#1682F1] transition-colors text-sm sm:text-base leading-snug">
+                    <h3 className="font-bold text-gray-900 group-hover:text-brand-primary transition-colors text-sm sm:text-base leading-snug">
                       {nextModule.title}
                     </h3>
 
@@ -690,7 +735,7 @@ export default function Dashboard() {
                       e.stopPropagation();
                       handlePlayModule();
                     }}
-                    className="w-12 h-12 bg-[#1682F1] rounded-full flex items-center justify-center text-white shrink-0 hover:bg-[#0050DE] hover:scale-110 transition-all shadow-lg shadow-[#1682F1]/20"
+                    className={`w-12 h-12 rounded-full flex items-center text-white shrink-0 hover:scale-110 transition-all shadow-lg shadow-brand-primary/20 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
                   >
                     <svg
                       className="w-5 h-5 ml-0.5"
@@ -702,7 +747,7 @@ export default function Dashboard() {
                   </button>
                 </div>
               ) : (
-                <div className="bg-[#F8FAFC] border border-gray-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                <div className="bg-surface-subtle border border-gray-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
                   <p className="text-sm font-semibold text-gray-500">
                     No modules available
                   </p>
@@ -711,20 +756,20 @@ export default function Dashboard() {
             </div>
 
            {/* RIGHT SIDE - LEARNING PROGRESS */}
-            <div className="bg-[#F0F7FF] border border-[#1682F1]/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
+            <div className="bg-surface-accent border border-brand-primary/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
 
-              <h2 className="text-2xl font-bold text-[#174778] mb-7 relative z-10">
+              <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-7 relative z-10`}>
                 Learning Progress
               </h2>
 
               {/* Circle */}
               <div className="flex justify-center relative z-10">
-                <div className="relative w-44 h-44 rounded-full border-[4px] border-[#1682F1] flex items-center justify-center bg-white shadow-sm">
+                <div className="relative w-44 h-44 rounded-full border-[4px] border-brand-primary flex items-center justify-center bg-white shadow-sm">
                   <div className="text-center">
-                    <h1 className="text-5xl font-black text-[#1682F1]">
+                    <h1 className="text-5xl font-black text-brand-primary">
                       {progressPercentage}%
                     </h1>
-                    <p className="text-xs tracking-[0.3em] text-[#1682F1]/70 mt-2 font-bold">
+                    <p className="text-xs tracking-[0.3em] text-brand-primary/70 mt-2 font-bold">
                       MASTERY
                     </p>
                   </div>
@@ -735,11 +780,11 @@ export default function Dashboard() {
               <div className="mt-auto pt-8 relative z-10">
                 <div className="bg-white border border-gray-100 rounded-xl p-5 space-y-4 shadow-sm">
                   
-                  <div className="flex items-center justify-between border-b border-[#1682F1]/10 pb-4">
+                  <div className="flex items-center justify-between border-b border-brand-primary/10 pb-4">
                     <span className="text-sm font-medium text-gray-600">
                       Modules Completed
                     </span>
-                    <span className="text-lg font-bold text-[#1682F1]">
+                    <span className="text-lg font-bold text-brand-primary">
                       {completedModules}/{totalModules}
                     </span>
                   </div>
@@ -748,8 +793,8 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                  <span className="text-lg font-bold text-[#1682F1]">
-                      {enrollments.length}
+                  <span className="text-lg font-bold text-brand-primary">
+                      {enrolledCourses.length}
                     </span>
                   </div>
                   
@@ -763,10 +808,10 @@ export default function Dashboard() {
 {/* Active Studies Grid / Carousel */}
         <div className="mb-12 relative px-0 sm:px-4 md:px-0">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-bold text-[#174778] tracking-tight">
+            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
               Active Studies
             </h2>
-            <span className="text-[10px] font-black text-[#1682F1] uppercase tracking-[0.3em]">
+            <span className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">
               {enrolledCourses.length} Courses in Progress
             </span>
           </div>
@@ -782,71 +827,52 @@ export default function Dashboard() {
             <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
               {enrolledCourses.map((course) => (
                 <CarouselItem
-                  key={course.id}
-                  // Responsive sizing: 85% on mobile, 50% on tablet, 33.3% on desktop
-                  className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
-                >
-                  <div className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white border border-gray-100 cursor-pointer" onClick={() => handleOpenCourse(course.id)}>
-                    <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
-                    {/* Thumbnail */}
-<div className="relative w-full aspect-[16/9] bg-[#F8FAFC] overflow-hidden">
-  <img
-    src={course.thumbnail_url || PLACEHOLDER_IMAGE}
-    alt={course.title}
-    className="w-full h-full object--scale-down object-center transition-transform duration-500 group-hover:scale-105"
+  key={course.id}
+  className="
+    pl-4
+    sm:pl-6
+    basis-[85vw]
+    sm:basis-1/2
+    lg:basis-1/3
+  "
+>
+  <CourseCard
+    id={course.id}
+    title={course.title}
+    description={course.description}
+    thumbnail={course.thumbnail_url}
+    progressPercentage={
+      courseProgress[String(course.id)]
+        ?.progressPercentage || 0
+    }
+    showProgress
+    variant="user"
+    onClick={() => handleOpenCourse(course.id)}
   />
-</div>
-                      {/* Content */}
-                      <div className="flex-1 flex flex-col px-6 pt-4 pb-5">
-                        <h3 className="font-bold text-lg text-[#1a2536] mb-2 leading-snug line-clamp-2 min-h-[56px]" title={course.title}>
-                          {course.title}
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-3 line-clamp-2">{course.description}</p>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-semibold text-gray-500 tracking-wide">PROGRESS</span>
-                          <span className="text-xs font-bold text-[#1a2536]">{courseProgress[String(course.id)]?.progressPercentage || 0}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
-                          <div
-                          className="h-2 rounded-full bg-gradient-to-r from-[#1682F1] to-[#25C8E5] transition-all"
-                            style={{ width: `${courseProgress[String(course.id)]?.progressPercentage || 0}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-400 mt-auto">
-                          {(() => {
-                            const progress = courseProgress[String(course.id)]?.progressPercentage || 0;
-                            if (progress === 0) return 'Start Learning';
-                            if (progress < 90) return 'Last accessed recently';
-                            return 'Nearing Completion';
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CarouselItem>
+</CarouselItem>
               ))}
             </CarouselContent>
 
             {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
             {enrolledCourses.length > 3 && (
               <>
-                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#1682F1] hover:bg-gray-50 hover:text-[#0050DE] h-12 w-12 z-10" />
-                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#1682F1] hover:bg-gray-50 hover:text-[#0050DE] h-12 w-12 z-10" />
+                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
+                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
               </>
             )}
           </Carousel>
         </div>
 
-        <section className="bg-gradient-to-r from-[#E8F2FF] to-[#F0F8FF] border-l-[6px] border-[#1682F1] p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-[#1682F1]/10">
+        <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
+          <div className="absolute right-6 top-6 text-brand-primary/10">
             <BookOpen size={80} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-[#1682F1] rounded-full flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-white" />
             </div>
-            <h3 className="font-bold text-[#174778] text-base">
+            <h3 className="font-bold text-brand-heading text-base">
               The Automate Insight
             </h3>
           </div>
@@ -858,7 +884,7 @@ export default function Dashboard() {
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
-                  <p className="text-[11px] text-[#0050DE] font-bold mt-4 tracking-wider uppercase">
+                  <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
                     &mdash; {currentInsight.author}
                   </p>
                 )}
@@ -874,7 +900,7 @@ export default function Dashboard() {
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className="w-1/6 justify-center bg-[#1682F1] hover:bg-[#0050DE]"
+              className={`w-1/6 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
             > Mark as Read
             </Button>
           </div>

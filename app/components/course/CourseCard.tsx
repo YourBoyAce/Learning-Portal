@@ -1,7 +1,4 @@
 "use client";
-
-import { CheckCircle, Pencil, Trash2, PlayCircle } from "lucide-react";
-
 type CourseCardProps = {
   id: string | number;
   title: string;
@@ -13,7 +10,7 @@ type CourseCardProps = {
   progressPercentage?: number;
   showProgress?: boolean;
 
-  variant?: "compact" | "detailed" | "admin";
+  variant?: "user" | "detailed" | "admin";
 
   createdAt?: string;
 
@@ -30,12 +27,10 @@ export default function CourseCard({
   description,
   thumbnail,
   category,
-  duration,
-
   progressPercentage = 0,
   showProgress = false,
 
-  variant = "compact",
+  variant = "user",
 
   createdAt,
 
@@ -53,64 +48,105 @@ export default function CourseCard({
   */
 
   if (isAdmin) {
-    return (
-      <div
-        onClick={onClick}
-        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col overflow-hidden relative cursor-pointer"
-      >
-        {/* Header */}
-        <div className="h-36 bg-gradient-to-br from-[#174778] to-[#1682F1] relative overflow-hidden">
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt={title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:16px_16px]" />
-          )}
-
-          {/* Status Badge */}
-          <div className="absolute top-4 left-4">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider shadow-sm border border-white/10">
-              <CheckCircle className="w-3 h-3" />
-              Active
-            </span>
-          </div>
+  return (
+    <div
+      onClick={onClick}
+      className="
+        h-full
+      min-h-[370px]
+      flex
+      items-stretch
+      w-full
+      shadow-sm
+      hover:shadow-md
+      transition-shadow
+      duration-300
+      rounded-xl
+      bg-white
+      border
+      border-gray-100
+      cursor-pointer
+      "
+    >
+      <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
+        
+        {/* Thumbnail */}
+        <div className="relative w-full aspect-[16/9] bg-surface-subtle overflow-hidden">
+          <img
+            src={thumbnail || PLACEHOLDER_IMAGE}
+            alt={title}
+            className="w-full h-full object-contain object-center"
+          />
         </div>
 
-        {/* Body */}
-        <div className="p-5 flex-1 flex flex-col">
-          <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#1682F1] transition-colors leading-tight">
-            {title}
-          </h4>
+        {/* Content */}
+        <div className="flex-1 flex flex-col px-6 pt-4 pb-3">
 
-          <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-1">
+          <h3
+  className="
+    font-bold
+    text-copy-navy
+    mb-1
+    leading-snug
+    line-clamp-2
+    min-h-[56px]
+  "
+>
+  {title}
+</h3>
+
+          <p className="card-description line-clamp-2 mb-3">
             {description || "No description available."}
           </p>
 
           {/* Footer */}
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-              {createdAt
-                ? new Date(createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "Recently Added"}
-            </span>
+          <div className="mt-auto border-t border-gray-100 pt-4">
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-400">
+                {createdAt
+                  ? new Date(createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "Recently Added"}
+              </span>
+
+              <span
+                className="
+                  px-2.5
+                  py-1
+                  rounded-full
+                  bg-brand-primary/10
+                  text-brand-primary
+                  text-[10px]
+                  font-semibold
+                "
+              >
+                Active
+              </span>
+            </div>
+
+            <div className="flex gap-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit?.();
                 }}
-                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1682F1] hover:bg-blue-50 rounded-lg transition-colors"
-                title="Edit Course"
+                className="
+                  flex-1
+                  py-1
+                  rounded-lg
+                  bg-brand-primary/10
+                  text-brand-primary
+                  text-sm
+                  font-medium
+                  hover:bg-brand-primary/15
+                  transition-colors
+                "
               >
-                <Pencil className="w-4 h-4" />
+                Edit
               </button>
 
               <button
@@ -118,217 +154,146 @@ export default function CourseCard({
                   e.stopPropagation();
                   onDelete?.();
                 }}
-                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Delete Course"
+                className="
+                  flex-1
+                  py-2
+                  rounded-lg
+                  bg-red-50
+                  text-red-600
+                  text-sm
+                  font-medium
+                  hover:bg-red-100
+                  transition-colors
+                "
               >
-                <Trash2 className="w-4 h-4" />
+                Delete
               </button>
             </div>
+
           </div>
         </div>
       </div>
-    );
-  }
-
+    </div>
+  );
+}
+  
   /*
-    =========================================================
-    DETAILED VARIANT (MY LEARNING)
-    =========================================================
-  */
+=========================================================
+USER DASHBOARD VARIANT
+=========================================================
+*/
 
-  if (isDetailed) {
-    return (
-      <div
-        onClick={onClick}
-        className="group bg-white rounded-[1rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-[#1682F1]/8 transition-all duration-500 overflow-hidden flex flex-col cursor-pointer"
-      >
-        {/* Thumbnail */}
-        <div className="relative w-full h-48 sm:h-64 overflow-hidden">
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt={title}
-              className="w-full h-full object-contain p-2 transition-transform duration-700 group-hover:scale-105"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#174778] via-[#1682F1] to-[#0f172a]" />
-          )}
-
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-          {/* Play Button */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/30 shadow-2xl group-hover:scale-110 transition-transform duration-300">
-              <PlayCircle
-                className="text-white"
-                size={32}
-                strokeWidth={1.5}
-              />
-            </div>
-          </div>
-
-          {/* Category Badge */}
-          {category && (
-            <span className="absolute top-4 left-4 bg-white/15 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/20">
-              {category}
-            </span>
-          )}
-
-          {/* Duration Badge */}
-          {duration && (
-            <span className="absolute top-4 right-4 bg-black/50 backdrop-blur-xl text-white text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/10">
-              {duration}
-            </span>
-          )}
-
-          {/* Progress Circle */}
-          {showProgress && (
-            <div className="absolute bottom-4 left-4 flex items-center gap-2">
-              <div className="w-9 h-9 rounded-full bg-white/15 backdrop-blur-xl border border-white/20 flex items-center justify-center">
-                <span className="text-white text-[11px] font-black">
-                  {progressPercentage}%
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 flex flex-col p-6 pt-5">
-          <h3 className="text-xl font-bold text-[#0f172a] group-hover:text-[#1682F1] transition-colors leading-snug mb-2">
-            {title}
-          </h3>
-
-          <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mb-6">
-            {description}
-          </p>
-
-          {/* Progress */}
-          {showProgress && (
-            <div className="mt-auto">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                  Progress
-                </span>
-
-                <span className="text-xs font-black text-[#1682F1]">
-                  {progressPercentage}%
-                </span>
-              </div>
-
-              <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
-                <div
-                  className="bg-gradient-to-r from-[#1682F1] via-[#25C8E5] to-[#1682F1] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${progressPercentage}%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  /*
-    =========================================================
-    COMPACT VARIANT (DASHBOARD)
-    =========================================================
-  */
-
-  return (
-    <div
-      onClick={onClick}
-      className="group bg-white border border-gray-100 rounded-[2.5rem] p-6 flex flex-col md:flex-row gap-8 hover:shadow-2xl hover:shadow-[#1682F1]/10 transition-all duration-500 cursor-pointer relative overflow-hidden"
-    >
-      {/* Decorative Blur */}
-      <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-[#1682F1]/5 rounded-full blur-3xl group-hover:bg-[#1682F1]/10 transition-colors" />
+return (
+  <div
+    onClick={onClick}
+    className="
+      h-full
+      min-h-[370px]
+      flex
+      items-stretch
+      w-full
+      shadow-sm
+      hover:shadow-md
+      transition-shadow
+      duration-300
+      rounded-xl
+      bg-white
+      border
+      border-gray-100
+      cursor-pointer
+    "
+  >
+    <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
 
       {/* Thumbnail */}
-      <div className="w-full md:w-48 h-40 rounded-[2rem] overflow-hidden shrink-0 shadow-xl shadow-black/5 relative group-hover:scale-[1.02] transition-transform duration-500">
+      <div className="relative w-full aspect-[16/9] bg-surface-subtle overflow-hidden">
         <img
           src={thumbnail || PLACEHOLDER_IMAGE}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           alt={title}
+          className="w-full h-full object-contain object-center"
         />
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-between py-2">
-        <div>
-          {/* Category */}
-          <div className="flex items-center gap-3 mb-3">
-            <span className="px-3 py-1 bg-[#2283FF]/5 text-[#2283FF] text-[10px] font-black rounded-full uppercase tracking-widest border border-[#2283FF]/10">
-              {category || "General Curriculum"}
-            </span>
-          </div>
+      <div className="flex-1 flex flex-col px-6 pt-4 pb-5">
 
-          {/* Title */}
-          <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight group-hover:text-[#2283FF] transition-colors">
-            {title}
-          </h3>
+        <div className="flex items-start justify-between gap-3 mb-2">
+  <h3
+    className="
+      font-bold
+      text-lg
+      text-copy-navy
+      leading-snug
+      line-clamp-2
+      flex-1
+    "
+  >
+    {title}
+  </h3>
 
-          {/* Description */}
-          <p className="text-xs sm:text-sm text-gray-500 leading-relaxed line-clamp-2 mt-2">
-            {description ||
-              "Master these concepts with our structured learning path."}
-          </p>
-        </div>
+  {category && (
+    <span
+      className="
+        px-2.5
+        py-1
+        rounded-full
+        text-[10px]
+        font-semibold
+        whitespace-nowrap
+        bg-brand-primary/10
+        text-brand-primary
+      "
+    >
+      {category}
+    </span>
+  )}
+</div>
 
-        {/* Progress */}
+        {/* Description */}
+        <p className="card-description line-clamp-2 mb-4">
+          {description ||
+            "Master these concepts with our structured learning path."}
+        </p>
+
         {showProgress && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-[#2283FF]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
+          <>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-gray-500 tracking-wide">
+                Progress
+              </span>
 
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  Progress
-                </span>
-              </div>
-
-              <span className="text-xs font-black text-[#2283FF]">
+              <span className="text-xs font-bold text-copy-navy">
                 {progressPercentage}%
               </span>
             </div>
 
-            <div className="w-full bg-gray-50 rounded-full h-2.5 overflow-hidden border border-gray-100 p-0.5">
+            <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
               <div
-                className="bg-gradient-to-r from-[#2283FF] via-[#2c6cb0] to-[#2283FF] bg-[length:200%_auto] animate-gradient-shift h-full rounded-full transition-all duration-1000"
+                className="
+                  h-2
+                  rounded-full
+                  bg-gradient-to-r
+                  from-brand-primary
+                  to-brand-success
+                  transition-all
+                "
                 style={{
                   width: `${progressPercentage}%`,
                 }}
               />
             </div>
-          </div>
+
+            <span className="text-xs text-gray-400 mt-auto">
+              {progressPercentage === 0
+                ? "Start Learning"
+                : progressPercentage < 90
+                ? "Last accessed recently"
+                : "Nearing Completion"}
+            </span>
+          </>
         )}
       </div>
     </div>
-  );
+  </div>
+);
 }

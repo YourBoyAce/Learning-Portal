@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   HelpCircle,
@@ -419,12 +420,12 @@ export default function AdminQuizzes() {
   },
 ];
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Quiz Management
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -459,7 +460,7 @@ export default function AdminQuizzes() {
         </div>
 
         <div>
-          <div className="text-2xl font-bold text-[var(--color-primary)]">
+          <div className="text-2xl font-bold text-brand-primary">
             {stat.value}
           </div>
 
@@ -483,7 +484,7 @@ export default function AdminQuizzes() {
               placeholder="Search quizzes or courses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2.5 text-gray-500 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+              className="pl-9 pr-4 py-2.5 text-gray-500 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
           </div>
         </div>
@@ -502,7 +503,7 @@ export default function AdminQuizzes() {
             </p>
             <button
               onClick={handleCreateNew}
-              className="bg-[#2283FF] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm"
+              className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-2 shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Create First Quiz
@@ -634,7 +635,7 @@ export default function AdminQuizzes() {
                     placeholder="e.g. Playwright Selectors"
                     value={quizTitle}
                     onChange={(e) => setQuizTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   />
                 </div>
 
@@ -655,7 +656,7 @@ export default function AdminQuizzes() {
                         setCourseName(val);
                       }
                     }}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     {dbCourses.length === 0 ? (
                       <>
@@ -685,7 +686,7 @@ export default function AdminQuizzes() {
                     max="100"
                     value={passingScore}
                     onChange={(e) => setPassingScore(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   />
                 </div>
 
@@ -698,7 +699,7 @@ export default function AdminQuizzes() {
                     onChange={(e) =>
                       setStatus(e.target.value as "Active" | "Inactive")
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -715,7 +716,7 @@ export default function AdminQuizzes() {
                   <button
                     type="button"
                     onClick={handleAddQuestion}
-                    className="text-[#2283FF] hover:bg-[#2283FF]/10 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-[#2283FF]/20"
+                    className="text-brand-primary hover:bg-brand-primary/10 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-brand-primary/20"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
                     Add Question
@@ -728,7 +729,7 @@ export default function AdminQuizzes() {
                     className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 relative shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#2283FF]/10 text-[#2283FF] text-xs font-bold">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold">
                         {qIdx + 1}
                       </span>
                       <div className="flex-1">
@@ -739,7 +740,7 @@ export default function AdminQuizzes() {
                             handleQuestionTextChange(qIdx, e.target.value)
                           }
                           rows={2}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] resize-none bg-white"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
                         />
                       </div>
                       {questions.length > 1 && (
@@ -768,7 +769,7 @@ export default function AdminQuizzes() {
                             onChange={(e) =>
                               handleOptionChange(qIdx, oIdx, e.target.value)
                             }
-                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-[#2283FF]"
+                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary"
                           />
                         </div>
                       ))}
@@ -784,7 +785,7 @@ export default function AdminQuizzes() {
                         onChange={(e) =>
                           handleCorrectAnswerChange(qIdx, Number(e.target.value))
                         }
-                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-[#2283FF]"
+                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary"
                       >
                         <option value={0}>Option A</option>
                         <option value={1}>Option B</option>

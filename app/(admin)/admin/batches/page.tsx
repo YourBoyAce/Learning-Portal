@@ -5,6 +5,7 @@ import { supabase } from "@/app/lib/supabase";
 import Select from "react-select";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   BookOpen,
@@ -422,12 +423,12 @@ export default function AdminBatches() {
 ];
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Manage Batches
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -500,7 +501,7 @@ export default function AdminBatches() {
                 placeholder="Search batches..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-60 text-black"
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-60 text-black"
               />
             </div>
           </div>
@@ -508,7 +509,7 @@ export default function AdminBatches() {
           {/* Loading State */}
           {loading && (
             <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 text-[#2283FF] animate-spin mx-auto mb-3" />
+              <Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-3" />
               <p className="text-sm text-gray-500">Loading batches...</p>
             </div>
           )}
@@ -528,7 +529,7 @@ export default function AdminBatches() {
               {!searchTerm && (
                 <button
                   onClick={() => setShowModal(true)}
-                  className="bg-[#2283FF] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#2283FF] transition-colors inline-flex items-center gap-2"
+                  className="bg-brand-primary text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create Batch
@@ -560,8 +561,8 @@ export default function AdminBatches() {
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 bg-[#2283FF]/10 rounded-lg flex items-center justify-center shrink-0">
-                              <BookOpen className="w-4 h-4 text-[#2283FF]" />
+                            <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                              <BookOpen className="w-4 h-4 text-brand-primary" />
                             </div>
                             <p className="font-semibold text-gray-900 text-sm truncate">
                               {batch.name}
@@ -593,7 +594,7 @@ export default function AdminBatches() {
                         <div className="flex items-center justify-end gap-2 mt-4">
                           <button
                             onClick={() => handleEdit(batch)}
-                            className="p-2 text-gray-400 hover:text-[#2283FF] hover:bg-[#2283FF]/5 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/5 rounded-lg transition-colors"
                             name="Edit"
                           >
                             <Pencil className="w-4 h-4" />
@@ -716,7 +717,7 @@ export default function AdminBatches() {
                   placeholder="e.g. Advanced Epistemology"
                   value={batchName}
                   onChange={(e) => setBatchName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all text-black"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black"
                 />
               </div>
 
@@ -730,7 +731,7 @@ export default function AdminBatches() {
                   value={batchDescription}
                   onChange={(e) => setBatchDescription(e.target.value)}
                   rows={3}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all resize-y text-black"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all resize-y text-black"
                 />
               </div>
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -740,7 +741,7 @@ export default function AdminBatches() {
                 type="date"
                 value={created_at}
                 onChange={(e) => setCreated_At(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] transition-all text-black"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black"
               />
 
               {/* Submit Button */}
@@ -757,7 +758,7 @@ export default function AdminBatches() {
               )}
               <button
                 onClick={handleSaveBatch}
-                className="w-full bg-[#2283FF] hover:bg-[#2283FF] text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
+                className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
               >
                 {isSaving
                   ? "Saving..."

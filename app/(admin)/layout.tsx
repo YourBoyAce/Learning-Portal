@@ -144,7 +144,7 @@ export default function AdminLayout({
   },
 ];
   return (
-    <div className="flex h-screen bg-[#F5F7FA] overflow-hidden">
+    <div className="admin-typography flex h-screen bg-surface-page overflow-hidden">
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -199,7 +199,7 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/profile">
             <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-              <div className="w-10 h-10 bg-[#2283FF] rounded-full flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
                 <span className="text-white text-lg font-semibold">
                   {userEmail?.[0]?.toUpperCase() || "U"}
                 </span>
@@ -250,7 +250,7 @@ export default function AdminLayout({
             </svg>
           </button>
           <Image src="/logo.svg" alt="Auto-Mate" width={130} height={40} className="object-contain" />
-          <div className="h-10 w-10 rounded-full bg-[#2283FF] text-white flex items-center justify-center font-semibold">
+          <div className="h-10 w-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-semibold">
             {userEmail?.[0]?.toUpperCase() || "U"}
           </div>
         </header>

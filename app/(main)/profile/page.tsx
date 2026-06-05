@@ -5,6 +5,7 @@ import { supabase } from "@/app/lib/supabase";
 import UserAvatar from "@/app/components/UserAvatar";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
 export default function ProfilePage() {
@@ -108,16 +109,16 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#F5F7FA]">
+      <div className="h-screen w-full flex items-center justify-center bg-surface-page">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-8 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-8 font-sans">
       <div className="max-w-[900px] mx-auto">
-        <h1 className="text-4xl font-extrabold text-[#174778] tracking-tight mb-2">
+        <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
           My Profile
         </h1>
 
@@ -131,7 +132,7 @@ export default function ProfilePage() {
           <div className="space-y-6">
             {/* PROFILE IDENTITY */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 flex flex-col items-center">
-              <h3 className="w-full text-left font-bold text-[#1682F1] text-[16px] mb-6">
+              <h3 className="w-full text-left font-bold text-brand-primary text-[16px] mb-6">
                 Profile Identity
               </h3>
 
@@ -159,7 +160,7 @@ export default function ProfilePage() {
                     Role
                   </span>
 
-                  <span className="text-[13px] font-bold text-[#1682F1] capitalize">
+                  <span className="text-[13px] font-bold text-brand-primary capitalize">
                     {role}
                   </span>
                 </div>
@@ -169,7 +170,7 @@ export default function ProfilePage() {
                     Member since
                   </span>
 
-                  <span className="text-[13px] font-bold text-[#1682F1]">
+                  <span className="text-[13px] font-bold text-brand-primary">
                     {memberSince}
                   </span>
                 </div>
@@ -205,7 +206,7 @@ export default function ProfilePage() {
           <div className="lg:col-span-2 space-y-6">
             {/* PERSONAL IDENTITY */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-              <h3 className="font-bold text-[#1682F1] text-[18px] mb-6">
+              <h3 className="font-bold text-brand-primary text-[18px] mb-6">
                 Personal Identity
               </h3>
 
@@ -219,7 +220,7 @@ export default function ProfilePage() {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-[#1682F1]/30 focus:bg-white focus:outline-none transition-colors"
+                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
                     placeholder="Alexander Hamilton"
                   />
                 </div>
@@ -233,7 +234,7 @@ export default function ProfilePage() {
                     type="email"
                     value={email}
                     disabled
-                    className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:outline-none cursor-not-allowed"
+                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:outline-none cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -241,7 +242,7 @@ export default function ProfilePage() {
 
             {/* SCHOLARLY BIO */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-              <h3 className="font-bold text-[#1682F1] text-[18px] mb-6">
+              <h3 className="font-bold text-brand-primary text-[18px] mb-6">
                 Scholarly Bio
               </h3>
 
@@ -255,7 +256,7 @@ export default function ProfilePage() {
                   onChange={(e) => setBio(e.target.value)}
                   rows={4}
                   maxLength={500}
-                  className="w-full bg-[#F8FAFC] border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-[#1682F1]/30 focus:bg-white focus:outline-none transition-colors resize-none"
+                  className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors resize-none"
                   placeholder="Dedicated polymath currently exploring..."
                 />
 
@@ -269,11 +270,11 @@ export default function ProfilePage() {
 
             {/* DIGITAL FOOTPRINT */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-              <h3 className="font-bold text-[#1682F1] text-[18px] mb-6">
+              <h3 className="font-bold text-brand-primary text-[18px] mb-6">
                 Digital Footprint
               </h3>
 
-              <div className="flex items-center bg-[#F8FAFC] rounded-md px-4 py-3.5 border border-transparent focus-within:border-[#1682F1]/30 focus-within:bg-white transition-colors mb-12">
+              <div className="flex items-center bg-surface-subtle rounded-md px-4 py-3.5 border border-transparent focus-within:border-brand-primary/30 focus-within:bg-white transition-colors mb-12">
                 <svg
                   className="w-5 h-5 text-gray-400 mr-3"
                   fill="none"

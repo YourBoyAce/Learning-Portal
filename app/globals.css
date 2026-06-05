@@ -93,6 +93,26 @@
 }
 
 @theme inline {
+  --color-brand-primary: var(--color-primary);
+  --color-brand-hover: var(--color-accent-hover);
+  --color-brand-heading: var(--color-primary-dark);
+  --color-brand-heading-hover: var(--color-accent-dark-hover);
+  --color-brand-info: var(--color-info);
+  --color-brand-success: var(--color-success);
+  --color-brand-highlight: var(--color-highlight);
+  --color-brand-border: var(--color-border-blue);
+  --color-brand-alt: var(--color-accent-alt);
+  --color-brand-alt-light: var(--color-accent-alt-light);
+  --color-surface-page: var(--color-page);
+  --color-surface-subtle: var(--color-page-subtle);
+  --color-surface-accent: var(--color-accent-surface);
+  --color-surface-accent-start: var(--color-accent-surface-start);
+  --color-surface-accent-end: var(--color-accent-surface-end);
+  --color-surface-input: var(--color-input-surface);
+  --color-surface-video: var(--color-video-surface);
+  --color-neutral-soft-black: var(--color-black-soft);
+  --color-copy-dark: var(--color-text-dark);
+  --color-copy-navy: var(--color-text-navy);
   --color-background: var(--bg-primary);
   --color-foreground: var(--text-primary);
   --color-primary: var(--accent-violet);
@@ -126,6 +146,8 @@
   --text-4xl--line-height: var(--typography-xl-line-height);
   --text-5xl: var(--typography-xl-font-size);
   --text-5xl--line-height: var(--typography-xl-line-height);
+  --text-main-heading: var(--typography-main-heading-font-size);
+  --text-main-heading--line-height: var(--typography-main-heading-line-height);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -698,4 +720,71 @@ body {
   font-size: var(--typography-body-font-size);
   line-height: var(--typography-body-line-height);
   font-weight: var(--typography-body-font-weight);
+}
+
+.admin-typography {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-body-font-size);
+  line-height: var(--typography-body-line-height);
+  font-weight: var(--typography-body-font-weight);
+}
+
+.admin-typography h1,
+.admin-typography .heading-xl,
+.admin-typography .text-3xl,
+.admin-typography .text-4xl,
+.admin-typography .text-5xl,
+.admin-typography .text-6xl {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-xl-font-size);
+  line-height: var(--typography-xl-line-height);
+  font-weight: var(--typography-xl-font-weight);
+}
+
+.admin-typography h2,
+.admin-typography .heading-h1,
+.admin-typography .text-2xl {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-h1-font-size);
+  line-height: var(--typography-h1-line-height);
+  font-weight: var(--typography-h1-font-weight);
+}
+
+.admin-typography h3,
+.admin-typography h4,
+.admin-typography h5,
+.admin-typography h6,
+.admin-typography .heading-h2,
+.admin-typography .text-lg,
+.admin-typography .text-xl {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-h2-font-size);
+  line-height: var(--typography-h2-line-height);
+  font-weight: var(--typography-h2-font-weight);
+}
+
+.admin-typography p,
+.admin-typography li,
+.admin-typography label,
+.admin-typography input,
+.admin-typography textarea,
+.admin-typography select,
+.admin-typography .body-text,
+.admin-typography .text-base {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-body-font-size);
+  line-height: var(--typography-body-line-height);
+  font-weight: var(--typography-body-font-weight);
+}
+
+.admin-typography button,
+.admin-typography .nav-item,
+.admin-typography .btn,
+.admin-typography .btn-brand,
+.admin-typography .text-xs,
+.admin-typography .text-sm {
+  font-family: var(--font-primary), system-ui, sans-serif;
+  font-size: var(--typography-button-font-size);
+  line-height: var(--typography-button-line-height);
+  font-weight: var(--typography-button-font-weight);
 }

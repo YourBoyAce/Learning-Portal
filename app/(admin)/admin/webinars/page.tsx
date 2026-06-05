@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image"; 
 import {
   Plus,
@@ -177,7 +178,7 @@ export default function AdminWebinarsPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Webinar Management
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -205,11 +206,11 @@ export default function AdminWebinarsPage() {
               placeholder="Search webinars by title or instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all shadow-sm text-black"
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all shadow-sm text-black"
             />
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-sm">
-            <Video className="text-[#2283FF]" size={20} />
+            <Video className="text-brand-primary" size={20} />
             <div className="text-center">
               <span className="block text-lg font-bold text-gray-900 leading-none">
                 {webinars.length}
@@ -245,7 +246,7 @@ export default function AdminWebinarsPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={4} className="py-20 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#2283FF] mx-auto mb-2" />
+                      <Loader2 className="w-8 h-8 animate-spin text-brand-primary mx-auto mb-2" />
                       <p className="text-sm text-black-400 font-medium">
                         Loading webinars...
                       </p>
@@ -283,7 +284,7 @@ export default function AdminWebinarsPage() {
                       <td className="py-5 px-6">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                            <Calendar size={14} className="text-[#2283FF]" />
+                            <Calendar size={14} className="text-brand-primary" />
                             {webinar.event_date}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-gray-400">
@@ -338,7 +339,7 @@ export default function AdminWebinarsPage() {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="px-4 sm:px-8 py-5 sm:py-6 border-b border-gray-100 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                     {isEditing ? "Edit Webinar" : "Create New Webinar"}
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
@@ -359,7 +360,7 @@ export default function AdminWebinarsPage() {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Masterclass on Neural Networks"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -373,7 +374,7 @@ export default function AdminWebinarsPage() {
                       value={subtitle}
                       onChange={(e) => setSubtitle(e.target.value)}
                       placeholder="e.g. Prof. Ariadne Â· Seminar Room R12"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -387,7 +388,7 @@ export default function AdminWebinarsPage() {
                       value={icon}
                       onChange={(e) => setIcon(e.target.value)}
                       placeholder="ðŸ“‹, ðŸ–¥ï¸, â–¶, etc."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -401,7 +402,7 @@ export default function AdminWebinarsPage() {
                       value={eventDate}
                       onChange={(e) => setEventDate(e.target.value)}
                       placeholder="e.g. TOMORROW, 10:00 AM"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -413,7 +414,7 @@ export default function AdminWebinarsPage() {
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all appearance-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-black"
                     >
                       <option value="streaming">Streaming</option>
                       <option value="link">Link</option>
@@ -430,7 +431,7 @@ export default function AdminWebinarsPage() {
                       value={linkText}
                       onChange={(e) => setLinkText(e.target.value)}
                       placeholder="e.g. Register Now, Link Active Soon"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -445,7 +446,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) =>
                         setAttendeesCount(parseInt(e.target.value) || 0)
                       }
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
                     />
                   </div>
 
@@ -459,7 +460,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                       placeholder="Describe what will be covered in this webinar..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] outline-none transition-all resize-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all resize-none text-black"
                     />
                   </div>
                 </div>
@@ -475,7 +476,7 @@ export default function AdminWebinarsPage() {
                 <button
                   onClick={handleSaveWebinar}
                   disabled={isSaving}
-                  className="flex-2 bg-[#2283FF] text-white py-3 rounded-xl text-sm font-bold hover:bg-[#2283FF] transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="flex-2 bg-brand-primary text-white py-3 rounded-xl text-sm font-bold hover:bg-brand-hover transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving
@@ -491,7 +492,7 @@ export default function AdminWebinarsPage() {
 
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-8 right-8 bg-[#0f172a] text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-100 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="fixed bottom-8 right-8 bg-copy-dark text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-100 animate-in slide-in-from-bottom-5 duration-300">
             <CheckCircle className="text-emerald-400" size={20} />
             <span className="text-sm font-semibold tracking-wide">
               {toastMessage}

@@ -5,20 +5,25 @@ import { supabase } from "@/app/lib/supabase";
 import { CourseCard } from "@/app/components/course";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
+import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import Image from "next/image";
 import {
   BookOpen,
-  CheckCircle,
   Plus,
   Search,
-  Pencil,
   Trash2,
   X,
   Loader2,
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-
 interface Course {
   id: number | string;
   title: string;
@@ -359,12 +364,12 @@ const router = useRouter();
 ];
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 sm:p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#2283FF] tracking-tight">
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Manage Courses
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -431,7 +436,7 @@ const router = useRouter();
               placeholder="Search courses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2.5 border text-gray-600 border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2283FF] focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+              className="pl-9 pr-4 py-2.5 border text-gray-600 border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
           </div>
         </div>
@@ -439,7 +444,7 @@ const router = useRouter();
         {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <Loader2 className="w-10 h-10 text-[#2283FF] animate-spin mb-4" />
+            <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
             <p className="text-sm font-medium text-gray-500">
               Loading your catalog...
             </p>
@@ -466,7 +471,7 @@ const router = useRouter();
             {!searchTerm && (
               <button
                 onClick={handleCreateNew}
-                className="bg-[#2283FF] text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2283FF] transition-colors inline-flex items-center gap-2 shadow-sm"
+                className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 Create First Course
@@ -477,24 +482,75 @@ const router = useRouter();
 
         {/* Courses Grid */}
         {!loading && filteredCourses.length > 0 && (
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+       <Carousel
+  opts={{
+    align: "start",
+    loop: false,
+    dragFree: true,
+  }}
+  className="w-full"
+>
+  <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+    {filteredCourses.map((course) => (
+      <CarouselItem
+        key={course.id}
+       className="
+  pl-4
+  sm:pl-6
+  basis-[85vw]
+sm:basis-1/2
+lg:basis-1/3
+"
+      >
+        <CourseCard
+          id={course.id}
+          title={course.title}
+          description={course.description}
+          thumbnail={course.thumbnail_url}
+          createdAt={course.created_at}
+          variant="admin"
+          onClick={() =>
+            router.push(`/courses/${course.id}`)
+          }
+          onEdit={() => handleEdit(course)}
+          onDelete={() => handleDeleteClick(course)}
+        />
+      </CarouselItem>
+    ))}
+  </CarouselContent>
 
-  {filteredCourses.map((course) => (
-    <CourseCard
-      key={course.id}
-      id={course.id}
-      title={course.title}
-      description={course.description}
-      thumbnail={course.thumbnail_url}
-      createdAt={course.created_at}
-      variant="admin"
-      onClick={() => router.push(`/courses/${course.id}`)}
-      onEdit={() => handleEdit(course)}
-      onDelete={() => handleDeleteClick(course)}
-    />
-  ))}
-</div>
-        )}
+  
+      <CarouselPrevious
+        className="
+          hidden
+          lg:flex
+          -left-5
+          bg-white
+          shadow-lg
+          border
+          border-gray-100
+          text-brand-primary
+          hover:bg-gray-50
+        "
+      />
+
+      <CarouselNext
+        className="
+          hidden
+          lg:flex
+          -right-5
+          bg-white
+          shadow-lg
+          border
+          border-gray-100
+          text-brand-primary
+          hover:bg-gray-50
+        "
+      />
+    
+  
+</Carousel>)}
+       
       </div> 
       
 
@@ -526,7 +582,7 @@ const router = useRouter();
                   placeholder="e.g. Playwright Mastery"
                   value={courseTitle}
                   onChange={(e) => setCourseTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                 />
               </div>
 
@@ -539,7 +595,7 @@ const router = useRouter();
                   value={courseDescription}
                   onChange={(e) => setCourseDescription(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-2 focus:ring-[#2283FF]/20 resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
                 />
               </div>
 
@@ -562,9 +618,9 @@ const router = useRouter();
                     </div>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-[#2283FF] hover:bg-blue-50/30 transition-all group">
-                    <Upload className="w-8 h-8 text-gray-300 group-hover:text-[#2283FF] transition-colors mb-2" />
-                    <span className="text-xs text-gray-400 group-hover:text-[#2283FF] font-medium">Click to upload thumbnail</span>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
+                    <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
+                    <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">Click to upload thumbnail</span>
                     <span className="text-[10px] text-gray-300 mt-1">PNG, JPG up to 5MB</span>
                     <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
                   </label>
@@ -579,7 +635,7 @@ const router = useRouter();
                   <button
                     type="button"
                     onClick={handleAddModule}
-                    className="text-[#2283FF] hover:bg-[#2283FF]/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                    className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
                   >
                     <Plus className="w-3 h-3" />
                     Add Module
@@ -597,7 +653,7 @@ const router = useRouter();
                           onChange={(e) =>
                             handleModuleChange(index, "title", e.target.value)
                           }
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] bg-white"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
                         />
                       </div>
                       <button
@@ -616,7 +672,7 @@ const router = useRouter();
                         handleModuleChange(index, "description", e.target.value)
                       }
                       rows={2}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-[#2283FF] focus:ring-1 focus:ring-[#2283FF] resize-none bg-white"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
                     />
                   </div>
                 ))}
@@ -645,7 +701,7 @@ const router = useRouter();
               <button
                 onClick={handleSaveCourse}
                 disabled={isSaving}
-                className="px-5 py-2 text-sm font-semibold text-white bg-[#2283FF] rounded-lg hover:bg-[#2283FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-5 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {isSaving

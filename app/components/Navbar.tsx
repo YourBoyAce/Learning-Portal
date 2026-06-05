@@ -5,7 +5,7 @@ import { Logo } from "@/app/components/Logo";
 
 export default function Navbar() {
     return (
-        <nav className="w-full bg-[#0a0a0f] text-white border-b border-[#1682F1]/20">
+        <nav className="w-full bg-neutral-soft-black text-white border-b border-brand-primary/20">
             <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
 
                 <div className="flex items-center gap-2">
@@ -18,7 +18,7 @@ export default function Navbar() {
                 </div>
 
                 <Link href="/login">
-                    <button className="px-4 py-2 bg-[#1682F1] rounded-md hover:bg-[#0050DE] transition-colors">
+                    <button className="px-4 py-2 bg-brand-primary rounded-md hover:bg-brand-hover transition-colors">
                         Login
                     </button>
                 </Link>

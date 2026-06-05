@@ -19,7 +19,7 @@ export function Logo({
       {/* Stylized 'A' (Reverted to original paths) */}
       <path
         d="M 50 15 L 85 75 L 61 75 L 50 55 L 39 75 L 15 75 Z"
-        fill="#2283FF"
+        fill="var(--color-accent-alt)"
       />
       <circle cx="50" cy="45" r="5" fill="white" />
       
@@ -30,7 +30,7 @@ export function Logo({
         fontFamily="'Futura', 'Tw Cen MT', 'Jost', 'Spartan', sans-serif"
         fontWeight="700"
         fontSize="44"
-        fill="#2283FF"
+        fill="var(--color-accent-alt)"
         letterSpacing="-1.5"
       >
         Auto-Mate
@@ -43,7 +43,7 @@ export function Logo({
         fontFamily="'Futura', 'Tw Cen MT', 'Jost', 'Spartan', sans-serif"
         fontWeight="300"
         fontSize="15"
-        fill="#4A9CF8"
+        fill="var(--color-accent-alt-light)"
         letterSpacing="7"
         textAnchor="middle"
       >

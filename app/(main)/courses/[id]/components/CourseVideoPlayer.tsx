@@ -293,7 +293,7 @@ export default function CourseVideoPlayer({
     <div className="w-full max-w-4xl mx-auto">
       <div className="relative rounded-[1.5rem] overflow-hidden shadow-xl bg-black">
         {isCloudflareIframe && streamSource ? (
-          <div className="aspect-video bg-[#111827]">
+          <div className="aspect-video bg-surface-video">
             <Stream
               streamRef={streamRef}
               src={streamSource}

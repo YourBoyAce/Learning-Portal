@@ -70,7 +70,7 @@ const Certificate = forwardRef<HTMLDivElement, CertificateProps>(
         {/* MAIN TEXT - Flex centered to prevent vertical overlaps */}
         <div className="flex-1 flex flex-col items-center justify-center text-center px-32 pt-20 z-10">
           
-          <h1 className="text-[64px] font-black text-[#174778] tracking-tight mb-2">
+          <h1 className="text-[64px] font-black text-brand-heading tracking-tight mb-2">
             Certificate
           </h1>
 
@@ -78,7 +78,7 @@ const Certificate = forwardRef<HTMLDivElement, CertificateProps>(
             Of Achievement In
           </p>
 
-          <h2 className="text-[48px] font-bold text-[#2283FF] leading-tight max-w-[900px] mb-12">
+          <h2 className="text-[48px] font-bold text-brand-alt leading-tight max-w-[900px] mb-12">
             {courseName}
           </h2>
 

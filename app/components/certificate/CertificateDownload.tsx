@@ -84,7 +84,7 @@ export default function CertificateDownload({
     <>
       <button
         onClick={downloadCertificate}
-        className="bg-[#174778] text-white px-6 py-3 rounded-xl hover:bg-[#113a63] transition-colors font-semibold"
+        className="bg-brand-heading text-white px-6 py-3 rounded-xl hover:bg-brand-heading-hover transition-colors font-semibold"
       >
         Download Certificate
       </button>

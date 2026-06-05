@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 <div className="relative">
                     <input
                         ref={ref}
-                        className={`w-full bg-[#F5F7FA] border ${error ? "border-red-500" : "border-gray-200"
+                        className={`w-full bg-surface-page border ${error ? "border-red-500" : "border-gray-200"
                             } rounded-md px-3 py-2.5 text-sm outline-none text-gray-800 placeholder-gray-400 focus:border-[#0B1E6D] focus:ring-1 focus:ring-[#0B1E6D] transition-all ${className}`}
                         {...props}
                     />
