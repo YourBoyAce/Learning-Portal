@@ -788,12 +788,13 @@ export default function CoursePlayerPage() {
     return true;
   }, [moduleCompletedAt, modules, userProgress]);
 
-  const canViewCertificate = hasCertificate && hasCompletedAllModulesInOrder;
+  // Show certificate button when progress reaches 100%
+  const canViewCertificate = progressPercentage === 100;
 
-  // Auto-generate certificate in DB only after ordered module completion.
+  // Auto-generate certificate in DB when progress reaches 100%.
   useEffect(() => {
     const generateCertificateInDb = async () => {
-      if (hasCompletedAllModulesInOrder && !hasCertificate && !loading && userId && id) {
+      if (progressPercentage === 100 && !hasCertificate && !loading && userId && id) {
         try {
           setIsGeneratingCertificate(true);
           const { error } = await supabase
@@ -817,7 +818,7 @@ export default function CoursePlayerPage() {
       }
     };
     generateCertificateInDb();
-  }, [hasCompletedAllModulesInOrder, hasCertificate, loading, userId, id]);
+  }, [progressPercentage, hasCertificate, loading, userId, id],);
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
     modules.forEach((mod) => {

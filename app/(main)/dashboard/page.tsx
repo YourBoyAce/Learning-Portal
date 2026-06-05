@@ -271,6 +271,66 @@ export default function Dashboard() {
         setAllCourseModules(allModules);
         setCompletedVideoIds(allCompletedVideoIds);
 
+        // Calculate total time spent across ALL courses (only for completed modules with valid durations)
+        let totalCompletedSeconds = 0;
+        let completedWithDuration = 0;
+        
+        for (const courseModule of allModules) {
+          // Check if this module is in our completed list
+          const isCompleted = allCompletedVideoIds.includes(String(courseModule.id));
+          
+          // Only process completed modules
+          if (!isCompleted) {
+            continue;
+          }
+          
+          // Skip modules without duration data
+          if (!courseModule.duration || !String(courseModule.duration).trim()) {
+            continue;
+          }
+          
+          const durationStr = String(courseModule.duration).toLowerCase().trim();
+          let durationSec = 0;
+          
+          // Parse duration from format like "HH:MM:SS"
+          if (durationStr.includes(':')) {
+            const parts = durationStr.split(":").map(p => parseInt(p, 10));
+            if (parts.length === 3) {
+              durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+            } else if (parts.length === 2) {
+              durationSec = (parts[0] || 0) * 60 + (parts[1] || 0);
+            } else if (parts.length === 1 && !isNaN(parts[0])) {
+              durationSec = parts[0] || 0;
+            }
+          }
+          // Try parsing as text format (e.g., "1h 30m 45s")
+          else if (durationStr.includes('h') || durationStr.includes('m') || durationStr.includes('s')) {
+            const hMatch = durationStr.match(/(\d+\.?\d*)\s*h/);
+            const mMatch = durationStr.match(/(\d+\.?\d*)\s*m/);
+            const sMatch = durationStr.match(/(\d+\.?\d*)\s*s/);
+            durationSec += hMatch ? parseFloat(hMatch[1]) * 3600 : 0;
+            durationSec += mMatch ? parseFloat(mMatch[1]) * 60 : 0;
+            durationSec += sMatch ? parseFloat(sMatch[1]) : 0;
+          }
+          // Try parsing as pure number (assumed to be seconds)
+          else {
+            const numVal = parseFloat(durationStr);
+            if (!isNaN(numVal) && numVal > 0) {
+              durationSec = numVal;
+            }
+          }
+          
+          if (durationSec > 0) {
+            totalCompletedSeconds += durationSec;
+            completedWithDuration++;
+          }
+        }
+        
+        const hrs = String(Math.floor(totalCompletedSeconds / 3600)).padStart(2, "0");
+        const mins = String(Math.floor((totalCompletedSeconds % 3600) / 60)).padStart(2, "0");
+        const secs = String(totalCompletedSeconds % 60).padStart(2, "0");
+        setTotalTime(`${hrs}:${mins}:${secs}`);
+
         // Fetch modules for the most recent course separately for "next module" display
         const { data: mostRecentModules } = await supabase
           .from("coursemodules")
@@ -303,41 +363,6 @@ export default function Dashboard() {
             // Show only unfinished course modules only
             setNextModule(null);
           }
-
-          // Calculate remaining time: sum remaining durations of all incomplete modules only
-          let remainingSeconds = 0;
-          for (const mod of mostRecentModules) {
-            const progressInfo = moduleCompletion.get(String(mod.id));
-            const isCompleted = progressInfo?.completed;
-            const progressPercentage = progressInfo?.progressPercentage || 0;
-            
-            if (!isCompleted && mod.duration) {
-              const durationStr = String(mod.duration).toLowerCase().trim();
-              let durationSec = 0;
-              
-              if (durationStr.includes('h') || durationStr.includes('m') || durationStr.includes('s')) {
-                const hMatch = durationStr.match(/(\d+)\s*h/);
-                const mMatch = durationStr.match(/(\d+)\s*m/);
-                const sMatch = durationStr.match(/(\d+)\s*s/);
-                durationSec += hMatch ? parseInt(hMatch[1]) * 3600 : 0;
-                durationSec += mMatch ? parseInt(mMatch[1]) * 60 : 0;
-                durationSec += sMatch ? parseInt(sMatch[1]) : 0;
-              } else {
-                const parts = durationStr.replace(/[;.]/g, ":").split(":").map(Number);
-                if (parts.length === 3) durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-                else if (parts.length === 2) durationSec = (parts[0] || 0) * 60 + (parts[1] || 0);
-                else if (parts.length === 1 && !isNaN(parts[0])) durationSec = parts[0] || 0;
-              }
-              
-              const watchedSec = Math.floor(durationSec * (progressPercentage / 100));
-              remainingSeconds += Math.max(0, durationSec - watchedSec);
-            }
-          }
-
-          const hrs = String(Math.floor(remainingSeconds / 3600)).padStart(2, "0");
-          const mins = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, "0");
-          const secs = String(remainingSeconds % 60).padStart(2, "0");
-          setTotalTime(`${hrs}:${mins}:${secs}`);
         }
       }
     }
@@ -806,62 +831,136 @@ export default function Dashboard() {
         )}
 
 {/* Active Studies Grid / Carousel */}
-        <div className="mb-12 relative px-0 sm:px-4 md:px-0">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-              Active Studies
-            </h2>
-            <span className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">
-              {enrolledCourses.length} Courses in Progress
-            </span>
-          </div>
+        {(() => {
+          const activeCourses = enrolledCourses.filter(
+            (course) => (courseProgress[String(course.id)]?.progressPercentage || 0) < 100
+          );
+          const completedCourses = enrolledCourses.filter(
+            (course) => (courseProgress[String(course.id)]?.progressPercentage || 0) === 100
+          );
 
-          <Carousel
-            opts={{
-              align: "start",
-              loop: false,
-              dragFree: true, // Allows smooth swiping like native mobile apps
-            }}
-            className="w-full"
-          >
-            <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-              {enrolledCourses.map((course) => (
-                <CarouselItem
-  key={course.id}
-  className="
-    pl-4
-    sm:pl-6
-    basis-[85vw]
-    sm:basis-1/2
-    lg:basis-1/3
-  "
->
-  <CourseCard
-    id={course.id}
-    title={course.title}
-    description={course.description}
-    thumbnail={course.thumbnail_url}
-    progressPercentage={
-      courseProgress[String(course.id)]
-        ?.progressPercentage || 0
-    }
-    showProgress
-    variant="user"
-    onClick={() => handleOpenCourse(course.id)}
-  />
-</CarouselItem>
-              ))}
-            </CarouselContent>
+          return (
+            <>
+              {activeCourses.length > 0 && (
+                <div className="mb-12 relative px-0 sm:px-4 md:px-0">
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                      Active Studies
+                    </h2>
+                    <span className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">
+                      {activeCourses.length} Courses in Progress
+                    </span>
+                  </div>
 
-            {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
-            {enrolledCourses.length > 3 && (
-              <>
-                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
-                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
-              </>
-            )}
-          </Carousel>
-        </div>
+                  <Carousel
+                    opts={{
+                      align: "start",
+                      loop: false,
+                      dragFree: true, // Allows smooth swiping like native mobile apps
+                    }}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                      {activeCourses.map((course) => (
+                        <CarouselItem
+          key={course.id}
+          className="
+            pl-4
+            sm:pl-6
+            basis-[85vw]
+            sm:basis-1/2
+            lg:basis-1/3
+          "
+        >
+          <CourseCard
+            id={course.id}
+            title={course.title}
+            description={course.description}
+            thumbnail={course.thumbnail_url}
+            progressPercentage={
+              courseProgress[String(course.id)]
+                ?.progressPercentage || 0
+            }
+            showProgress
+            variant="user"
+            onClick={() => handleOpenCourse(course.id)}
+          />
+        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+
+                    {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
+                    {activeCourses.length > 3 && (
+                      <>
+                        <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
+                        <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
+                      </>
+                    )}
+                  </Carousel>
+                </div>
+              )}
+
+              {/* Completed Courses Section */}
+              {completedCourses.length > 0 && (
+                <div className="mb-12 relative px-0 sm:px-4 md:px-0">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                        Completed Courses
+                      </h2>
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    </div>
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-[0.3em]">
+                      {completedCourses.length} Completed
+                    </span>
+                  </div>
+
+                  <Carousel
+                    opts={{
+                      align: "start",
+                      loop: false,
+                      dragFree: true,
+                    }}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                      {completedCourses.map((course) => (
+                        <CarouselItem
+          key={course.id}
+          className="
+            pl-4
+            sm:pl-6
+            basis-[85vw]
+            sm:basis-1/2
+            lg:basis-1/3
+          "
+        >
+          <CourseCard
+            id={course.id}
+            title={course.title}
+            description={course.description}
+            thumbnail={course.thumbnail_url}
+            progressPercentage={100}
+            showProgress
+            variant="user"
+            onClick={() => handleOpenCourse(course.id)}
+          />
+        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+
+                    {completedCourses.length > 3 && (
+                      <>
+                        <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-12 w-12 z-10" />
+                        <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-12 w-12 z-10" />
+                      </>
+                    )}
+                  </Carousel>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
           <div className="absolute right-6 top-6 text-brand-primary/10">

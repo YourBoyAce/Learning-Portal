@@ -172,11 +172,12 @@ export async function POST(request: Request) {
       ? String(formData.get("thumbnail_url")).trim()
       : "";
 
+  // Create or update module WITHOUT waiting for duration (background process)
   const { data: moduleResult, error: dbError } = moduleId
     ? await authContext.supabaseAdmin
         .from("coursemodules")
         .update({
-          video_cf_id: uid, // Store UID directly for better integration
+          video_cf_id: uid,
           ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
         })
         .eq("id", moduleId)
@@ -197,10 +198,83 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
+  // Fetch duration in the background (non-blocking)
+  // This runs without waiting for completion
+  (async () => {
+    try {
+      const fetchDurationWithRetry = async (maxRetries = 5) => {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const metadataUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/stream/${uid}`;
+            const metadataResponse = await fetch(metadataUrl, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${cloudflareApiToken}`,
+              },
+            });
+
+            if (!metadataResponse.ok) {
+              console.warn(`Attempt ${attempt + 1}: Failed to fetch metadata - ${metadataResponse.statusText}`);
+              if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+              }
+              continue;
+            }
+
+            const metadataResult = await metadataResponse.json();
+            console.log(`Attempt ${attempt + 1} - Cloudflare metadata response:`, metadataResult);
+            
+            const durationSeconds = metadataResult?.result?.duration;
+            const status = metadataResult?.result?.status?.state;
+            
+            if (durationSeconds && durationSeconds > 0) {
+              const totalSeconds = Math.round(durationSeconds);
+              const hours = Math.floor(totalSeconds / 3600);
+              const minutes = Math.floor((totalSeconds % 3600) / 60);
+              const seconds = totalSeconds % 60;
+              
+              const formatted = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+              console.log(`✓ Duration extracted: ${durationSeconds}s → ${formatted}`);
+              return formatted;
+            } else if (status === "queued" || status === "processing") {
+              console.log(`Attempt ${attempt + 1}: Video still processing (status: ${status}), retrying...`);
+              if (attempt < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+              }
+            } else {
+              console.warn(`No valid duration found (duration: ${durationSeconds}, status: ${status})`);
+              return null;
+            }
+          } catch (error) {
+            console.warn(`Attempt ${attempt + 1}: Error fetching duration -`, error);
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            }
+          }
+        }
+        return null;
+      };
+      
+      const videoDuration = await fetchDurationWithRetry();
+      
+      if (videoDuration && moduleResult?.id) {
+        // Update module with duration once available
+        await authContext.supabaseAdmin
+          .from("coursemodules")
+          .update({ duration: videoDuration })
+          .eq("id", moduleResult.id);
+        console.log(`✓ Module ${moduleResult.id} updated with duration: ${videoDuration}`);
+      }
+    } catch (error) {
+      console.error("Background duration fetch failed:", error);
+    }
+  })();
+
   return NextResponse.json({
     success: true,
     module: moduleResult,
     videoUrl,
     cloudflareUid: uid,
+    message: "Video uploaded successfully. Duration will be added automatically.",
   });
 }
