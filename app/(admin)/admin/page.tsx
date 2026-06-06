@@ -6,7 +6,7 @@ import { supabase } from "@/app/lib/supabase";
 import { Users, BookOpen, Search, Loader2, Clock, LogIn, Timer } from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
 interface LoginLog {
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Management Console
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
               Orchestrating the intellectual flow of Academic Atelier through data
               and media precision.
             </p>

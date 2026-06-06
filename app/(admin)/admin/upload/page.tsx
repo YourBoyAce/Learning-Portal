@@ -6,7 +6,7 @@ import { supabase } from "@/app/lib/supabase";
 import CourseCard from "@/app/components/course/CourseCard";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
 type Course = {
@@ -412,7 +412,7 @@ export default function UploadPage() {
           <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
             Video Asset Upload
           </h1>
-          <p className="text-[var(--color-text-secondary)]">
+          <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
             Upload high-fidelity instructional media to your course modules.
           </p>
         </div>

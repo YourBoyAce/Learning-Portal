@@ -28,7 +28,6 @@ import {
   Layers,
   DownloadCloud,
 } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 
@@ -187,8 +186,6 @@ export default function CoursePlayerPage() {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
-  const [showCertificate, setShowCertificate] = useState(false);
-
   const getProgressStorageKey = (uid: string, courseId: string) =>
     `course_progress_${uid}_${courseId}`;
 
@@ -444,16 +441,6 @@ export default function CoursePlayerPage() {
       const orderedModules = modulesData || [];
       setModules(orderedModules);
 
-      if (orderedModules.length > 0) {
-        const requestedModuleId = searchParams.get("module");
-        const requestedModule = findModuleByLookupId(
-          orderedModules,
-          requestedModuleId,
-        );
-
-        setActiveModuleId(getModuleKey(requestedModule ?? orderedModules[0]));
-      }
-
       let { data: progressData, error: progressError }: {
         data: any[] | null;
         error: any;
@@ -556,6 +543,45 @@ export default function CoursePlayerPage() {
       setUserProgress(progressMap);
       setModuleCompletedAt(completedAtMap);
       setPlaybackPositions(positionMap);
+
+      // Select the best module to play
+      if (orderedModules.length > 0) {
+        const requestedModuleId = searchParams.get("module");
+        const requestedModule = findModuleByLookupId(
+          orderedModules,
+          requestedModuleId
+        );
+
+        let targetModule = requestedModule;
+
+        if (!targetModule) {
+          // First priority: unfinished module that already has watch progress
+          targetModule = orderedModules.find((module) => {
+            const moduleKey = getModuleKey(module);
+            return (
+              !progressMap[moduleKey] &&
+              (positionMap[moduleKey] ?? 0) > 0
+            );
+          });
+
+          // Second priority: first unfinished module
+          if (!targetModule) {
+            targetModule = orderedModules.find((module) => {
+              const moduleKey = getModuleKey(module);
+              return !progressMap[moduleKey];
+            });
+          }
+
+          // Third priority: course fully completed, show last module
+          if (!targetModule) {
+            targetModule = orderedModules[orderedModules.length - 1];
+          }
+        }
+
+        if (targetModule) {
+          setActiveModuleId(getModuleKey(targetModule));
+        }
+      }
 
       const { data: profile } = await supabase
         .from("profiles")

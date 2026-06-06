@@ -5,7 +5,7 @@ import { supabase } from "@/app/lib/supabase";
 import { CourseCard } from "@/app/components/course";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import {
   Carousel,
   CarouselContent,
@@ -372,7 +372,7 @@ const router = useRouter();
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Manage Courses
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
               Create, edit, and publish your course catalog.
             </p>
           </div>
@@ -481,6 +481,7 @@ const router = useRouter();
         )}
 
         {/* Courses Grid */}
+        <div className="relative">
         {!loading && filteredCourses.length > 0 && (
        <Carousel
   opts={{
@@ -550,6 +551,7 @@ lg:basis-1/3
     
   
 </Carousel>)}
+</div>
        
       </div> 
       

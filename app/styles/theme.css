@@ -85,9 +85,10 @@
 }
 
 .card-description {
-  font-family: var(--font-primary);
-  font-size: 13px;
-  line-height: 24px;
-  font-weight: 300;
-  color: var(--color-text-secondary);
+  font-family: var(--font-primary) !important;
+  font-size: 13px !important;
+  font-weight: 300 !important;
+  line-height: 24px !important;
+  color: var(--color-text-secondary) !important;
+  margin: 0;
 }

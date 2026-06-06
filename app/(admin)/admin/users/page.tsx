@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   createUser,
@@ -221,7 +221,7 @@ export default function AdminUsers() {
           <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
             User Management
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
             Manage users, roles, and platform access.
           </p>
         </div>

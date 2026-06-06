@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   FileText,
@@ -17,8 +17,6 @@ import {
   FileCode,
   FileArchive,
   BarChart3,
-  HardDrive,
-  CheckCircle,
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -593,7 +591,7 @@ const stats = [
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Artifacts Management
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
               Upload study sheets, exercises, boilerplate repositories, and other downloadable resources.
             </p>
           </div>
