@@ -74,6 +74,9 @@ export default function AdminBatches() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [batchThumbnail, setBatchThumbnail] = useState<File | null>(null);
+  const [batchThumbnailPreview, setBatchThumbnailPreview] = useState<string>("");
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
 
   // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -176,6 +179,8 @@ export default function AdminBatches() {
     setBatchName(batch.name);
     setBatchDescription(batch.description || "");
     setCreated_At(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
+    setBatchThumbnail(null);
+    setBatchThumbnailPreview("");
     setModalMessage(null);
     setShowModal(true);
 
@@ -241,6 +246,65 @@ export default function AdminBatches() {
     }
   };
 
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setModalMessage({
+        type: "error",
+        text: "Please select a valid image file (JPG, PNG, WebP, etc.)",
+      });
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setModalMessage({
+        type: "error",
+        text: "File size must be less than 5MB",
+      });
+      return;
+    }
+
+    setBatchThumbnail(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBatchThumbnailPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    setModalMessage(null);
+  };
+
+  const uploadThumbnailToStorage = async (file: File): Promise<string | null> => {
+    try {
+      setIsUploadingThumbnail(true);
+      const timestamp = Date.now();
+      const fileName = `batch-thumbnail-${timestamp}.${file.name.split(".").pop()}`;
+
+      const { data, error } = await supabase.storage
+        .from("course-thumbnails")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) {
+        console.error("Upload error:", error);
+        return null;
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/course-thumbnails/${fileName}`;
+      return url;
+    } catch (error) {
+      console.error("Failed to upload thumbnail:", error);
+      return null;
+    } finally {
+      setIsUploadingThumbnail(false);
+    }
+  };
+
   const handleSaveBatch = async () => {
     const name = batchName.trim();
     const description = batchDescription.trim();
@@ -256,6 +320,16 @@ export default function AdminBatches() {
     try {
       setIsSaving(true);
       setModalMessage(null);
+      
+      // Upload thumbnail if provided
+      let thumbnailUrl: string | null = null;
+      if (batchThumbnail) {
+        thumbnailUrl = await uploadThumbnailToStorage(batchThumbnail);
+        if (!thumbnailUrl) {
+          throw new Error("Failed to upload thumbnail. Please try again.");
+        }
+      }
+
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
       if (sessionError || !sessionData.session?.access_token) {
@@ -263,20 +337,25 @@ export default function AdminBatches() {
       }
 
       if (isEditing && editingBatchId) {
+        const body: any = {
+          id: editingBatchId,
+          name,
+          description,
+          start_date: created_at || null,
+          assigned_scholars: selectedUsers.map((user) => user.value),
+          assigned_courses: selectedCourses.map((course) => course.value),
+        };
+        if (thumbnailUrl) {
+          body.thumbnail_url = thumbnailUrl;
+        }
+
         const response = await fetch("/api/admin/batches", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({
-            id: editingBatchId,
-            name,
-            description,
-            start_date: created_at || null,
-            assigned_scholars: selectedUsers.map((user) => user.value),
-            assigned_courses: selectedCourses.map((course) => course.value),
-          }),
+          body: JSON.stringify(body),
         });
         const result = await response.json().catch(() => null);
         if (!response.ok) {
@@ -285,19 +364,24 @@ export default function AdminBatches() {
           );
         }
       } else {
+        const body: any = {
+          name,
+          description,
+          start_date: created_at || null,
+          assigned_scholars: selectedUsers.map((user) => user.value),
+          assigned_courses: selectedCourses.map((course) => course.value),
+        };
+        if (thumbnailUrl) {
+          body.thumbnail_url = thumbnailUrl;
+        }
+
         const response = await fetch("/api/admin/batches", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({
-            name,
-            description,
-            start_date: created_at || null,
-            assigned_scholars: selectedUsers.map((user) => user.value),
-            assigned_courses: selectedCourses.map((course) => course.value),
-          }),
+          body: JSON.stringify(body),
         });
         const result = await response.json().catch(() => null);
         if (!response.ok) {
@@ -315,6 +399,8 @@ export default function AdminBatches() {
       setCreated_At("");
       setSelectedUsers([]);
       setSelectedCourses([]);
+      setBatchThumbnail(null);
+      setBatchThumbnailPreview("");
       setToastMessage(
         isEditing
           ? "Batch updated successfully."
@@ -437,6 +523,16 @@ export default function AdminBatches() {
           </div>
           <Button
             onClick={() => {
+              setIsEditing(false);
+              setEditingBatchId(null);
+              setBatchName("");
+              setBatchDescription("");
+              setCreated_At("");
+              setSelectedUsers([]);
+              setSelectedCourses([]);
+              setBatchThumbnail(null);
+              setBatchThumbnailPreview("");
+              setModalMessage(null);
               setShowModal(true);
             }}
             className="w-full justify-center sm:w-auto"
@@ -635,7 +731,13 @@ export default function AdminBatches() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-4">
+            <div 
+              className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400"
+              style={{ 
+                maxHeight: "calc(90vh - 180px)",
+                scrollBehavior: "smooth",
+              }}
+            >
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Users size={14} /> Assign Members (Email)
@@ -676,18 +778,16 @@ export default function AdminBatches() {
                   <BookOpen size={14} /> Courses
                 </label>
                 <Select
-                  isMulti={false}
+                  isMulti={true}
                   options={courses.map((course) => ({
                     value: String(course.id),
                     label: course.title,
                   }))}
-                  value={selectedCourses[0] ?? null}
+                  value={selectedCourses}
                   onChange={(value) =>
-                    setSelectedCourses(
-                      value ? ([value] as readonly BatchOption[]) : [],
-                    )
+                    setSelectedCourses((value ?? []) as readonly BatchOption[])
                   }
-                  placeholder="Select courses..."
+                  placeholder="Select one or more courses..."
                   menuPortalTarget={
                     typeof window !== "undefined" ? document.body : null
                   }
@@ -744,6 +844,45 @@ export default function AdminBatches() {
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black"
               />
 
+              {/* Thumbnail Upload */}
+              <div>
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <FileText size={14} /> Batch Thumbnail (Optional)
+                </label>
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                    disabled={isUploadingThumbnail}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-brand-hover disabled:opacity-60"
+                  />
+                  {batchThumbnailPreview && (
+                    <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                      <img
+                        src={batchThumbnailPreview}
+                        alt="Batch thumbnail preview"
+                        className="w-full h-32 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchThumbnail(null);
+                          setBatchThumbnailPreview("");
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500">
+                    Max file size: 5MB. Recommended: 1200×675px. JPG, PNG, WebP
+                    supported.
+                  </p>
+                </div>
+              </div>
+
               {/* Submit Button */}
               {modalMessage && (
                 <div
@@ -758,9 +897,10 @@ export default function AdminBatches() {
               )}
               <button
                 onClick={handleSaveBatch}
-                className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2"
+                disabled={isSaving || isUploadingThumbnail}
+                className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2 disabled:opacity-60"
               >
-                {isSaving
+                {isSaving || isUploadingThumbnail
                   ? "Saving..."
                   : isEditing
                     ? "Update Batch"

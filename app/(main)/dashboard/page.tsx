@@ -31,6 +31,9 @@ type Enrollment = {
   startDate: string | null;
   courseId: number | string | null;
   courseTitle: string;
+  courseDescription?: string;
+  courseCategory?: string;
+  courseThumbnail?: string;
 };
 
 type CalendarEvent = {
@@ -331,38 +334,114 @@ export default function Dashboard() {
         const secs = String(totalCompletedSeconds % 60).padStart(2, "0");
         setTotalTime(`${hrs}:${mins}:${secs}`);
 
-        // Fetch modules for the most recent course separately for "next module" display
-        const { data: mostRecentModules } = await supabase
-          .from("coursemodules")
-          .select("*")
-          .eq("maincourse_id", mostRecentCourse.id)
-          .order("order_index", { ascending: true, nullsFirst: false })
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true });
+        // Find the next module to resume from across ALL enrolled courses
+        let resumeModule: any = null;
+        let resumeCourse: any = null;
+        let mostRecentActivity: Date | null = null;
 
-        if (mostRecentModules && mostRecentModules.length > 0) {
-          // Fetch user_video_progress for most recent course to find next uncompleted module
-          const { data: progressData } = await supabase
-            .from("user_video_progress")
-            .select("video_id, completed, updated_at, progress_percentage")
-            .eq("user_id", user.id)
-            .eq("course_id", mostRecentCourse.id);
+        // Build a map of course modules for lookup
+        const courseModulesMap = new Map<string, any[]>();
+        const courseProgressMap = new Map<string, Map<string, { completed: boolean }>>();
 
-          const moduleCompletion = resolveModuleCompletion(
-            mostRecentModules,
-            progressData ?? [],
-          );
+        for (const course of mappedCourses) {
+          const { data: courseModules } = await supabase
+            .from("coursemodules")
+            .select("*")
+            .eq("maincourse_id", course.id)
+            .order("order_index", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
 
-          // Find the first incomplete module as the "next" module
-          const firstIncomplete = mostRecentModules.find(
-            (m: any) => !moduleCompletion.get(String(m.id))?.completed
-          );
-          if (firstIncomplete) {
-            setNextModule(firstIncomplete);
-          } else {
-            // Show only unfinished course modules only
-            setNextModule(null);
+          if (courseModules && courseModules.length > 0) {
+            courseModulesMap.set(course.id, courseModules);
+
+            // Fetch progress for this course
+            const { data: progressData } = await supabase
+              .from("user_video_progress")
+              .select("video_id, completed, updated_at, progress_percentage")
+              .eq("user_id", user.id)
+              .eq("course_id", course.id)
+              .order("updated_at", { ascending: false });
+
+            const moduleCompletion = resolveModuleCompletion(courseModules, progressData ?? []);
+            courseProgressMap.set(course.id, moduleCompletion);
+
+            // Find the module with most recent activity in this course
+            if (progressData && progressData.length > 0) {
+              for (const progress of progressData) {
+                const progressDate = new Date(progress.updated_at);
+                
+                // Find the matching module
+                const matchingModule = courseModules.find(
+                  (m: any) =>
+                    normalizeProgressId(m.id) === normalizeProgressId(progress.video_id) ||
+                    normalizeProgressId(m.video_cf_id) === normalizeProgressId(progress.video_id)
+                );
+
+                if (matchingModule && (!mostRecentActivity || progressDate > mostRecentActivity)) {
+                  mostRecentActivity = progressDate;
+                  resumeModule = matchingModule;
+                  resumeCourse = course;
+                  break;
+                }
+              }
+            }
           }
+        }
+
+        // If we found a recently viewed module, check if it's incomplete
+        if (resumeModule && resumeCourse) {
+          const moduleCompletion = courseProgressMap.get(resumeCourse.id);
+          const isCompleted = moduleCompletion?.get(String(resumeModule.id))?.completed;
+          
+          // If it's completed, try to find an incomplete module in the same course
+          if (isCompleted) {
+            const courseModules = courseModulesMap.get(resumeCourse.id) || [];
+            const incompleteModule = courseModules.find(
+              (m: any) => !moduleCompletion?.get(String(m.id))?.completed
+            );
+            
+            if (incompleteModule) {
+              resumeModule = incompleteModule;
+            }
+            // If no incomplete in this course, we'll search across all courses below
+            else {
+              resumeModule = null;
+            }
+          }
+        }
+
+        // If we still don't have a module, find the first incomplete across all courses
+        if (!resumeModule) {
+          for (const course of mappedCourses) {
+            const courseModules = courseModulesMap.get(course.id) || [];
+            const moduleCompletion = courseProgressMap.get(course.id);
+            
+            const incompleteModule = courseModules.find(
+              (m: any) => !moduleCompletion?.get(String(m.id))?.completed
+            );
+
+            if (incompleteModule) {
+              resumeModule = incompleteModule;
+              resumeCourse = course;
+              break;
+            }
+          }
+        }
+
+        // Fallback: if all modules are complete, use the most recent course's first module
+        if (!resumeModule && mappedCourses.length > 0) {
+          const firstCourse = mappedCourses[0];
+          const firstCourseModules = courseModulesMap.get(firstCourse.id) || [];
+          if (firstCourseModules.length > 0) {
+            resumeModule = firstCourseModules[0];
+            resumeCourse = firstCourse;
+          }
+        }
+
+        if (resumeModule && resumeCourse) {
+          setNextModule(resumeModule);
+          setNextCourse(resumeCourse);
         }
       }
     }
@@ -452,9 +531,13 @@ export default function Dashboard() {
   };
 
   const handlePlayModule = () => {
-    if (nextCourse && nextModule) {
-      router.push(`/courses/${nextCourse.id}?module=${nextModule.id}`);
+    if (!nextCourse) {
+      return;
     }
+    if (!nextModule) {
+      return;
+    }
+    router.push(`/courses/${nextCourse.id}?module=${nextModule.id}`);
   };
   // async function for handling insights
   const handleMarkInsightAsRead = async () => {
@@ -647,31 +730,63 @@ export default function Dashboard() {
                   {enrollments.map((item) => (
                     <div
                       key={`${item.batchId}-${item.courseId}`}
-                      className="bg-surface-subtle hover:bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-brand-primary/30 transition-all duration-300 group relative overflow-hidden flex flex-col cursor-default"
+                      className="h-full min-h-[420px] flex items-stretch w-full shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl bg-white border border-gray-100 hover:border-brand-primary/20 cursor-default overflow-hidden group flex-col"
                     >
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-gradient-to-br from-brand-primary/5 to-brand-success/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
-
-                      <div className="flex items-start gap-4 mb-4 relative z-10">
-                        <div className="w-12 h-12 bg-gradient-to-br from-brand-primary to-brand-success rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-primary/20 group-hover:-translate-y-1 transition-transform duration-300 shrink-0">
-                          {item.courseTitle.charAt(0)}
-                        </div>
-                        <div className="min-w-0 pt-1 flex-1">
-                          <p className="text-sm font-bold text-gray-900 truncate group-hover:text-brand-primary transition-colors" title={item.courseTitle}>
-                            {item.courseTitle}
-                          </p>
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-white text-brand-primary text-[10px] font-bold uppercase tracking-widest mt-2 border border-brand-primary/20 shadow-sm truncate max-w-full" title={item.batchName}>
-                            {item.batchName}
-                          </span>
+                      {/* Thumbnail */}
+                      <div className="relative w-full aspect-[16/9] bg-gradient-to-br from-brand-primary/10 to-brand-success/10 overflow-hidden flex-shrink-0">
+                        <img
+                          src={item.courseThumbnail || "https://images.unsplash.com/photo-1498050108023-c5249f4df085"}
+                          alt={item.courseTitle}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                        
+                        {/* Category Badge */}
+                        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-brand-primary uppercase tracking-widest shadow-md">
+                          {item.courseCategory || "General"}
                         </div>
                       </div>
 
-                      <div className="mt-auto pt-4 border-t border-gray-200/60 flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-2.5">
-                          <div className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      {/* Content */}
+                      <div className="flex-1 flex flex-col px-6 pt-5 pb-5">
+                        <h3 className="font-bold text-gray-900 mb-2 leading-snug line-clamp-2 text-sm group-hover:text-brand-primary transition-colors">
+                          {item.courseTitle}
+                        </h3>
+
+                        <p className="text-gray-600 text-xs line-clamp-2 mb-4 flex-1">
+                          {item.courseDescription || "No description available."}
+                        </p>
+
+                        {/* Batch info */}
+                        <div className="space-y-3 pt-3 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Batch</span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-brand-primary/10 text-brand-primary text-[10px] font-bold uppercase tracking-wider truncate max-w-[140px]" title={item.batchName}>
+                              {item.batchName}
+                            </span>
                           </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Active</span>
+
+                          {item.startDate && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Start Date</span>
+                              <span className="text-[11px] font-semibold text-gray-700">
+                                {new Date(item.startDate).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric"
+                                })}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Status */}
+                          <div className="flex items-center gap-2 pt-2">
+                            <div className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -17,8 +17,16 @@ export default function LoginPage() {
   useEffect(() => {
     // Rectify "Invalid Refresh Token" error by clearing stale sessions on mount
     const cleanupSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session) {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error?.message?.includes('Refresh Token Not Found') || error || !session) {
+          // Clear invalid tokens from localStorage
+          window.localStorage.removeItem('sb-rqeqcwlchxfboqtghkko-auth-token');
+          window.localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
+          await supabase.auth.signOut();
+        }
+      } catch (err) {
+        console.error('Session cleanup error:', err);
         await supabase.auth.signOut();
       }
     };

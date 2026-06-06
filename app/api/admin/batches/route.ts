@@ -202,14 +202,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: membersError.message }, { status: 500 });
   }
 
-  const { data: batchRow, error: batchRowError } = await authContext.supabaseAdmin
-    .from("batches")
+  const { data: batchCoursesRows, error: batchCoursesError } = await authContext.supabaseAdmin
+    .from("batch_courses")
     .select("course_id")
-    .eq("id", batchId)
-    .maybeSingle();
+    .eq("batch_id", batchId);
 
-  if (batchRowError) {
-    return NextResponse.json({ error: batchRowError.message }, { status: 500 });
+  if (batchCoursesError) {
+    return NextResponse.json({ error: batchCoursesError.message }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -221,9 +220,9 @@ export async function GET(request: Request) {
       memberEmails: ((memberRows ?? []) as BatchMemberRow[])
         .map((row) => row.email)
         .filter((email): email is string => Boolean(email)),
-      courseIds: (batchRow as BatchCourseRow | null)?.course_id
-        ? [String((batchRow as BatchCourseRow).course_id)]
-        : [],
+      courseIds: ((batchCoursesRows ?? []) as any[])
+        .map((row) => String(row.course_id))
+        .filter((id): id is string => Boolean(id)),
     },
   });
 }
@@ -240,6 +239,8 @@ export async function POST(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : "";
 
   // 1. Get the array of IDs sent from the frontend
   const assignedMembers = Array.isArray(body?.assigned_scholars)
@@ -251,9 +252,11 @@ export async function POST(request: Request) {
     : [];
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
+        .map((value: unknown) => normalizeCourseId(value))
+        .filter((id): id is string | number => id !== null)
     : [];
   const selectedCourseId =
-    assignedCourses.length > 0 ? normalizeCourseId(assignedCourses[0]) : null;
+    assignedCourses.length > 0 ? assignedCourses[0] : null;
 
   if (!name || !description) {
     return NextResponse.json(
@@ -270,6 +273,7 @@ export async function POST(request: Request) {
       description,
       start_date: startDate || null,
       course_id: selectedCourseId,
+      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
     })
     .select()
     .single();
@@ -281,12 +285,12 @@ export async function POST(request: Request) {
   // 3. Link the scholars to the batch
   if (assignedMembers.length > 0) {
     const junctionData = assignedMembers.map((memberEmail: string) => ({
-      batch_id: batch.id, // This comes from the 'batch' we just created above
-      email: memberEmail, // Persist selected email as per schema
+      batch_id: batch.id,
+      email: memberEmail,
     }));
 
     const { error: junctionError } = await authContext.supabaseAdmin
-      .from("batch_members") // Make sure this table exists in Supabase!
+      .from("batch_members")
       .insert(junctionData);
 
     if (junctionError) {
@@ -296,25 +300,48 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
-    
-    // 4. Enroll the scholars in the assigned course
-    if (selectedCourseId) {
-      const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const authUsers = authUsersResult.data?.users ?? [];
-      
-      const userIdsToEnroll: string[] = [];
-      for (const email of assignedMembers) {
-        const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        if (authUser) {
-          userIdsToEnroll.push(authUser.id);
-        }
-      }
+  }
 
-      if (userIdsToEnroll.length > 0) {
+  // 4. Link courses to the batch via batch_courses junction table
+  if (assignedCourses.length > 0) {
+    const batchCoursesData = assignedCourses.map((courseId) => ({
+      batch_id: batch.id,
+      course_id: courseId,
+    }));
+
+    const { error: batchCoursesError } = await authContext.supabaseAdmin
+      .from("batch_courses")
+      .insert(batchCoursesData);
+
+    if (batchCoursesError) {
+      console.error("Batch Courses Link Error:", batchCoursesError.message);
+      return NextResponse.json(
+        { error: "Failed to link courses" },
+        { status: 500 },
+      );
+    }
+  }
+
+  // 5. Enroll the scholars in all assigned courses
+  if (assignedCourses.length > 0 && assignedMembers.length > 0) {
+    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUsers = authUsersResult.data?.users ?? [];
+    
+    const userIdsToEnroll: string[] = [];
+    for (const email of assignedMembers) {
+      const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (authUser) {
+        userIdsToEnroll.push(authUser.id);
+      }
+    }
+
+    if (userIdsToEnroll.length > 0) {
+      // Enroll in all courses
+      for (const courseId of assignedCourses) {
         const { data: existing } = await authContext.supabaseAdmin
           .from("course_enrollments")
           .select("user_id")
-          .eq("course_id", selectedCourseId)
+          .eq("course_id", courseId)
           .in("user_id", userIdsToEnroll);
           
         const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
@@ -323,7 +350,7 @@ export async function POST(request: Request) {
           .filter(id => !existingUserIds.has(id))
           .map(id => ({
             user_id: id,
-            course_id: selectedCourseId,
+            course_id: courseId,
           }));
           
         if (newEnrollments.length > 0) {
@@ -332,7 +359,7 @@ export async function POST(request: Request) {
             .insert(newEnrollments);
             
           if (enrollError) {
-             console.error("Enrollment Error:", enrollError.message);
+            console.error(`Enrollment Error for course ${courseId}:`, enrollError.message);
           }
         }
       }
@@ -361,6 +388,8 @@ export async function PUT(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : "";
   const assignedMembers = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((value: unknown) =>
@@ -369,10 +398,12 @@ export async function PUT(request: Request) {
         .filter((email: string) => EMAIL_RE.test(email))
     : [];
   const assignedCourses = Array.isArray(body?.assigned_courses)
-    ? body.assigned_courses.map(String)
+    ? body.assigned_courses
+        .map((value: unknown) => normalizeCourseId(value))
+        .filter((id): id is string | number => id !== null)
     : [];
   const selectedCourseId =
-    assignedCourses.length > 0 ? normalizeCourseId(assignedCourses[0]) : null;
+    assignedCourses.length > 0 ? assignedCourses[0] : null;
 
   if ((typeof id === "string" && !id) || !name || !description) {
     return NextResponse.json(
@@ -388,6 +419,7 @@ export async function PUT(request: Request) {
       description,
       start_date: startDate || null,
       course_id: selectedCourseId,
+      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
     })
     .eq("id", id);
 
@@ -395,6 +427,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // Clear and re-insert batch members
   const { error: clearMembersError } = await authContext.supabaseAdmin
     .from("batch_members")
     .delete()
@@ -415,25 +448,53 @@ export async function PUT(request: Request) {
     if (insertMembersError) {
       return NextResponse.json({ error: insertMembersError.message }, { status: 500 });
     }
-    
-    // Enroll the scholars in the assigned course
-    if (selectedCourseId) {
-      const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const authUsers = authUsersResult.data?.users ?? [];
-      
-      const userIdsToEnroll: string[] = [];
-      for (const email of assignedMembers) {
-        const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        if (authUser) {
-          userIdsToEnroll.push(authUser.id);
-        }
-      }
+  }
 
-      if (userIdsToEnroll.length > 0) {
+  // Clear and re-insert batch courses
+  const { error: clearCoursesError } = await authContext.supabaseAdmin
+    .from("batch_courses")
+    .delete()
+    .eq("batch_id", id);
+
+  if (clearCoursesError) {
+    return NextResponse.json({ error: clearCoursesError.message }, { status: 500 });
+  }
+
+  if (assignedCourses.length > 0) {
+    const batchCoursesData = assignedCourses.map((courseId) => ({
+      batch_id: id,
+      course_id: courseId,
+    }));
+
+    const { error: insertCoursesError } = await authContext.supabaseAdmin
+      .from("batch_courses")
+      .insert(batchCoursesData);
+
+    if (insertCoursesError) {
+      return NextResponse.json({ error: insertCoursesError.message }, { status: 500 });
+    }
+  }
+
+  // Enroll members in all courses
+  if (assignedCourses.length > 0 && assignedMembers.length > 0) {
+    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUsers = authUsersResult.data?.users ?? [];
+    
+    const userIdsToEnroll: string[] = [];
+    for (const email of assignedMembers) {
+      const authUser = authUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (authUser) {
+        userIdsToEnroll.push(authUser.id);
+      }
+    }
+
+    if (userIdsToEnroll.length > 0) {
+      // Enroll in all courses
+      for (const courseId of assignedCourses) {
         const { data: existing } = await authContext.supabaseAdmin
           .from("course_enrollments")
           .select("user_id")
-          .eq("course_id", selectedCourseId)
+          .eq("course_id", courseId)
           .in("user_id", userIdsToEnroll);
           
         const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
@@ -442,7 +503,7 @@ export async function PUT(request: Request) {
           .filter(id => !existingUserIds.has(id))
           .map(id => ({
             user_id: id,
-            course_id: selectedCourseId,
+            course_id: courseId,
           }));
           
         if (newEnrollments.length > 0) {
@@ -451,7 +512,7 @@ export async function PUT(request: Request) {
             .insert(newEnrollments);
             
           if (enrollError) {
-             console.error("Enrollment Error:", enrollError.message);
+            console.error(`Enrollment Error for course ${courseId}:`, enrollError.message);
           }
         }
       }
