@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image"; 
 import {
   Plus,
@@ -181,7 +181,7 @@ export default function AdminWebinarsPage() {
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Webinar Management
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
               Schedule and curate upcoming webinars for scholars.
             </p>
           </div>

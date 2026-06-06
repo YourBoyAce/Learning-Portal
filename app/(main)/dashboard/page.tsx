@@ -229,8 +229,96 @@ export default function Dashboard() {
       }
 
       if (mappedCourses.length > 0) {
-        const mostRecentCourse = mappedCourses[0];
-        setNextCourse(mostRecentCourse);
+        let selectedCourse: any = null;
+        let selectedModule: any = null;
+
+        // First pass: partially completed courses
+        for (const course of mappedCourses) {
+          const { data: modules } = await supabase
+            .from("coursemodules")
+            .select("*")
+            .eq("maincourse_id", course.id)
+            .order("order_index", { ascending: true });
+
+          if (!modules?.length) continue;
+
+          const { data: progressData } = await supabase
+            .from("user_video_progress")
+            .select(
+              "video_id, completed, updated_at, progress_percentage"
+            )
+            .eq("user_id", user.id)
+            .eq("course_id", course.id);
+
+          const moduleCompletion = resolveModuleCompletion(
+            modules,
+            progressData ?? []
+          );
+
+          const firstIncomplete = modules.find(
+            (m) =>
+              !moduleCompletion.get(String(m.id))?.completed
+          );
+
+          const progressPercent =
+            courseProgress[String(course.id)]
+              ?.progressPercentage ?? 0;
+
+          if (
+            firstIncomplete &&
+            progressPercent > 0 &&
+            progressPercent < 100
+          ) {
+            selectedCourse = course;
+            selectedModule = firstIncomplete;
+            break;
+          }
+        }
+
+        // If no partially completed course found, find first course with incomplete module
+        if (!selectedCourse) {
+          for (const course of mappedCourses) {
+            const { data: modules } = await supabase
+              .from("coursemodules")
+              .select("*")
+              .eq("maincourse_id", course.id)
+              .order("order_index", { ascending: true });
+
+            if (!modules?.length) continue;
+
+            const { data: progressData } = await supabase
+              .from("user_video_progress")
+              .select(
+                "video_id, completed, updated_at, progress_percentage"
+              )
+              .eq("user_id", user.id)
+              .eq("course_id", course.id);
+
+            const moduleCompletion = resolveModuleCompletion(
+              modules,
+              progressData ?? []
+            );
+
+            const firstIncomplete = modules.find(
+              (m) =>
+                !moduleCompletion.get(String(m.id))?.completed
+            );
+
+            if (firstIncomplete) {
+              selectedCourse = course;
+              selectedModule = firstIncomplete;
+              break;
+            }
+          }
+        }
+
+        // Fallback to most recent course if no incomplete modules found
+        if (!selectedCourse) {
+          selectedCourse = mappedCourses[0];
+        }
+
+        setNextCourse(selectedCourse);
+        setNextModule(selectedModule);
 
         // Fetch ALL modules from ALL enrolled courses (for learning progress)
         let allModules: any[] = [];
@@ -330,40 +418,6 @@ export default function Dashboard() {
         const mins = String(Math.floor((totalCompletedSeconds % 3600) / 60)).padStart(2, "0");
         const secs = String(totalCompletedSeconds % 60).padStart(2, "0");
         setTotalTime(`${hrs}:${mins}:${secs}`);
-
-        // Fetch modules for the most recent course separately for "next module" display
-        const { data: mostRecentModules } = await supabase
-          .from("coursemodules")
-          .select("*")
-          .eq("maincourse_id", mostRecentCourse.id)
-          .order("order_index", { ascending: true, nullsFirst: false })
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true });
-
-        if (mostRecentModules && mostRecentModules.length > 0) {
-          // Fetch user_video_progress for most recent course to find next uncompleted module
-          const { data: progressData } = await supabase
-            .from("user_video_progress")
-            .select("video_id, completed, updated_at, progress_percentage")
-            .eq("user_id", user.id)
-            .eq("course_id", mostRecentCourse.id);
-
-          const moduleCompletion = resolveModuleCompletion(
-            mostRecentModules,
-            progressData ?? [],
-          );
-
-          // Find the first incomplete module as the "next" module
-          const firstIncomplete = mostRecentModules.find(
-            (m: any) => !moduleCompletion.get(String(m.id))?.completed
-          );
-          if (firstIncomplete) {
-            setNextModule(firstIncomplete);
-          } else {
-            // Show only unfinished course modules only
-            setNextModule(null);
-          }
-        }
       }
     }
 
