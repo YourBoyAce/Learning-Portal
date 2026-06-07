@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabase";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
@@ -235,10 +235,10 @@ export default function AdminUsers() {
 
               <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Email Address
                   </label>
-              <input
+                  <input
                     type="email"
                     required
                     value={email}
@@ -249,7 +249,7 @@ export default function AdminUsers() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Initial Password
                   </label>
                   <div className="relative">
@@ -272,7 +272,7 @@ export default function AdminUsers() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Assign Role
                   </label>
                   <select
@@ -402,19 +402,19 @@ export default function AdminUsers() {
               <table className="w-full min-w-[860px] text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       User
                     </th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Role
                     </th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Today&apos;s Sessions
                     </th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Time Spent
                     </th>
-                    <th className="py-4 px-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Action
                     </th>
                   </tr>
@@ -445,18 +445,33 @@ export default function AdminUsers() {
                               {user.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900 text-sm">
+                              <p style={{
+                                fontSize: TYPOGRAPHY.BODY.fontSize,
+                                lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                                fontWeight: TYPOGRAPHY.H2.fontWeight,
+                              }}
+                                className="text-brand-heading">
                                 {user.name}
                               </p>
-                              <p className="text-xs text-gray-500">{user.email}</p>
+                              <p style={{
+                                fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                                lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                                fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                              }}
+                                className={TYPOGRAPHY_CLASSES.CAPTION}>{user.email}</p>
                             </div>
                           </div>
                         </td>
 
                         {/* Role */}
                         <td className="py-4 px-4">
-                          <span className="inline-flex px-2.5 py-1 rounded-md bg-blue-50 text-brand-primary text-[11px] font-bold tracking-wide capitalize border border-blue-100">
-                            {user.role}
+                          <span
+                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border ${user.role?.toLowerCase() === "admin"
+                              ? "bg-red-500/10 text-red-600 border-red-500/20"
+                              : "bg-brand-success/10 text-[#174778] border-brand-success/20"
+                              }`}
+                          >
+                            {user.role || "User"}
                           </span>
                         </td>
 

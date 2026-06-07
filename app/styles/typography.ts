@@ -24,7 +24,7 @@ export const TYPOGRAPHY = {
   },
 
   BODY: {
-    fontSize: "16px",
+    fontSize: "15px",
     lineHeight: "28px",
     fontWeight: 300,
   },
@@ -34,6 +34,11 @@ export const TYPOGRAPHY = {
     lineHeight: "20px",
     fontWeight: 700,
   },
+  CAPTION: {
+    fontSize: "13px",
+    lineHeight: "24px",
+    fontWeight: 300,
+  },
 } as const;
 
 type TypographyScale = typeof TYPOGRAPHY;
@@ -42,6 +47,10 @@ export const TYPOGRAPHY_CSS_VARIABLES = {
   "--typography-xl-font-size": TYPOGRAPHY.XL.fontSize,
   "--typography-xl-line-height": TYPOGRAPHY.XL.lineHeight,
   "--typography-xl-font-weight": TYPOGRAPHY.XL.fontWeight,
+
+  "--typography-caption-font-size": TYPOGRAPHY.CAPTION.fontSize,
+  "--typography-caption-line-height": TYPOGRAPHY.CAPTION.lineHeight,
+  "--typography-caption-font-weight": TYPOGRAPHY.CAPTION.fontWeight,
 
   "--typography-main-heading-font-size": TYPOGRAPHY.MAIN_HEADING.fontSize,
   "--typography-main-heading-line-height": TYPOGRAPHY.MAIN_HEADING.lineHeight,
@@ -59,6 +68,7 @@ export const TYPOGRAPHY_CSS_VARIABLES = {
   "--typography-body-line-height": TYPOGRAPHY.BODY.lineHeight,
   "--typography-body-font-weight": TYPOGRAPHY.BODY.fontWeight,
 
+
   "--typography-button-font-size": TYPOGRAPHY.BUTTON.fontSize,
   "--typography-button-line-height": TYPOGRAPHY.BUTTON.lineHeight,
   "--typography-button-font-weight": TYPOGRAPHY.BUTTON.fontWeight,
@@ -71,6 +81,11 @@ export const TYPOGRAPHY_CLASSES = {
     "text-4xl md:text-main-heading font-bold text-brand-heading mb-4 tracking-tight leading-tight",
   SUBHEADING:
     "text-2xl font-bold text-brand-heading tracking-tight",
+  CAPTION:
+    "text-[13px] leading-6 font-light text-gray-500",
+
   PRIMARY_BUTTON:
     "justify-center bg-brand-primary hover:bg-brand-hover",
+  INNERHEADING:
+    "text-[18px] font-semibold text-brand-heading tracking-tight"
 } as const;

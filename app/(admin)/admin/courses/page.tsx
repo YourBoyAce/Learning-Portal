@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import { CourseCard } from "@/app/components/course";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import {
   Carousel,
@@ -37,7 +37,7 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-const router = useRouter();
+  const router = useRouter();
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -350,18 +350,18 @@ const router = useRouter();
     });
 
   const stats = [
-  {
-    label: "Total Courses",
-    value: courses.length.toString(),
-    icon: ICONS.BOOK,
-  },
-  {
-    label: "Active Courses",
-    value: courses.length.toString(),
-    icon: ICONS.GLOBE,
-  },
-  
-];
+    {
+      label: "Total Courses",
+      value: courses.length.toString(),
+      icon: ICONS.BOOK,
+    },
+    {
+      label: "Active Courses",
+      value: courses.length.toString(),
+      icon: ICONS.GLOBE,
+    },
+
+  ];
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
@@ -388,47 +388,47 @@ const router = useRouter();
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
           {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
-              >
-                <div className="flex items-center justify-center shrink-0">
-                  <Image
-                    src={stat.icon}
-                    alt={stat.label}
-                    width={30}
-                    height={30}
-                  />
-                </div>
-          
-                <div className="flex flex-col">
-                  <span
-                    className="text-2xl font-bold"
-                    style={{
-                      color: "var(--color-primary)",
-                      fontFamily: "var(--font-primary)",
-                    }}
-                  >
-                    {stat.value}
-                  </span>
-          
-                  <span
-                    className="text-sm"
-                    style={{
-                      color: "var(--color-text-secondary)",
-                      fontFamily: "var(--font-primary)",
-                    }}
-                  >
-                    {stat.label}
-                  </span>
-                </div>
+            <div
+              key={stat.label}
+              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+            >
+              <div className="flex items-center justify-center shrink-0">
+                <Image
+                  src={stat.icon}
+                  alt={stat.label}
+                  width={30}
+                  height={30}
+                />
               </div>
-            ))}
+
+              <div className="flex flex-col">
+                <span
+                  className="text-2xl font-bold"
+                  style={{
+                    color: "var(--color-primary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.value}
+                </span>
+
+                <span
+                  className="text-sm"
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.label}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Course Catalog Header & Search */}
         <div className="flex items-center justify-between flex-wrap gap-4 mt-12 mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Course Catalog</h3>
+          <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Course Catalog</h2>
           <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -482,47 +482,47 @@ const router = useRouter();
 
         {/* Courses Grid */}
         <div className="relative">
-        {!loading && filteredCourses.length > 0 && (
-       <Carousel
-  opts={{
-    align: "start",
-    loop: false,
-    dragFree: true,
-  }}
-  className="w-full"
->
-  <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-    {filteredCourses.map((course) => (
-      <CarouselItem
-        key={course.id}
-       className="
+          {!loading && filteredCourses.length > 0 && (
+            <Carousel
+              opts={{
+                align: "start",
+                loop: false,
+                dragFree: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                {filteredCourses.map((course) => (
+                  <CarouselItem
+                    key={course.id}
+                    className="
   pl-4
   sm:pl-6
   basis-[85vw]
 sm:basis-1/2
 lg:basis-1/3
 "
-      >
-        <CourseCard
-          id={course.id}
-          title={course.title}
-          description={course.description}
-          thumbnail={course.thumbnail_url}
-          createdAt={course.created_at}
-          variant="admin"
-          onClick={() =>
-            router.push(`/courses/${course.id}`)
-          }
-          onEdit={() => handleEdit(course)}
-          onDelete={() => handleDeleteClick(course)}
-        />
-      </CarouselItem>
-    ))}
-  </CarouselContent>
+                  >
+                    <CourseCard
+                      id={course.id}
+                      title={course.title}
+                      description={course.description}
+                      thumbnail={course.thumbnail_url}
+                      createdAt={course.created_at}
+                      variant="admin"
+                      onClick={() =>
+                        router.push(`/courses/${course.id}`)
+                      }
+                      onEdit={() => handleEdit(course)}
+                      onDelete={() => handleDeleteClick(course)}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
 
-  
-      <CarouselPrevious
-        className="
+
+              <CarouselPrevious
+                className="
           hidden
           lg:flex
           -left-5
@@ -533,10 +533,10 @@ lg:basis-1/3
           text-brand-primary
           hover:bg-gray-50
         "
-      />
+              />
 
-      <CarouselNext
-        className="
+              <CarouselNext
+                className="
           hidden
           lg:flex
           -right-5
@@ -547,14 +547,14 @@ lg:basis-1/3
           text-brand-primary
           hover:bg-gray-50
         "
-      />
-    
-  
-</Carousel>)}
-</div>
-       
-      </div> 
-      
+              />
+
+
+            </Carousel>)}
+        </div>
+
+      </div>
+
 
       {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
       {showModal && (
@@ -683,8 +683,8 @@ lg:basis-1/3
               {modalMessage && (
                 <p
                   className={`text-xs font-medium ${modalMessage.type === "success"
-                      ? "text-emerald-600"
-                      : "text-red-600"
+                    ? "text-emerald-600"
+                    : "text-red-600"
                     }`}
                 >
                   {modalMessage.text}

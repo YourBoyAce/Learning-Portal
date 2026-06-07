@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import CourseCard from "@/app/components/course/CourseCard";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 
@@ -260,7 +260,7 @@ export default function UploadPage() {
         if (!directUploadResponse.ok) {
           throw new Error(
             directUploadResult.error ||
-              "Failed to initialize Cloudflare upload.",
+            "Failed to initialize Cloudflare upload.",
           );
         }
 
@@ -406,9 +406,6 @@ export default function UploadPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            ADMIN PORTAL / CONTENT MANAGEMENT
-          </p>
           <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
             Video Asset Upload
           </h1>
@@ -455,23 +452,28 @@ export default function UploadPage() {
           {/* Left Panel - Upload Form */}
           <div className="lg:col-span-1 space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>
                 Upload New Video
               </h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Select Curriculum
                   </label>
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedCurriculum ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   >
-                    <option value="">Select curriculum...</option>
+                    <option value="" className="text-gray-400">Select curriculum...</option>
                     {courses.map((course) => (
-                      <option key={course.id} value={String(course.id)}>
+                      <option key={course.id} value={String(course.id)} className="text-gray-900">
                         {course.title}
                       </option>
                     ))}
@@ -479,22 +481,27 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Select Module
                   </label>
                   <select
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
                     disabled={!selectedCurriculum || isModulesLoading}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedModuleId ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   >
-                    <option value="">
+                    <option value="" className="text-gray-400">
                       {isModulesLoading
                         ? "Loading modules..."
                         : "Select module..."}
                     </option>
                     {modules.map((module) => (
-                      <option key={module.id} value={String(module.id)}>
+                      <option key={module.id} value={String(module.id)} className="text-gray-900">
                         {module.title}
                       </option>
                     ))}
@@ -502,7 +509,7 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Video Title
                   </label>
                   <input
@@ -510,12 +517,17 @@ export default function UploadPage() {
                     placeholder="e.g. Intro to Variables"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Module Thumbnail (Optional)
                   </label>
                   <input
@@ -528,7 +540,12 @@ export default function UploadPage() {
                         file ? URL.createObjectURL(file) : "",
                       );
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-blue-50 file:text-brand-heading file:font-semibold hover:file:bg-blue-100"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   />
                   {moduleThumbnailPreview && (
                     <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
@@ -546,11 +563,10 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
-                    isDragging
-                      ? "border-brand-primary bg-blue-50"
-                      : "border-dashed border-gray-300 hover:border-gray-400"
-                  }`}
+                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${isDragging
+                    ? "border-brand-primary bg-blue-50"
+                    : "border-dashed border-gray-300 hover:border-gray-400"
+                    }`}
                   onClick={() => document.getElementById("file-input")?.click()}
                 >
                   <input
@@ -561,20 +577,15 @@ export default function UploadPage() {
                     className="hidden"
                   />
 
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                      />
-                    </svg>
+                  <div className="w-16 h-16 mx-auto mb-4 bg-brand-primary/50 rounded-full flex items-center justify-center">
+                    <Image
+                      src="/icons/arrowLight.svg"
+                      alt="upload"
+                      width={32}
+                      height={32}
+                      className="w-8 h-8 text-brand-primary"
+                    />
+
                   </div>
 
                   {fileNameDisplay ? (
@@ -586,12 +597,7 @@ export default function UploadPage() {
                     </>
                   ) : (
                     <>
-                      <p className="text-sm font-semibold text-gray-900 mb-1">
-                        Drop asset or click to browse
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        MP4, MOV (large files are uploaded in chunks)
-                      </p>
+                      <p className={`${TYPOGRAPHY.BODY.fontSize} ${TYPOGRAPHY.BODY.fontWeight} ${TYPOGRAPHY.BODY.lineHeight} text-brand-primary`}>Drop asset or click to browse</p>
                     </>
                   )}
                 </div>
@@ -613,7 +619,7 @@ export default function UploadPage() {
           <div className="lg:col-span-2 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                   Active Curriculum
                 </h3>
               </div>
@@ -631,17 +637,17 @@ export default function UploadPage() {
                 )}
 
                 {displayedCourses.map((course) => (
-  <CourseCard
-    key={course.id}
-    id={course.id}
-    title={course.title}
-    description={course.description}
-    thumbnail={course.thumbnail_url}
-    createdAt={course.created_at}
-    variant="admin"
-    showProgress={false}
-  />
-))}
+                  <CourseCard
+                    key={course.id}
+                    id={course.id}
+                    title={course.title}
+                    description={course.description}
+                    thumbnail={course.thumbnail_url}
+                    createdAt={course.created_at}
+                    variant="admin"
+                    showProgress={false}
+                  />
+                ))}
 
                 {/* View More Card */}
                 {!showAllCourses && courses.length > 4 && (

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import Image from "next/image"; 
+import Image from "next/image";
 import {
   Plus,
   Search,
@@ -228,16 +228,16 @@ export default function AdminWebinarsPage() {
             <table className="w-full min-w-[760px] border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider text-black">
+                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                     Webinar Details
                   </th>
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider  text-black">
+                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                     Schedule
                   </th>
-                  <th className="text-left py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider  text-black">
+                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                     Status
                   </th>
-                  <th className="text-right py-4 px-6 text-[11px] font-bold text-black-400 uppercase tracking-wider text-black">
+                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                     Actions
                   </th>
                 </tr>
@@ -295,11 +295,10 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${
-                            webinar.status === "streaming"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                               : "bg-blue-50 text-blue-700 border-blue-100"
-                          }`}
+                            }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${webinar.status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`}

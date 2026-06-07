@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
@@ -275,13 +275,13 @@ export default function AdminQuizzes() {
       quiz.questions.length > 0
         ? quiz.questions.map((q) => ({ ...q }))
         : [
-            {
-              id: "q-temp-1",
-              text: "",
-              options: ["", "", "", ""],
-              correctAnswer: 0,
-            },
-          ]
+          {
+            id: "q-temp-1",
+            text: "",
+            options: ["", "", "", ""],
+            correctAnswer: 0,
+          },
+        ]
     );
     setShowModal(true);
   };
@@ -343,15 +343,15 @@ export default function AdminQuizzes() {
         prev.map((q) =>
           q.id === editingQuizId
             ? {
-                ...q,
-                title: quizTitle,
-                courseName,
-                courseId,
-                passingScore,
-                status,
-                questionsCount: validQuestions.length,
-                questions: validQuestions,
-              }
+              ...q,
+              title: quizTitle,
+              courseName,
+              courseId,
+              passingScore,
+              status,
+              questionsCount: validQuestions.length,
+              questions: validQuestions,
+            }
             : q
         )
       );
@@ -394,31 +394,31 @@ export default function AdminQuizzes() {
   );
 
   const stats = [
-  {
-    label: "Total Quizzes",
-    value: quizzes.length.toString(),
-    icon: ICONS.BULB,
-  },
-  {
-    label: "Active Quizzes",
-    value: quizzes.filter((q) => q.status === "Active").length.toString(),
-    icon: ICONS.CLOCK,
-  },
-  {
-    label: "Total Attempts",
-    value: quizzes
-      .reduce((acc, q) => acc + q.attemptsCount, 0)
-      .toString(),
-    icon: ICONS.ITEMS,
-  },
-  {
-    label: "Avg. Passing Grade",
-    value: `${Math.round(
-      quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length
-    )}%`,
-    icon: ICONS.CHAMPION,
-  },
-];
+    {
+      label: "Total Quizzes",
+      value: quizzes.length.toString(),
+      icon: ICONS.BULB,
+    },
+    {
+      label: "Active Quizzes",
+      value: quizzes.filter((q) => q.status === "Active").length.toString(),
+      icon: ICONS.CLOCK,
+    },
+    {
+      label: "Total Attempts",
+      value: quizzes
+        .reduce((acc, q) => acc + q.attemptsCount, 0)
+        .toString(),
+      icon: ICONS.ITEMS,
+    },
+    {
+      label: "Avg. Passing Grade",
+      value: `${Math.round(
+        quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length
+      )}%`,
+      icon: ICONS.CHAMPION,
+    },
+  ];
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -441,42 +441,42 @@ export default function AdminQuizzes() {
           </Button>
         </div>
 
-       {/* Stats Row */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-  {stats.map((stat) => (
-    <div
-      key={stat.label}
-      className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100"
-    >
-      <div className="flex items-center gap-4 mb-3">
-        
-        <div className="flex items-center justify-center w-12 h-12 rounded-lg">
-          <Image
-            src={stat.icon}
-            alt={stat.label}
-            width={24}
-            height={24}
-          />
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100"
+            >
+              <div className="flex items-center gap-4 mb-3">
+
+                <div className="flex items-center justify-center w-12 h-12 rounded-lg">
+                  <Image
+                    src={stat.icon}
+                    alt={stat.label}
+                    width={24}
+                    height={24}
+                  />
+                </div>
+
+                <div>
+                  <div className="text-2xl font-bold text-brand-primary">
+                    {stat.value}
+                  </div>
+
+                  <div className="text-sm text-[var(--color-text-secondary)]">
+                    {stat.label}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          ))}
         </div>
-
-        <div>
-          <div className="text-2xl font-bold text-brand-primary">
-            {stat.value}
-          </div>
-
-          <div className="text-sm text-[var(--color-text-secondary)]">
-            {stat.label}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  ))}
-</div>
 
         {/* Search */}
         <div className="flex items-center justify-between flex-wrap gap-4 mt-8 mb-6">
-          <h3 className="text-xl font-bold text-gray-900">All Quizzes</h3>
+          <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>All Quizzes</h3>
           <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -515,28 +515,28 @@ export default function AdminQuizzes() {
               <table className="w-full min-w-[760px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-6">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Quiz Title
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Course
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Questions
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Passing Score
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Attempts
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Avg Score
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Status
                     </th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right pr-6">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Actions
                     </th>
                   </tr>
@@ -547,34 +547,63 @@ export default function AdminQuizzes() {
                       key={quiz.id}
                       className="hover:bg-gray-50/30 transition-colors group"
                     >
-                      <td className="p-4 pl-6 font-semibold text-gray-900 text-sm">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4 pl-6">
                         {quiz.title}
                       </td>
-                      <td className="p-4 text-gray-500 text-sm">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4">
                         <span className="flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-gray-400" />
                           {quiz.courseName}
                         </span>
                       </td>
-                      <td className="p-4 text-sm text-gray-700 text-center font-medium">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4">
                         {quiz.questionsCount}
                       </td>
-                      <td className="p-4 text-sm text-gray-700 text-center font-medium">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4">
                         {quiz.passingScore}%
                       </td>
-                      <td className="p-4 text-sm text-gray-500 text-center">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4">
                         {quiz.attemptsCount}
                       </td>
-                      <td className="p-4 text-sm text-gray-900 text-center font-bold">
+                      <td style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: TYPOGRAPHY.H2.fontWeight,
+                      }}
+                        className="text-brand-heading p-4">
                         {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
                       </td>
                       <td className="p-4 text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
-                            quiz.status === "Active"
-                              ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-                              : "bg-gray-50 border-gray-200 text-gray-500"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${quiz.status === "Active"
+                            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                            : "bg-gray-50 border-gray-200 text-gray-500"
+                            }`}
                         >
                           {quiz.status}
                         </span>

@@ -365,24 +365,24 @@ export default function Dashboard() {
         // Calculate total time spent across ALL courses (only for completed modules with valid durations)
         let totalCompletedSeconds = 0;
         let completedWithDuration = 0;
-        
+
         for (const courseModule of allModules) {
           // Check if this module is in our completed list
           const isCompleted = allCompletedVideoIds.includes(String(courseModule.id));
-          
+
           // Only process completed modules
           if (!isCompleted) {
             continue;
           }
-          
+
           // Skip modules without duration data
           if (!courseModule.duration || !String(courseModule.duration).trim()) {
             continue;
           }
-          
+
           const durationStr = String(courseModule.duration).toLowerCase().trim();
           let durationSec = 0;
-          
+
           // Parse duration from format like "HH:MM:SS"
           if (durationStr.includes(':')) {
             const parts = durationStr.split(":").map(p => parseInt(p, 10));
@@ -410,13 +410,13 @@ export default function Dashboard() {
               durationSec = numVal;
             }
           }
-          
+
           if (durationSec > 0) {
             totalCompletedSeconds += durationSec;
             completedWithDuration++;
           }
         }
-        
+
         const hrs = String(Math.floor(totalCompletedSeconds / 3600)).padStart(2, "0");
         const mins = String(Math.floor((totalCompletedSeconds % 3600) / 60)).padStart(2, "0");
         const secs = String(totalCompletedSeconds % 60).padStart(2, "0");
@@ -458,7 +458,7 @@ export default function Dashboard() {
             if (progressData && progressData.length > 0) {
               for (const progress of progressData) {
                 const progressDate = new Date(progress.updated_at);
-                
+
                 // Find the matching module
                 const matchingModule = courseModules.find(
                   (m: any) =>
@@ -481,14 +481,14 @@ export default function Dashboard() {
         if (resumeModule && resumeCourse) {
           const moduleCompletion = courseProgressMap.get(resumeCourse.id);
           const isCompleted = moduleCompletion?.get(String(resumeModule.id))?.completed;
-          
+
           // If it's completed, try to find an incomplete module in the same course
           if (isCompleted) {
             const courseModules = courseModulesMap.get(resumeCourse.id) || [];
             const incompleteModule = courseModules.find(
               (m: any) => !moduleCompletion?.get(String(m.id))?.completed
             );
-            
+
             if (incompleteModule) {
               resumeModule = incompleteModule;
             }
@@ -504,7 +504,7 @@ export default function Dashboard() {
           for (const course of mappedCourses) {
             const courseModules = courseModulesMap.get(course.id) || [];
             const moduleCompletion = courseProgressMap.get(course.id);
-            
+
             const incompleteModule = courseModules.find(
               (m: any) => !moduleCompletion?.get(String(m.id))?.completed
             );
@@ -517,19 +517,12 @@ export default function Dashboard() {
           }
         }
 
-        // Fallback: if all modules are complete, use the most recent course's first module
-        if (!resumeModule && mappedCourses.length > 0) {
-          const firstCourse = mappedCourses[0];
-          const firstCourseModules = courseModulesMap.get(firstCourse.id) || [];
-          if (firstCourseModules.length > 0) {
-            resumeModule = firstCourseModules[0];
-            resumeCourse = firstCourse;
-          }
-        }
-
         if (resumeModule && resumeCourse) {
           setNextModule(resumeModule);
           setNextCourse(resumeCourse);
+        } else {
+          setNextModule(null);
+          setNextCourse(null);
         }
       }
     }
@@ -693,11 +686,11 @@ export default function Dashboard() {
           )}
         </div>
 
-       
+
         {/* Upcoming Webinars Widget */}
-    {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
+        {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
-          
+
           {/* 1. Upcoming Webinars Widget */}
           <div className="bg-surface-accent rounded-2xl p-6 md:p-7 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
 
@@ -787,7 +780,7 @@ export default function Dashboard() {
 
           {/* 2. Enrollment Summary / Batch Allocations Widget */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-7 shadow-sm flex flex-col h-full">
-            
+
             <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center">
@@ -801,7 +794,7 @@ export default function Dashboard() {
                 {enrollments.length} Active
               </span>
             </div>
-            
+
             <div className="flex-1 flex flex-col">
               {enrollments.length === 0 ? (
                 <div className="h-full py-8 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
@@ -810,7 +803,7 @@ export default function Dashboard() {
                   </div>
                   <p className="text-gray-800 font-semibold text-lg mb-1">No Active Cohorts</p>
                   <p className="text-gray-500 text-sm max-w-[200px]">
-                    You haven't been allocated to any specific batches yet. 
+                    You haven't been allocated to any specific batches yet.
                   </p>
                 </div>
               ) : (
@@ -828,7 +821,7 @@ export default function Dashboard() {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                        
+
                         {/* Category Badge */}
                         <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-brand-primary uppercase tracking-widest shadow-md">
                           {item.courseCategory || "General"}
@@ -904,7 +897,7 @@ export default function Dashboard() {
                     Total Time
                   </p>
 
-                  <p className="text-2xl sm:text-3xl font-black text-brand-primary tracking-tight font-mono">
+                  <p className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary font-black tracking-tight font-mono`}>
                     {totalTime}
                   </p>
                 </div>
@@ -976,38 +969,88 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="bg-surface-subtle border border-gray-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
-                  <p className="text-sm font-semibold text-gray-500">
-                    No modules available
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 text-2xl">
+                    ✓
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">
+                    You&apos;re all caught up!
+                  </h3>
+                  <p className="text-sm text-gray-500 max-w-sm">
+                    You&apos;ve completed every module currently available in your enrolled courses.
                   </p>
                 </div>
               )}
             </div>
 
-           {/* RIGHT SIDE - LEARNING PROGRESS */}
+            {/* RIGHT SIDE - LEARNING PROGRESS */}
             <div className="bg-surface-accent border border-brand-primary/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
 
               <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-7 relative z-10`}>
                 Learning Progress
               </h2>
-
               {/* Circle */}
               <div className="flex justify-center relative z-10">
-                <div className="relative w-44 h-44 rounded-full border-[4px] border-brand-primary flex items-center justify-center bg-white shadow-sm">
-                  <div className="text-center">
-                    <h1 className="text-5xl font-black text-brand-primary">
-                      {progressPercentage}%
-                    </h1>
-                    <p className="text-xs tracking-[0.3em] text-brand-primary/70 mt-2 font-bold">
-                      MASTERY
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const radius = 80;
+                  const stroke = 5;
+                  const normalizedRadius = radius - stroke / 2;
+                  const circumference = normalizedRadius * 2 * Math.PI;
+                  const strokeDashoffset =
+                    circumference - (progressPercentage / 100) * circumference;
+
+                  return (
+                    <div className="relative w-44 h-44 flex items-center justify-center">
+                      <svg
+                        height={radius * 2}
+                        width={radius * 2}
+                        className="-rotate-90"
+                      >
+                        {/* Background Ring */}
+                        <circle
+                          stroke="#E5E7EB"
+                          fill="transparent"
+                          strokeWidth={stroke}
+                          r={normalizedRadius}
+                          cx={radius}
+                          cy={radius}
+                        />
+
+                        {/* Progress Ring */}
+                        <circle
+                          stroke="#1682F1"
+                          fill="transparent"
+                          strokeWidth={stroke}
+                          strokeLinecap="round"
+                          strokeDasharray={`${circumference} ${circumference}`}
+                          strokeDashoffset={strokeDashoffset}
+                          r={normalizedRadius}
+                          cx={radius}
+                          cy={radius}
+                          className="transition-all duration-700 ease-out"
+                        />
+                      </svg>
+
+                      {/* Center Content */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} text-brand-primary`}>
+                            {progressPercentage}%
+                          </h1>
+
+                          <p className="text-xs tracking-[0.3em] text-brand-primary/70 mt-2 font-bold">
+                            MASTERY
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Stats Wrapped in Glassmorphism */}
               <div className="mt-auto pt-8 relative z-10">
                 <div className="bg-white border border-gray-100 rounded-xl p-5 space-y-4 shadow-sm">
-                  
+
                   <div className="flex items-center justify-between border-b border-brand-primary/10 pb-4">
                     <span className="text-sm font-medium text-gray-600">
                       Modules Completed
@@ -1021,19 +1064,19 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                  <span className="text-lg font-bold text-brand-primary">
+                    <span className="text-lg font-bold text-brand-primary">
                       {enrolledCourses.length}
                     </span>
                   </div>
-                  
+
                 </div>
               </div>
-              
+
             </div>
           </div>
         )}
 
-{/* Active Studies Grid / Carousel */}
+        {/* Active Studies Grid / Carousel */}
         {(() => {
           const activeCourses = enrolledCourses.filter(
             (course) => (courseProgress[String(course.id)]?.progressPercentage || 0) < 100
@@ -1066,29 +1109,29 @@ export default function Dashboard() {
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
                       {activeCourses.map((course) => (
                         <CarouselItem
-          key={course.id}
-          className="
+                          key={course.id}
+                          className="
             pl-4
             sm:pl-6
             basis-[85vw]
             sm:basis-1/2
             lg:basis-1/3
           "
-        >
-          <CourseCard
-            id={course.id}
-            title={course.title}
-            description={course.description}
-            thumbnail={course.thumbnail_url}
-            progressPercentage={
-              courseProgress[String(course.id)]
-                ?.progressPercentage || 0
-            }
-            showProgress
-            variant="user"
-            onClick={() => handleOpenCourse(course.id)}
-          />
-        </CarouselItem>
+                        >
+                          <CourseCard
+                            id={course.id}
+                            title={course.title}
+                            description={course.description}
+                            thumbnail={course.thumbnail_url}
+                            progressPercentage={
+                              courseProgress[String(course.id)]
+                                ?.progressPercentage || 0
+                            }
+                            showProgress
+                            variant="user"
+                            onClick={() => handleOpenCourse(course.id)}
+                          />
+                        </CarouselItem>
                       ))}
                     </CarouselContent>
 
@@ -1129,26 +1172,26 @@ export default function Dashboard() {
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
                       {completedCourses.map((course) => (
                         <CarouselItem
-          key={course.id}
-          className="
+                          key={course.id}
+                          className="
             pl-4
             sm:pl-6
             basis-[85vw]
             sm:basis-1/2
             lg:basis-1/3
           "
-        >
-          <CourseCard
-            id={course.id}
-            title={course.title}
-            description={course.description}
-            thumbnail={course.thumbnail_url}
-            progressPercentage={100}
-            showProgress
-            variant="user"
-            onClick={() => handleOpenCourse(course.id)}
-          />
-        </CarouselItem>
+                        >
+                          <CourseCard
+                            id={course.id}
+                            title={course.title}
+                            description={course.description}
+                            thumbnail={course.thumbnail_url}
+                            progressPercentage={100}
+                            showProgress
+                            variant="user"
+                            onClick={() => handleOpenCourse(course.id)}
+                          />
+                        </CarouselItem>
                       ))}
                     </CarouselContent>
 

@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
-import { Users, BookOpen, Search, Loader2, Clock, LogIn, Timer } from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Loader2, Clock, LogIn, Timer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+
 import Image from "next/image";
 
 interface LoginLog {
@@ -121,19 +122,19 @@ export default function AdminDashboard() {
     if (hrs > 0) return `${hrs}h ${mins % 60}m`;
     return `${mins}m`;
   };
-   const stats = [
-  {
-    label: "Total Scholars",
-    value: totalStudents.toString(),
-    icon: ICONS.USERS,
-  },
-  {
-    label: "Active Courses",
-    value: courses.length.toString(),
-    icon: ICONS.GLOBE,
-  },
-  
-];
+  const stats = [
+    {
+      label: "Total Scholars",
+      value: totalStudents.toString(),
+      icon: ICONS.USERS,
+    },
+    {
+      label: "Active Courses",
+      value: courses.length.toString(),
+      icon: ICONS.GLOBE,
+    },
+
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
@@ -152,45 +153,45 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Row */}
-                <div className="grid grid-cols-1  mb-8 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-                  {stats.map((stat) => (
-                      <div
-                        key={stat.label}
-                        className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
-                      >
-                        <div className="flex items-center justify-center shrink-0">
-                          <Image
-                            src={stat.icon}
-                            alt={stat.label}
-                            width={30}
-                            height={30}
-                          />
-                        </div>
-                  
-                        <div className="flex flex-col">
-                          <span
-                            className="text-2xl font-bold"
-                            style={{
-                              color: "var(--color-primary)",
-                              fontFamily: "var(--font-primary)",
-                            }}
-                          >
-                            {stat.value}
-                          </span>
-                  
-                          <span
-                            className="text-sm"
-                            style={{
-                              color: "var(--color-text-secondary)",
-                              fontFamily: "var(--font-primary)",
-                            }}
-                          >
-                            {stat.label}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+        <div className="grid grid-cols-1  mb-8 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+            >
+              <div className="flex items-center justify-center shrink-0">
+                <Image
+                  src={stat.icon}
+                  alt={stat.label}
+                  width={30}
+                  height={30}
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <span
+                  className="text-2xl font-bold"
+                  style={{
+                    color: "var(--color-primary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.value}
+                </span>
+
+                <span
+                  className="text-sm"
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -207,13 +208,13 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[560px]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Scholar
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Role
                     </th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Joined
                     </th>
                   </tr>
@@ -245,11 +246,18 @@ export default function AdminDashboard() {
                               {(user.full_name || user.email || "U")
                                 .charAt(0)}
                             </div>
-                            <div>
-                              <span className="text-sm font-medium text-gray-900 block">
+                            <div className="flex flex-col">
+                              <span
+                                style={{
+                                  fontSize: TYPOGRAPHY.BODY.fontSize,
+                                  lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                                  fontWeight: TYPOGRAPHY.H2.fontWeight,
+                                }}
+                                className="text-brand-heading"
+                              >
                                 {user.full_name || "Unknown"}
                               </span>
-                              <span className="text-xs text-gray-500 block">
+                              <span className={TYPOGRAPHY_CLASSES.CAPTION}>
                                 {user.email}
                               </span>
                             </div>
@@ -257,16 +265,21 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-4 px-4">
                           <span
-                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase rounded-md border ${
-                              user.role?.toLowerCase() === "instructor"
-                                ? "bg-purple-50 text-purple-700 border-purple-100"
-                                : "bg-gray-50 text-gray-700 border-gray-200"
-                            }`}
+                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase rounded-md border ${user.role?.toLowerCase() === "instructor"
+                              ? "bg-purple-50 text-purple-700 border-purple-100"
+                              : "bg-gray-50 text-gray-700 border-gray-200"
+                              }`}
                           >
                             {user.role || "User"}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-sm text-gray-500">
+                        <td style={{
+                          fontSize: TYPOGRAPHY.BODY.fontSize,
+                          lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                          fontWeight: TYPOGRAPHY.H2.fontWeight,
+                        }}
+                          className="text-brand-heading"
+                        >
                           {new Date(user.created_at).toLocaleDateString()}
                         </td>
                       </tr>
@@ -320,13 +333,16 @@ export default function AdminDashboard() {
                     <div className="h-20 bg-gradient-to-br from-brand-primary to-[#2563eb] relative overflow-hidden">
                       <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:12px_12px]"></div>
                       <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
-                        <BookOpen className="w-8 h-8 text-white" />
+                        <Image src={ICONS.BOOKLIGHT} alt="Book" width={40} height={40} />
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-brand-primary transition-colors">
+                      <p
+                        className="text-copy-navy leading-snug line-clamp-2 flex-1"
+                        style={{ fontWeight: "semibold", fontSize: "14px" }}
+                      >
                         {course.title}
-                      </h3>
+                      </p>
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
                           {new Date(course.created_at).toLocaleDateString()}

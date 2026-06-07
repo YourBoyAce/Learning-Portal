@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import Select from "react-select";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
@@ -90,7 +90,7 @@ export default function AdminBatches() {
       const { data, error } = await supabase
         .from("batch_members")
         .select("email");
-      
+
       if (error) {
         console.error("Failed to fetch total students:", error.message);
         return;
@@ -203,10 +203,10 @@ export default function AdminBatches() {
 
       const memberEmails: string[] = Array.isArray(result.assignment.memberEmails)
         ? result.assignment.memberEmails
-            .map((email: unknown) =>
-              typeof email === "string" ? email.trim().toLowerCase() : "",
-            )
-            .filter(Boolean)
+          .map((email: unknown) =>
+            typeof email === "string" ? email.trim().toLowerCase() : "",
+          )
+          .filter(Boolean)
         : [];
       const courseIds: string[] = Array.isArray(result.assignment.courseIds)
         ? result.assignment.courseIds
@@ -320,7 +320,7 @@ export default function AdminBatches() {
     try {
       setIsSaving(true);
       setModalMessage(null);
-      
+
       // Upload thumbnail if provided
       let thumbnailUrl: string | null = null;
       if (batchThumbnail) {
@@ -491,22 +491,22 @@ export default function AdminBatches() {
   });
 
   const stats = [
-  {
-    label: "Total Batches",
-    value: batches.length.toString(),
-    icon: ICONS.BATCH,
-  },
-  {
-    label: "Total Students",
-    value: totalStudents.toString(),
-    icon: ICONS.USERS,
-  },
-  {
-    label: "Published",
-    value: batches.length.toString(),
-    icon: ICONS.GLOBE,
-  },
-];
+    {
+      label: "Total Batches",
+      value: batches.length.toString(),
+      icon: ICONS.BATCH,
+    },
+    {
+      label: "Total Students",
+      value: totalStudents.toString(),
+      icon: ICONS.USERS,
+    },
+    {
+      label: "Published",
+      value: batches.length.toString(),
+      icon: ICONS.GLOBE,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
@@ -542,54 +542,54 @@ export default function AdminBatches() {
           </Button>
         </div>
 
-       {/* Stats Row */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-  {stats.map((stat) => (
-    <div
-      key={stat.label}
-      className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
-    >
-      <div className="flex items-center justify-center shrink-0">
-        <Image
-          src={stat.icon}
-          alt={stat.label}
-          width={40}
-          height={40}
-        />
-      </div>
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+            >
+              <div className="flex items-center justify-center shrink-0">
+                <Image
+                  src={stat.icon}
+                  alt={stat.label}
+                  width={40}
+                  height={40}
+                />
+              </div>
 
-      <div className="flex flex-col">
-        <span
-          className="text-2xl font-bold"
-          style={{
-            color: "var(--color-primary)",
-            fontFamily: "var(--font-primary)",
-          }}
-        >
-          {stat.value}
-        </span>
+              <div className="flex flex-col">
+                <span
+                  className="text-2xl font-bold"
+                  style={{
+                    color: "var(--color-primary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.value}
+                </span>
 
-        <span
-          className="text-sm"
-          style={{
-            color: "var(--color-text-secondary)",
-            fontFamily: "var(--font-primary)",
-          }}
-        >
-          {stat.label}
-        </span>
-      </div>
-    </div>
-  ))}
-</div>
+                <span
+                  className="text-sm"
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* Batches Grid */}
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-base font-bold text-gray-900">
+            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
               Batches By Course
-            </h3>
+            </h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -640,9 +640,16 @@ export default function AdminBatches() {
               {Object.entries(groupedBatches).map(([courseTitle, courseBatches]) => (
                 <div key={courseTitle} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-gray-900">
+                    <h6
+                      style={{
+                        fontSize: TYPOGRAPHY.BODY.fontSize,
+                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                        fontWeight: 500,
+                      }}
+                      className="text-brand-heading"
+                    >
                       {courseTitle}
-                    </h4>
+                    </h6>
                     <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                       {courseBatches.length} Batch
                       {courseBatches.length > 1 ? "es" : ""}
@@ -657,10 +664,10 @@ export default function AdminBatches() {
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center shrink-0">
-                              <BookOpen className="w-4 h-4 text-brand-primary" />
+                            <div className="w-8 h-8 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
+                              <Image src={ICONS.BOOK} alt="book" width={30} height={30} />
                             </div>
-                            <p className="font-semibold text-gray-900 text-sm truncate">
+                            <p className={`${TYPOGRAPHY.BODY.fontSize}, ${TYPOGRAPHY.BODY.lineHeight}, ${TYPOGRAPHY.H2.fontWeight} text-black truncate`}>
                               {batch.name}
                             </p>
                           </div>
@@ -670,20 +677,33 @@ export default function AdminBatches() {
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-500 line-clamp-2 min-h-[40px]">
-                          {batch.description || "â€”"}
+                        <p
+                          style={{
+                            fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                            lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                            fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                          }}
+                          className="text-text-secondary"
+                        >
+                          {batch.description || "—"}
                         </p>
 
-                        <p className="text-xs text-gray-500 mt-3">
+                        <p style={{
+                          fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                          lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                          fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                        }}
+                          className="text-text-secondary"
+                        >
                           {batch.start_date
                             ? new Date(batch.start_date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )
                             : "â€”"}
                         </p>
 
@@ -693,14 +713,14 @@ export default function AdminBatches() {
                             className="p-2 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/5 rounded-lg transition-colors"
                             name="Edit"
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="w-4 h-4 text-brand-primary" />
                           </button>
                           <button
                             onClick={() => handleDeleteClick(batch)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             name="Delete"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 text-red-500" />
                           </button>
                         </div>
                       </div>
@@ -731,9 +751,9 @@ export default function AdminBatches() {
             </div>
 
             {/* Modal Body */}
-            <div 
+            <div
               className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400"
-              style={{ 
+              style={{
                 maxHeight: "calc(90vh - 180px)",
                 scrollBehavior: "smooth",
               }}
@@ -886,11 +906,10 @@ export default function AdminBatches() {
               {/* Submit Button */}
               {modalMessage && (
                 <div
-                  className={`text-sm px-3 py-2 rounded-lg ${
-                    modalMessage.type === "success"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-red-50 text-red-700 border border-red-200"
-                  }`}
+                  className={`text-sm px-3 py-2 rounded-lg ${modalMessage.type === "success"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                    }`}
                 >
                   {modalMessage.text}
                 </div>
