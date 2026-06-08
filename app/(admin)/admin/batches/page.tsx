@@ -13,7 +13,6 @@ import {
   CheckCircle,
   Plus,
   Search,
-  Pencil,
   Trash2,
   X,
   Loader2,
@@ -25,6 +24,7 @@ interface Batch {
   id: number | string;
   name: string;
   description: string;
+  thumbnail_url?: string | null;
   created_at?: string;
   start_date?: string | null;
   category?: string;
@@ -46,6 +46,19 @@ interface Course {
   id: number | string;
   title: string;
 }
+
+type SaveBatchBody = {
+  id?: number | string;
+  name: string;
+  description: string;
+  start_date: string | null;
+  assigned_scholars: string[];
+  assigned_courses: string[];
+  thumbnail_url?: string | null;
+};
+
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1498050108023-c5249f4df085";
 
 export default function AdminBatches() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -129,7 +142,6 @@ export default function AdminBatches() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBatches();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTotalStudents();
   }, []);
 
@@ -180,7 +192,7 @@ export default function AdminBatches() {
     setBatchDescription(batch.description || "");
     setCreated_At(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
     setBatchThumbnail(null);
-    setBatchThumbnailPreview("");
+    setBatchThumbnailPreview(batch.thumbnail_url || "");
     setModalMessage(null);
     setShowModal(true);
 
@@ -283,7 +295,7 @@ export default function AdminBatches() {
       const timestamp = Date.now();
       const fileName = `batch-thumbnail-${timestamp}.${file.name.split(".").pop()}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from("course-thumbnails")
         .upload(fileName, file, {
           cacheControl: "3600",
@@ -295,8 +307,11 @@ export default function AdminBatches() {
         return null;
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/course-thumbnails/${fileName}`;
-      return url;
+      const { data: urlData } = supabase.storage
+        .from("course-thumbnails")
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
     } catch (error) {
       console.error("Failed to upload thumbnail:", error);
       return null;
@@ -322,12 +337,16 @@ export default function AdminBatches() {
       setModalMessage(null);
 
       // Upload thumbnail if provided
-      let thumbnailUrl: string | null = null;
+      let thumbnailUrl: string | null | undefined;
       if (batchThumbnail) {
         thumbnailUrl = await uploadThumbnailToStorage(batchThumbnail);
         if (!thumbnailUrl) {
           throw new Error("Failed to upload thumbnail. Please try again.");
         }
+      } else if (isEditing && !batchThumbnailPreview) {
+        thumbnailUrl = null;
+      } else {
+        thumbnailUrl = undefined;
       }
 
       const { data: sessionData, error: sessionError } =
@@ -337,7 +356,7 @@ export default function AdminBatches() {
       }
 
       if (isEditing && editingBatchId) {
-        const body: any = {
+        const body: SaveBatchBody = {
           id: editingBatchId,
           name,
           description,
@@ -345,7 +364,7 @@ export default function AdminBatches() {
           assigned_scholars: selectedUsers.map((user) => user.value),
           assigned_courses: selectedCourses.map((course) => course.value),
         };
-        if (thumbnailUrl) {
+        if (thumbnailUrl !== undefined) {
           body.thumbnail_url = thumbnailUrl;
         }
 
@@ -364,7 +383,7 @@ export default function AdminBatches() {
           );
         }
       } else {
-        const body: any = {
+        const body: SaveBatchBody = {
           name,
           description,
           start_date: created_at || null,
@@ -468,26 +487,10 @@ export default function AdminBatches() {
   const filteredBatches = batches.filter((batch) =>
     batch.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
-  const courseTitleById = new Map(
-    courses.map((course) => [String(course.id), course.title]),
-  );
-  const groupedBatches = filteredBatches.reduce(
-    (acc, batch) => {
-      const courseTitle = batch.course_id
-        ? (courseTitleById.get(String(batch.course_id)) ?? "Unassigned Course")
-        : "Unassigned Course";
-      if (!acc[courseTitle]) acc[courseTitle] = [];
-      acc[courseTitle].push(batch);
-      return acc;
-    },
-    {} as Record<string, Batch[]>,
-  );
-  Object.values(groupedBatches).forEach((courseBatches) => {
-    courseBatches.sort((a, b) => {
-      const aDate = a.start_date || a.created_at || "";
-      const bDate = b.start_date || b.created_at || "";
-      return aDate.localeCompare(bDate);
-    });
+  const sortedBatches = [...filteredBatches].sort((a, b) => {
+    const aDate = a.start_date || a.created_at || "";
+    const bDate = b.start_date || b.created_at || "";
+    return aDate.localeCompare(bDate);
   });
 
   const stats = [
@@ -588,7 +591,7 @@ export default function AdminBatches() {
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
             <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-              Batches By Course
+              Batche Catalog
             </h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -636,32 +639,25 @@ export default function AdminBatches() {
 
           {/* Grid */}
           {!loading && filteredBatches.length > 0 && (
-            <div className="p-6 space-y-6">
-              {Object.entries(groupedBatches).map(([courseTitle, courseBatches]) => (
-                <div key={courseTitle} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h6
-                      style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: 500,
-                      }}
-                      className="text-brand-heading"
-                    >
-                      {courseTitle}
-                    </h6>
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                      {courseBatches.length} Batch
-                      {courseBatches.length > 1 ? "es" : ""}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {courseBatches.map((batch) => (
+            <div className="p-6">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 items-stretch">
+                    {sortedBatches.map((batch) => (
                       <div
                         key={batch.id}
-                        className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
+                        className="h-full border border-gray-100 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
                       >
+                        <div className="relative w-full aspect-[16/9] bg-surface-subtle overflow-hidden">
+                          <div
+                            role="img"
+                            aria-label={batch.name}
+                            className="w-full h-full bg-contain bg-center bg-no-repeat"
+                            style={{
+                              backgroundImage: `url("${batch.thumbnail_url || PLACEHOLDER_IMAGE}")`,
+                            }}
+                          />
+                        </div>
+
+                        <div className="p-4 flex flex-1 flex-col">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="w-8 h-8 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
@@ -685,7 +681,7 @@ export default function AdminBatches() {
                           }}
                           className="text-text-secondary"
                         >
-                          {batch.description || "—"}
+                          {batch.description || "-"}
                         </p>
 
                         <p style={{
@@ -704,30 +700,29 @@ export default function AdminBatches() {
                                 year: "numeric",
                               },
                             )
-                            : "â€”"}
+                            : "-"}
                         </p>
 
-                        <div className="flex items-center justify-end gap-2 mt-4">
+                        <div className="flex gap-2 mt-auto pt-4">
                           <button
                             onClick={() => handleEdit(batch)}
-                            className="p-2 text-gray-400 hover:text-brand-primary hover:bg-brand-primary/5 rounded-lg transition-colors"
+                            className="flex-1 py-1 rounded-lg bg-brand-primary/10 text-brand-primary text-sm font-medium hover:bg-brand-primary/15 transition-colors"
                             name="Edit"
                           >
-                            <Pencil className="w-4 h-4 text-brand-primary" />
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDeleteClick(batch)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
                             name="Delete"
                           >
-                            <Trash2 className="w-4 h-4 text-red-500" />
+                            Delete
                           </button>
+                        </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
@@ -879,10 +874,13 @@ export default function AdminBatches() {
                   />
                   {batchThumbnailPreview && (
                     <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                      <img
-                        src={batchThumbnailPreview}
-                        alt="Batch thumbnail preview"
-                        className="w-full h-32 object-cover"
+                      <div
+                        role="img"
+                        aria-label="Batch thumbnail preview"
+                        className="w-full h-32 bg-cover bg-center"
+                        style={{
+                          backgroundImage: `url("${batchThumbnailPreview}")`,
+                        }}
                       />
                       <button
                         type="button"

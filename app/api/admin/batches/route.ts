@@ -46,6 +46,10 @@ type BatchCourseRow = {
   course_id: string | number | null;
 };
 
+type CourseEnrollmentRow = {
+  user_id: string;
+};
+
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
     return {
@@ -220,7 +224,7 @@ export async function GET(request: Request) {
       memberEmails: ((memberRows ?? []) as BatchMemberRow[])
         .map((row) => row.email)
         .filter((email): email is string => Boolean(email)),
-      courseIds: ((batchCoursesRows ?? []) as any[])
+      courseIds: ((batchCoursesRows ?? []) as BatchCourseRow[])
         .map((row) => String(row.course_id))
         .filter((id): id is string => Boolean(id)),
     },
@@ -239,8 +243,13 @@ export async function POST(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
-    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : "";
+    typeof body?.thumbnail_url === "string"
+      ? body.thumbnail_url.trim()
+      : hasThumbnailField
+        ? null
+        : undefined;
 
   // 1. Get the array of IDs sent from the frontend
   const assignedMembers = Array.isArray(body?.assigned_scholars)
@@ -273,7 +282,7 @@ export async function POST(request: Request) {
       description,
       start_date: startDate || null,
       course_id: selectedCourseId,
-      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+      ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
     .select()
     .single();
@@ -344,7 +353,9 @@ export async function POST(request: Request) {
           .eq("course_id", courseId)
           .in("user_id", userIdsToEnroll);
           
-        const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
+        const existingUserIds = new Set(
+          ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
+        );
         
         const newEnrollments = userIdsToEnroll
           .filter(id => !existingUserIds.has(id))
@@ -388,8 +399,13 @@ export async function PUT(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
-    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : "";
+    typeof body?.thumbnail_url === "string"
+      ? body.thumbnail_url.trim()
+      : hasThumbnailField
+        ? null
+        : undefined;
   const assignedMembers = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((value: unknown) =>
@@ -419,7 +435,7 @@ export async function PUT(request: Request) {
       description,
       start_date: startDate || null,
       course_id: selectedCourseId,
-      ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+      ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
     .eq("id", id);
 
@@ -497,7 +513,9 @@ export async function PUT(request: Request) {
           .eq("course_id", courseId)
           .in("user_id", userIdsToEnroll);
           
-        const existingUserIds = new Set(existing?.map((e: any) => e.user_id) || []);
+        const existingUserIds = new Set(
+          ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
+        );
         
         const newEnrollments = userIdsToEnroll
           .filter(id => !existingUserIds.has(id))
