@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import Select from "react-select";
 import { Button } from "@/components/ui/button";
+import { CourseCard } from "@/app/components/course";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import {
   BookOpen,
   Users,
@@ -56,9 +64,6 @@ type SaveBatchBody = {
   assigned_courses: string[];
   thumbnail_url?: string | null;
 };
-
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1498050108023-c5249f4df085";
 
 export default function AdminBatches() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -587,48 +592,54 @@ export default function AdminBatches() {
         </div>
 
         {/* Batches Grid */}
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div>
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center justify-between flex-wrap gap-4 mt-12 mb-6">
             <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-              Batche Catalog
+              Batch Catalog
             </h2>
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search batches..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-60 text-black"
+                className="pl-9 pr-4 py-2.5 border text-gray-600 border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
               />
             </div>
           </div>
 
           {/* Loading State */}
           {loading && (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-3" />
-              <p className="text-sm text-gray-500">Loading batches...</p>
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
+              <p className="text-sm font-medium text-gray-500">
+                Loading your catalog...
+              </p>
             </div>
           )}
 
           {/* Empty State */}
           {!loading && filteredBatches.length === 0 && (
-            <div className="p-12 text-center">
-              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium mb-2">
-                {searchTerm ? "No batches match your search" : "No batches yet"}
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <BookOpen className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-lg text-gray-900 font-bold mb-2">
+                {searchTerm
+                  ? "No batches match your search"
+                  : "Your catalog is empty"}
               </p>
               {!searchTerm && (
-                <p className="text-sm text-gray-400 mb-4">
+                <p className="text-sm text-gray-500 mb-6 max-w-md">
                   Create your first batch to get started.
                 </p>
               )}
               {!searchTerm && (
                 <button
                   onClick={() => setShowModal(true)}
-                  className="bg-brand-primary text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2"
+                  className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2 shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
                   Create Batch
@@ -637,92 +648,71 @@ export default function AdminBatches() {
             </div>
           )}
 
-          {/* Grid */}
+          {/* Batches Carousel */}
           {!loading && filteredBatches.length > 0 && (
-            <div className="p-6">
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 items-stretch">
-                    {sortedBatches.map((batch) => (
-                      <div
-                        key={batch.id}
-                        className="h-full border border-gray-100 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
-                      >
-                        <div className="relative w-full aspect-[16/9] bg-surface-subtle overflow-hidden">
-                          <div
-                            role="img"
-                            aria-label={batch.name}
-                            className="w-full h-full bg-contain bg-center bg-no-repeat"
-                            style={{
-                              backgroundImage: `url("${batch.thumbnail_url || PLACEHOLDER_IMAGE}")`,
-                            }}
-                          />
-                        </div>
+            <div className="relative">
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: false,
+                  dragFree: true,
+                }}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                  {sortedBatches.map((batch) => (
+                    <CarouselItem
+                      key={batch.id}
+                      className="
+  pl-4
+  sm:pl-6
+  basis-[85vw]
+sm:basis-1/2
+lg:basis-1/3
+"
+                    >
+                      <CourseCard
+                        id={batch.id}
+                        title={batch.name}
+                        description={batch.description}
+                        thumbnail={batch.thumbnail_url || undefined}
+                        createdAt={batch.start_date || batch.created_at}
+                        variant="admin"
+                        onEdit={() => handleEdit(batch)}
+                        onDelete={() => handleDeleteClick(batch)}
+                      />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
 
-                        <div className="p-4 flex flex-1 flex-col">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
-                              <Image src={ICONS.BOOK} alt="book" width={30} height={30} />
-                            </div>
-                            <p className={`${TYPOGRAPHY.BODY.fontSize}, ${TYPOGRAPHY.BODY.lineHeight}, ${TYPOGRAPHY.H2.fontWeight} text-black truncate`}>
-                              {batch.name}
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200 shrink-0">
-                            <CheckCircle className="w-3 h-3" />
-                            Active
-                          </span>
-                        </div>
+                <CarouselPrevious
+                  className="
+          hidden
+          lg:flex
+          -left-5
+          bg-white
+          shadow-lg
+          border
+          border-gray-100
+          text-brand-primary
+          hover:bg-gray-50
+        "
+                />
 
-                        <p
-                          style={{
-                            fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                            lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                            fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                          }}
-                          className="text-text-secondary"
-                        >
-                          {batch.description || "-"}
-                        </p>
-
-                        <p style={{
-                          fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                          lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                          fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                        }}
-                          className="text-text-secondary"
-                        >
-                          {batch.start_date
-                            ? new Date(batch.start_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )
-                            : "-"}
-                        </p>
-
-                        <div className="flex gap-2 mt-auto pt-4">
-                          <button
-                            onClick={() => handleEdit(batch)}
-                            className="flex-1 py-1 rounded-lg bg-brand-primary/10 text-brand-primary text-sm font-medium hover:bg-brand-primary/15 transition-colors"
-                            name="Edit"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(batch)}
-                            className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
-                            name="Delete"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                        </div>
-                      </div>
-                    ))}
-              </div>
+                <CarouselNext
+                  className="
+          hidden
+          lg:flex
+          -right-5
+          bg-white
+          shadow-lg
+          border
+          border-gray-100
+          text-brand-primary
+          hover:bg-gray-50
+        "
+                />
+              </Carousel>
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import Certificate from "@/app/components/certificate/Certificate";
@@ -27,6 +27,8 @@ import {
   BarChart3,
   Layers,
   DownloadCloud,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -88,8 +90,13 @@ const getModuleProgressIds = (module?: Module | null) =>
 export default function CoursePlayerPage() {
   const { id } = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { setLoading: setGlobalLoading } = useLoading();
+  const isAdminCoursePage = pathname.startsWith("/admin/courses");
+  const courseListPath = pathname.startsWith("/admin/courses")
+    ? "/admin/courses"
+    : "/courses";
 
   // Helper functions for artifact downloading (from practice page)
   const getArtifactBucketCandidates = (art: any) => {
@@ -174,6 +181,9 @@ export default function CoursePlayerPage() {
   const [courseQuizzes, setCourseQuizzes] = useState<any[]>([]);
   const [courseArtifacts, setCourseArtifacts] = useState<any[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
+  const [openModuleMenuId, setOpenModuleMenuId] = useState<string | null>(null);
+  const [deletingModuleId, setDeletingModuleId] = useState<string | null>(null);
+  const [moduleDeleteError, setModuleDeleteError] = useState("");
 
   // Interactive Quiz Player State
   const [showQuizModal, setShowQuizModal] = useState(false);
@@ -966,6 +976,99 @@ export default function CoursePlayerPage() {
     );
   };
 
+  const selectModule = (moduleKey: string) => {
+    setAutoPlayModuleId(null);
+    setActiveModuleId(moduleKey);
+    setOpenModuleMenuId(null);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleDeleteModule = async (mod: Module) => {
+    if (!isAdminCoursePage || deletingModuleId) return;
+
+    const confirmed = window.confirm(
+      `Delete "${mod.title}" from this course? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      setOpenModuleMenuId(null);
+      return;
+    }
+
+    try {
+      setDeletingModuleId(String(mod.id));
+      setModuleDeleteError("");
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
+
+      const response = await fetch(
+        `/api/admin/coursemodules?moduleId=${encodeURIComponent(
+          String(mod.id),
+        )}&courseId=${encodeURIComponent(String(id))}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
+      }
+
+      const deletedKey = getModuleKey(mod);
+      const nextModules = modules.filter(
+        (moduleItem) => getModuleKey(moduleItem) !== deletedKey,
+      );
+      setModules(nextModules);
+      setUserProgress((prev) => {
+        const next = { ...prev };
+        for (const progressId of getModuleProgressIds(mod)) {
+          delete next[progressId];
+        }
+        return next;
+      });
+      setModuleCompletedAt((prev) => {
+        const next = { ...prev };
+        for (const progressId of getModuleProgressIds(mod)) {
+          delete next[progressId];
+        }
+        return next;
+      });
+      setPlaybackPositions((prev) => {
+        const next = { ...prev };
+        for (const progressId of getModuleProgressIds(mod)) {
+          delete next[progressId];
+        }
+        return next;
+      });
+
+      if (activeModuleId && getModuleProgressIds(mod).includes(activeModuleId)) {
+        setActiveModuleId(nextModules[0] ? getModuleKey(nextModules[0]) : null);
+        setAutoPlayModuleId(null);
+      }
+
+      setOpenModuleMenuId(null);
+    } catch (error) {
+      setModuleDeleteError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete module. Please try again.",
+      );
+    } finally {
+      setDeletingModuleId(null);
+    }
+  };
+
   const renderModulesList = () => {
     return (
       <>
@@ -983,22 +1086,32 @@ export default function CoursePlayerPage() {
           </div>
         </div>
 
+        {isAdminCoursePage && moduleDeleteError && (
+          <div className="mx-5 mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+            {moduleDeleteError}
+          </div>
+        )}
+
         {modules.map((mod, index) => {
           const moduleKey = getModuleKey(mod);
           const isActive = moduleKey === activeModuleId;
           const isCompleted = userProgress[moduleKey];
 
           return (
-            <button
+            <div
               key={mod.id}
+              role="button"
+              tabIndex={0}
               onClick={() => {
-                setAutoPlayModuleId(null);
-                setActiveModuleId(moduleKey);
-                if (typeof window !== "undefined") {
-                  window.scrollTo({ top: 0, behavior: "smooth" });
+                selectModule(moduleKey);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  selectModule(moduleKey);
                 }
               }}
-              className={`w-full text-left p-5 transition-all flex items-start gap-4 group ${
+              className={`relative w-full cursor-pointer text-left p-5 transition-all flex items-start gap-4 group ${
                 isActive
                   ? "bg-blue-50/50 border-r-4 border-brand-heading"
                   : "hover:bg-gray-50"
@@ -1037,7 +1150,46 @@ export default function CoursePlayerPage() {
                   </span>
                 </div>
               </div>
-            </button>
+
+              {isAdminCoursePage && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpenModuleMenuId((current) =>
+                        current === moduleKey ? null : moduleKey,
+                      );
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    className="rounded-lg p-1.5 text-gray-400 opacity-100 transition-colors hover:bg-white hover:text-gray-700 sm:opacity-0 sm:group-hover:opacity-100"
+                    aria-label={`Open actions for ${mod.title}`}
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+
+                  {openModuleMenuId === moduleKey && (
+                    <div
+                      className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteModule(mod)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        disabled={deletingModuleId === String(mod.id)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                        {deletingModuleId === String(mod.id)
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
 
@@ -1213,7 +1365,7 @@ export default function CoursePlayerPage() {
             moved or removed.
           </p>
           <Button
-            onClick={() => router.push("/courses")}
+            onClick={() => router.push(courseListPath)}
             className="bg-brand-heading hover:bg-brand-heading-hover"
           >
             Return to Curriculum
@@ -1229,7 +1381,7 @@ export default function CoursePlayerPage() {
         <div className="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push("/courses")}
+              onClick={() => router.push(courseListPath)}
               className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400 hover:text-brand-heading"
             >
               <ChevronLeft size={20} />

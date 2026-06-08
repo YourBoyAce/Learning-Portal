@@ -83,8 +83,8 @@ export default function AdminLayout({
   {
     label: "Manage Courses",
     href: "/admin/courses",
-    active: pathname === "/admin/courses",
-    icon: pathname === "/admin/courses"
+    active: pathname.startsWith("/admin/courses"),
+    icon: pathname.startsWith("/admin/courses")
       ? ICONS.BOOKLIGHT
       : ICONS.BOOK,
   },

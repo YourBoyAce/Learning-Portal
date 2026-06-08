@@ -135,7 +135,9 @@ export default function CourseCard({
           <img
             src={thumbnail || PLACEHOLDER_IMAGE}
             alt={title}
-            className="w-full h-full object-contain object-center"
+            className={`w-full h-full object-center ${
+              isAdmin ? "object-cover" : "object-contain"
+            }`}
           />
         </div>
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,7 +9,7 @@ const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN;
 
 type AuthContext =
   | { error: NextResponse }
-  | { supabaseAdmin: SupabaseClient<any, "public", any> };
+  | { supabaseAdmin: SupabaseClient };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -277,4 +277,75 @@ export async function POST(request: Request) {
     cloudflareUid: uid,
     message: "Video uploaded successfully. Duration will be added automatically.",
   });
+}
+
+export async function DELETE(request: Request) {
+  const authContext = await authenticateAdmin(request);
+  if ("error" in authContext) {
+    return authContext.error;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const moduleId = searchParams.get("moduleId")?.trim();
+  const courseId = searchParams.get("courseId")?.trim();
+
+  if (!moduleId || !courseId) {
+    return NextResponse.json(
+      { error: "moduleId and courseId are required." },
+      { status: 400 },
+    );
+  }
+
+  const { data: moduleRow, error: moduleError } = await authContext.supabaseAdmin
+    .from("coursemodules")
+    .select("id, maincourse_id, video_cf_id")
+    .eq("id", moduleId)
+    .eq("maincourse_id", courseId)
+    .maybeSingle();
+
+  if (moduleError) {
+    return NextResponse.json({ error: moduleError.message }, { status: 500 });
+  }
+
+  if (!moduleRow) {
+    return NextResponse.json(
+      { error: "Module was not found for this course." },
+      { status: 404 },
+    );
+  }
+
+  const progressIds = Array.from(
+    new Set(
+      [moduleRow.id, moduleRow.video_cf_id]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (progressIds.length > 0) {
+    const { error: progressError } = await authContext.supabaseAdmin
+      .from("user_video_progress")
+      .delete()
+      .eq("course_id", courseId)
+      .in("video_id", progressIds);
+
+    if (progressError) {
+      return NextResponse.json(
+        { error: "Failed to remove module progress: " + progressError.message },
+        { status: 500 },
+      );
+    }
+  }
+
+  const { error: deleteError } = await authContext.supabaseAdmin
+    .from("coursemodules")
+    .delete()
+    .eq("id", moduleId)
+    .eq("maincourse_id", courseId);
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, moduleId });
 }

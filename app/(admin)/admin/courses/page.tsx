@@ -511,7 +511,7 @@ lg:basis-1/3
                       createdAt={course.created_at}
                       variant="admin"
                       onClick={() =>
-                        router.push(`/courses/${course.id}`)
+                        router.push(`/admin/courses/${course.id}`)
                       }
                       onEdit={() => handleEdit(course)}
                       onDelete={() => handleDeleteClick(course)}
