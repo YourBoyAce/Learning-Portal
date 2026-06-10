@@ -262,7 +262,7 @@ export async function POST(request: Request) {
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
-        .filter((id): id is string | number => id !== null)
+        .filter((id: string | number | null): id is string | number => id !== null)
     : [];
   const selectedCourseId =
     assignedCourses.length > 0 ? assignedCourses[0] : null;
@@ -313,7 +313,7 @@ export async function POST(request: Request) {
 
   // 4. Link courses to the batch via batch_courses junction table
   if (assignedCourses.length > 0) {
-    const batchCoursesData = assignedCourses.map((courseId) => ({
+    const batchCoursesData = assignedCourses.map((courseId: string | number) => ({
       batch_id: batch.id,
       course_id: courseId,
     }));
@@ -416,7 +416,7 @@ export async function PUT(request: Request) {
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
-        .filter((id): id is string | number => id !== null)
+        .filter((id: string | number | null): id is string | number => id !== null)
     : [];
   const selectedCourseId =
     assignedCourses.length > 0 ? assignedCourses[0] : null;
@@ -477,7 +477,7 @@ export async function PUT(request: Request) {
   }
 
   if (assignedCourses.length > 0) {
-    const batchCoursesData = assignedCourses.map((courseId) => ({
+    const batchCoursesData = assignedCourses.map((courseId: string | number) => ({
       batch_id: id,
       course_id: courseId,
     }));
