@@ -495,7 +495,7 @@ export default function AdminQuizzes() {
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
               <HelpCircle className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-lg text-gray-900 font-bold mb-2">
+            <p className="text-base font-semibold text-gray-800 mb-2">
               No quizzes found
             </p>
             <p className="text-sm text-gray-500 mb-6 max-w-md">
@@ -547,55 +547,25 @@ export default function AdminQuizzes() {
                       key={quiz.id}
                       className="hover:bg-gray-50/30 transition-colors group"
                     >
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4 pl-6">
+                      <td className="p-4 pl-6 text-sm font-medium text-gray-800">
                         {quiz.title}
                       </td>
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4">
+                      <td className="p-4 text-sm text-gray-600">
                         <span className="flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-gray-400" />
                           {quiz.courseName}
                         </span>
                       </td>
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4">
+                      <td className="p-4 text-sm text-gray-600">
                         {quiz.questionsCount}
                       </td>
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4">
+                      <td className="p-4 text-sm text-gray-600">
                         {quiz.passingScore}%
                       </td>
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4">
+                      <td className="p-4 text-sm text-gray-600">
                         {quiz.attemptsCount}
                       </td>
-                      <td style={{
-                        fontSize: TYPOGRAPHY.BODY.fontSize,
-                        lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                        fontWeight: TYPOGRAPHY.H2.fontWeight,
-                      }}
-                        className="text-brand-heading p-4">
+                      <td className="p-4 text-sm text-gray-600">
                         {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
                       </td>
                       <td className="p-4 text-center">
@@ -656,7 +626,7 @@ export default function AdminQuizzes() {
             <div className="px-4 sm:px-6 py-5 space-y-6 overflow-y-auto flex-1 bg-gray-50/30">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Quiz Title
                   </label>
                   <input
@@ -664,12 +634,12 @@ export default function AdminQuizzes() {
                     placeholder="e.g. Playwright Selectors"
                     value={quizTitle}
                     onChange={(e) => setQuizTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Associated Course
                   </label>
                   <select
@@ -685,7 +655,7 @@ export default function AdminQuizzes() {
                         setCourseName(val);
                       }
                     }}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
                     {dbCourses.length === 0 ? (
                       <>
@@ -706,7 +676,7 @@ export default function AdminQuizzes() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Passing Score (%)
                   </label>
                   <input
@@ -715,12 +685,12 @@ export default function AdminQuizzes() {
                     max="100"
                     value={passingScore}
                     onChange={(e) => setPassingScore(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Status
                   </label>
                   <select
@@ -728,7 +698,7 @@ export default function AdminQuizzes() {
                     onChange={(e) =>
                       setStatus(e.target.value as "Active" | "Inactive")
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -739,7 +709,7 @@ export default function AdminQuizzes() {
               {/* Questions Section */}
               <div className="space-y-4 pt-4 border-t border-gray-100">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="block text-sm font-bold text-gray-800 uppercase tracking-wider">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
                     Questions List
                   </label>
                   <button
@@ -769,7 +739,7 @@ export default function AdminQuizzes() {
                             handleQuestionTextChange(qIdx, e.target.value)
                           }
                           rows={2}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
                         />
                       </div>
                       {questions.length > 1 && (
@@ -788,7 +758,7 @@ export default function AdminQuizzes() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
                       {question.options.map((opt, oIdx) => (
                         <div key={oIdx} className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-400 uppercase w-4">
+                          <span className="text-[11px] font-bold text-gray-400 uppercase w-4">
                             {String.fromCharCode(65 + oIdx)}
                           </span>
                           <input
@@ -798,7 +768,7 @@ export default function AdminQuizzes() {
                             onChange={(e) =>
                               handleOptionChange(qIdx, oIdx, e.target.value)
                             }
-                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary"
+                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
                           />
                         </div>
                       ))}
@@ -806,7 +776,7 @@ export default function AdminQuizzes() {
 
                     {/* Correct Answer Dropdown */}
                     <div className="flex items-center gap-3 pl-10 pt-2 border-t border-dashed border-gray-100">
-                      <label className="text-xs font-bold text-gray-500 uppercase">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
                         Correct Answer Option:
                       </label>
                       <select
@@ -814,7 +784,7 @@ export default function AdminQuizzes() {
                         onChange={(e) =>
                           handleCorrectAnswerChange(qIdx, Number(e.target.value))
                         }
-                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary"
+                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
                       >
                         <option value={0}>Option A</option>
                         <option value={1}>Option B</option>

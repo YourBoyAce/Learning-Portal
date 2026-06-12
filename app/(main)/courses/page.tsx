@@ -691,7 +691,7 @@ console.log("COURSE PROGRESS", courseProgress);
     Completed Courses
   </h2>
 
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
     {completedCourses.map((course) => (
       <div
         key={course.id}
@@ -707,6 +707,18 @@ console.log("COURSE PROGRESS", courseProgress);
           showProgress={true}
           onClick={() => router.push(`/courses/${course.id}`)}
         />
+        {course.progress === 100 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCertificateCourse(course);
+            }}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-heading text-white text-sm font-semibold rounded-xl hover:bg-brand-heading/90 transition-colors shadow-sm"
+          >
+            <Award size={16} />
+            Download Certificate
+          </button>
+        )}
       </div>
     ))}
   </div>

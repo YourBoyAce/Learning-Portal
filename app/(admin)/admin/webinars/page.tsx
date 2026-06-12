@@ -292,7 +292,7 @@ export default function AdminWebinarsPage() {
                             )}
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1">
+                            <h3 className="text-sm font-medium text-gray-800 leading-tight mb-1">
                               {webinar.title}
                             </h3>
                             <p className="text-xs text-gray-500 leading-relaxed max-w-xs line-clamp-1">
@@ -303,7 +303,7 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                          <div className="flex items-center gap-2 text-xs font-normal text-gray-600">
                             <Calendar size={14} className="text-brand-primary" />
                             {webinar.event_date}
                           </div>
@@ -358,9 +358,9 @@ export default function AdminWebinarsPage() {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
               <div className="px-4 sm:px-8 py-5 sm:py-6 border-b border-gray-100 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                  <h3 className="text-lg font-bold text-gray-900">
                     {isEditing ? "Edit Webinar" : "Create New Webinar"}
-                  </h2>
+                  </h3>
                   <p className="text-sm text-gray-500 mt-1">
                     Fill in the details to schedule the webinar.
                   </p>
@@ -371,7 +371,7 @@ export default function AdminWebinarsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Title */}
                   <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Webinar Title
                     </label>
                     <input
@@ -379,13 +379,13 @@ export default function AdminWebinarsPage() {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Masterclass on Neural Networks"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                     />
                   </div>
 
                   {/* Subtitle / Instructor */}
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Instructor / Location
                     </label>
                     <input
@@ -393,12 +393,12 @@ export default function AdminWebinarsPage() {
                       value={subtitle}
                       onChange={(e) => setSubtitle(e.target.value)}
                       placeholder="e.g. Prof. Ariadne Â· Seminar Room R12"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                     />
                   </div>
                   {/* Event Date */}
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Event Date & Time
                     </label>
 
@@ -430,13 +430,13 @@ export default function AdminWebinarsPage() {
                   </div>
                   {/* Status */}
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Status
                     </label>
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
                       <option value="streaming">Streaming</option>
                       <option value="link">Link</option>
@@ -445,7 +445,7 @@ export default function AdminWebinarsPage() {
 
                   {/* Link Text */}
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Action Link Text
                     </label>
                     <input
@@ -453,13 +453,13 @@ export default function AdminWebinarsPage() {
                       value={linkText}
                       onChange={(e) => setLinkText(e.target.value)}
                       placeholder="e.g. Register Now, Link Active Soon"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                     />
                   </div>
 
                   {/* Attendees Count */}
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Initial Attendee Count
                     </label>
                     <input
@@ -468,13 +468,13 @@ export default function AdminWebinarsPage() {
                       onChange={(e) =>
                         setAttendeesCount(parseInt(e.target.value) || 0)
                       }
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                     />
                   </div>
 
                   {/* Description */}
                   <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                       Webinar Description
                     </label>
                     <textarea
@@ -482,7 +482,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                       placeholder="Describe what will be covered in this webinar..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all resize-none text-gray-700 font-normal"
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all resize-none text-gray-700"
                     />
                   </div>
                 </div>
@@ -491,14 +491,14 @@ export default function AdminWebinarsPage() {
               <div className="px-4 sm:px-8 py-5 sm:py-6 border-t border-gray-100 bg-gray-50/50 flex flex-col-reverse sm:flex-row gap-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-3 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveWebinar}
                   disabled={isSaving}
-                  className="flex-2 bg-brand-primary text-white py-3 rounded-xl text-sm font-bold hover:bg-brand-hover transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="flex-2 bg-brand-primary text-white py-3 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving

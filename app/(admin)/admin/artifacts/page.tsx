@@ -672,7 +672,7 @@ export default function AdminArtifacts() {
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
               <DownloadCloud className="w-8 h-8 text-gray-400" />
             </div>
-            <p className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+            <p className="text-base font-semibold text-gray-800">
               No artifacts found
             </p>
             <p className={TYPOGRAPHY_CLASSES.CAPTION + " mb-6 max-w-md"}>
@@ -726,7 +726,7 @@ export default function AdminArtifacts() {
                             {getFileIcon(art.type)}
                           </div>
                           <div className="min-w-0">
-                            <h4 className="font-semibold text-gray-900 text-sm truncate">
+                            <h4 className="font-medium text-gray-800 text-sm truncate">
                               {art.name}
                             </h4>
                             <p className="text-xs text-gray-400 truncate mt-0.5">
@@ -813,7 +813,7 @@ export default function AdminArtifacts() {
               {/* File Uploader box (Only if creating new, or allowed to update file) */}
               {!isEditing && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Artifact File
                   </label>
                   {selectedFile ? (
@@ -861,7 +861,7 @@ export default function AdminArtifacts() {
 
               {/* Resource Name */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                   Display Name
                 </label>
                 <input
@@ -869,13 +869,13 @@ export default function AdminArtifacts() {
                   placeholder="e.g. Playwright Setup Cheat Sheet"
                   value={artName}
                   onChange={(e) => setArtName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                 />
               </div>
 
               {/* Course Selection */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                   Associated Course
                 </label>
                 <select
@@ -888,7 +888,7 @@ export default function AdminArtifacts() {
                       setCourseName(courseObj.title);
                     }
                   }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                 >
                   {dbCourses.length > 0 ? (
                     dbCourses.map((c) => (
@@ -909,7 +909,7 @@ export default function AdminArtifacts() {
               {/* Type & Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Resource Type
                   </label>
                   <select
@@ -917,7 +917,7 @@ export default function AdminArtifacts() {
                     onChange={(e) =>
                       setArtType(e.target.value as Artifact["type"])
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     <option value="PDF">PDF Document</option>
                     <option value="ZIP">ZIP Archive</option>
@@ -928,7 +928,7 @@ export default function AdminArtifacts() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                     Visibility Status
                   </label>
                   <select
@@ -936,7 +936,7 @@ export default function AdminArtifacts() {
                     onChange={(e) =>
                       setStatus(e.target.value as "Published" | "Draft")
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
                   >
                     <option value="Published">Published (Public)</option>
                     <option value="Draft">Draft (Hidden)</option>
@@ -946,7 +946,7 @@ export default function AdminArtifacts() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                   Instructions / Description
                 </label>
                 <textarea
@@ -954,7 +954,7 @@ export default function AdminArtifacts() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
                 />
               </div>
             </div>

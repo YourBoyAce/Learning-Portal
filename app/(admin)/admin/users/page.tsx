@@ -260,7 +260,7 @@ export default function AdminUsers() {
           <div className="flex flex-col gap-6">
             {/* ADD NEW USER FORM */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-6`}>Add New User</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-5">Add New User</h2>
 
               <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
@@ -366,7 +366,7 @@ export default function AdminUsers() {
           {/* RIGHT COLUMN: USER REGISTRY TABLE */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>User Registry</h2>
+              <h2 className="text-lg font-bold text-gray-900">User Registry</h2>
 
               <div className="flex items-center gap-3">
                 <div className="relative flex items-center">
@@ -474,12 +474,7 @@ export default function AdminUsers() {
                               {user.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p style={{
-                                fontSize: TYPOGRAPHY.BODY.fontSize,
-                                lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                                fontWeight: TYPOGRAPHY.H2.fontWeight,
-                              }}
-                                className="text-brand-heading">
+                              <p className="text-sm font-medium text-gray-800">
                                 {user.name}
                               </p>
                               <p style={{
