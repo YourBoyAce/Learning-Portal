@@ -17,6 +17,7 @@ import {
   FileCode,
   FileArchive,
   BarChart3,
+  CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -96,6 +97,14 @@ export default function AdminArtifacts() {
   const [selectedFile, setSelectedFile] = useState<File | null>(
     null
   );
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] =
@@ -301,14 +310,15 @@ export default function AdminArtifacts() {
   ========================================================= */
 
   const handleSaveArtifact = async () => {
+    setIsUploading(true);
     try {
       if (!artName.trim() || !courseId) {
-        alert("Please complete all required fields.");
+        showToast("Please complete all required fields.");
         return;
       }
 
       if (!selectedFile && !isEditing) {
-        alert("Please upload a file.");
+        showToast("Please upload a file.");
         return;
       }
 
@@ -345,7 +355,7 @@ export default function AdminArtifacts() {
 
         if (!usedBucket) {
           console.error(lastUploadError);
-          alert(
+          showToast(
             `Failed to upload file: ${lastUploadError?.message || "Unknown error"}`
           );
           return;
@@ -384,7 +394,7 @@ export default function AdminArtifacts() {
 
         if (error) {
           console.error(error);
-          alert("Failed to update artifact");
+          showToast("Failed to update artifact");
           return;
         }
 
@@ -409,7 +419,7 @@ export default function AdminArtifacts() {
 
         if (error) {
           console.error(error);
-          alert("Failed to save artifact");
+          showToast("Failed to save artifact");
           return;
         }
 
@@ -421,9 +431,11 @@ export default function AdminArtifacts() {
       setShowModal(false);
 
       setSelectedFile(null);
-      alert(successMessage);
+      showToast(successMessage);
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -957,9 +969,10 @@ export default function AdminArtifacts() {
               </Button>
               <Button
                 onClick={handleSaveArtifact}
-                className="w-full justify-center sm:w-1/2"
+                disabled={isUploading}
+                className="w-full justify-center sm:w-1/2 flex items-center gap-2"
               >
-                {isEditing ? "Save Changes" : "Publish Resource"}
+                {isUploading ? "Uploading..." : (isEditing ? "Save Changes" : "Publish Resource")}
               </Button>
             </div>
           </div>
@@ -1001,6 +1014,15 @@ export default function AdminArtifacts() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* --- TOAST NOTIFICATION --- */}
+      {toastMessage && (
+        <div className="fixed bottom-8 right-8 bg-copy-dark text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-bottom-5 duration-300">
+          <CheckCircle2 className="text-emerald-400" size={20} />
+          <span className="text-sm font-semibold tracking-wide">
+            {toastMessage}
+          </span>
         </div>
       )}
     </div>

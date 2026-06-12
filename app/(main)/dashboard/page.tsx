@@ -9,6 +9,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { BookOpen, CheckCircle2, FolderOpen, Users } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
+import Image from "next/image";
 import {
   Carousel,
   CarouselContent,
@@ -16,6 +17,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel"; // <-- Update path to match your folder structure
+import { ICONS } from "@/app/styles/icons";
 
 type Profile = {
   full_name?: string | null;
@@ -784,7 +786,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center">
-                  <Users size={20} className="text-brand-primary" />
+                  <Image src={ICONS.USERS} alt="Users" width={20} height={20} />
                 </div>
                 <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                   Batch Allocations
@@ -915,11 +917,12 @@ export default function Dashboard() {
                   className="bg-surface-subtle border border-gray-100 rounded-xl p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:border-brand-primary/30 transition-all cursor-pointer group"
                 >
                   {/* Instructor image */}
+                  {/* Course Thumbnail */}
                   <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-brand-primary/30 transition-colors">
                     <img
-                      src="/images/instructor.png"
-                      alt="Instructor"
-                      className="w-full h-full object-cover"
+                      src={nextCourse?.thumbnail_url || "/images/instructor.png"}
+                      alt={nextCourse?.title || "Course thumbnail"}
+                      className="w-full h-full object-contain"
                     />
                   </div>
 
@@ -937,17 +940,6 @@ export default function Dashboard() {
 
                       {nextModule.duration && <> • {nextModule.duration}</>}
                     </p>
-
-                    <div className="flex items-center gap-2 mt-2.5">
-                      <div className="flex -space-x-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white" />
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white" />
-                      </div>
-
-                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        +{Math.max(allCourseModules.length, 5)} Joining soon…
-                      </span>
-                    </div>
                   </div>
 
                   {/* Play button */}

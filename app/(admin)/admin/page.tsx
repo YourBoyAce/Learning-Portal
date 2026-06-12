@@ -9,6 +9,14 @@ import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 
 import Image from "next/image";
+import CourseCard from "@/app/components/course/CourseCard";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 interface LoginLog {
   userId: string;
@@ -312,7 +320,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div className="space-y-4 flex-1">
+            <div className="mt-4">
               {loading && (
                 <div className="py-8 text-center text-gray-400">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -323,34 +331,35 @@ export default function AdminDashboard() {
                   No courses found.
                 </div>
               )}
-              {!loading &&
-                courses.map((course) => (
-                  <div
-                    key={course.id}
-                    onClick={() => router.push("/admin/courses")}
-                    className="border border-gray-200 rounded-lg overflow-hidden hover:border-brand-primary hover:shadow-md transition-all cursor-pointer group"
-                  >
-                    <div className="h-20 bg-gradient-to-br from-brand-primary to-[#2563eb] relative overflow-hidden">
-                      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:12px_12px]"></div>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-20 transform group-hover:scale-110 transition-transform duration-500">
-                        <Image src={ICONS.BOOKLIGHT} alt="Book" width={40} height={40} />
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <p
-                        className="text-copy-navy leading-snug line-clamp-2 flex-1"
-                        style={{ fontWeight: "semibold", fontSize: "14px" }}
-                      >
-                        {course.title}
-                      </p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
-                          {new Date(course.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              {!loading && courses.length > 0 && (
+                <Carousel
+                  opts={{
+                    align: "start",
+                    loop: true,
+                  }}
+                  className="w-full relative"
+                >
+                  <CarouselContent className="pb-4">
+                    {courses.map((course) => (
+                      <CarouselItem key={course.id} className="basis-full">
+                        <CourseCard
+                          id={course.id}
+                          title={course.title}
+                          description={course.description}
+                          thumbnail={course.thumbnail_url}
+                          variant="admin"
+                          createdAt={course.created_at}
+                          onClick={() => router.push("/admin/courses")}
+                          onEdit={() => router.push("/admin/courses")}
+                          onDelete={() => router.push("/admin/courses")}
+                        />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="hidden sm:flex -left-4 w-8 h-8" />
+                  <CarouselNext className="hidden sm:flex -right-4 w-8 h-8" />
+                </Carousel>
+              )}
             </div>
           </div>
         </div>

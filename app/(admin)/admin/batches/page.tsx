@@ -846,7 +846,24 @@ lg:basis-1/3
                 type="date"
                 value={created_at}
                 onChange={(e) => setCreated_At(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black"
+                className="
+                  w-full
+                  bg-[#1682F1]/10
+                  border
+                  border-[#1682F1]/20
+                  rounded-xl
+                  px-4
+                  py-3
+                  text-sm
+                  text-[#174778]
+                  font-semibold
+                  outline-none
+                  focus:border-[#1682F1]
+                  focus:ring-2
+                  focus:ring-[#1682F1]/20
+                  transition-all
+                  cursor-pointer
+                "
               />
 
               {/* Thumbnail Upload */}

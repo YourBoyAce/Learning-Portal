@@ -23,6 +23,8 @@ import {
   Timer,
   LogIn,
   LogOut,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
 interface LoginSession {
@@ -85,6 +87,17 @@ export default function AdminUsers() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Delete Confirmation State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function fetchUsers() {
     setLoading(true);
@@ -195,14 +208,30 @@ export default function AdminUsers() {
   const handleChangeRole = async (userId: string, newRole: string) => {
     await updateUserRole(userId, newRole);
     setOpenActionMenuId(null);
+    showToast("Role updated successfully.");
     fetchUsers();
   };
 
-  const handleDelete = async (userId: string) => {
-    if (window.confirm("Are you sure you want to permanently remove this user?")) {
-      await deleteUser(userId);
-      setOpenActionMenuId(null);
+  const handleDeleteClick = (user: User) => {
+    setDeletingUser(user);
+    setShowDeleteConfirm(true);
+    setOpenActionMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
+    setIsDeleting(true);
+    try {
+      await deleteUser(deletingUser.id);
+      showToast("User removed successfully.");
       fetchUsers();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to remove user.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      setDeletingUser(null);
     }
   };
 
@@ -299,7 +328,7 @@ export default function AdminUsers() {
                   disabled={isSubmitting}
                   className="w-full"
                 >
-                  {isSubmitting ? "Creating..." : "Create User"}
+                  {isSubmitting ? `Creating ${role === "admin" ? "Admin" : "Scholar"}...` : `Create ${role === "admin" ? "Admin" : "Scholar"}`}
                 </Button>
               </form>
             </div>
@@ -398,7 +427,7 @@ export default function AdminUsers() {
               </div>
             </div>
 
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto flex-1 light-scrollbar">
               <table className="w-full min-w-[860px] text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
@@ -544,10 +573,10 @@ export default function AdminUsers() {
                               ))}
                               <div className="border-t border-gray-100 mt-1 pt-1">
                                 <button
-                                  onClick={() => handleDelete(user.id)}
+                                  onClick={() => handleDeleteClick(user)}
                                   className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
                                 >
-                                  Remove User
+                                  {user.role === "admin" ? "Remove Admin" : "Remove Scholar"}
                                 </button>
                               </div>
                             </div>
@@ -562,6 +591,53 @@ export default function AdminUsers() {
           </div>
         </div>
       </div>
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {showDeleteConfirm && deletingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-5">
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+                Remove {deletingUser.role === "admin" ? "Admin" : "Scholar"}
+              </h3>
+              <p className="text-sm text-gray-500 text-center">
+                Are you sure you want to permanently remove{" "}
+                <strong className="text-gray-900">{deletingUser.name || deletingUser.email}</strong>?
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletingUser(null);
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <Button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isDeleting ? "Removing..." : "Remove"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div className="fixed bottom-8 right-8 bg-copy-dark text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 duration-300">
+          <CheckCircle2 className="text-emerald-400" size={20} />
+          <span className="text-sm font-semibold tracking-wide">
+            {toastMessage}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,8 +4,9 @@
 import { useRef } from "react";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
-
+import Image from "next/image";
 import Certificate from "./Certificate";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   userName?: string;
@@ -82,12 +83,12 @@ export default function CertificateDownload({
 
   return (
     <>
-      <button
+      <Button
         onClick={downloadCertificate}
         className="bg-brand-heading text-white px-6 py-3 rounded-xl hover:bg-brand-heading-hover transition-colors font-semibold"
       >
         Download Certificate
-      </button>
+      </Button>
 
       {/* Hidden certificate used for PDF generation */}
       <div

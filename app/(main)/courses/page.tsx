@@ -691,30 +691,22 @@ console.log("COURSE PROGRESS", courseProgress);
     Completed Courses
   </h2>
 
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     {completedCourses.map((course) => (
       <div
         key={course.id}
-        className="bg-white rounded-xl border border-brand-border p-6 shadow-sm text-gray-900 hover:border-brand-info transition-colors"
+        className="flex flex-col h-full"
       >
-        <h3 className="font-bold text-brand-heading">
-          {course.title}
-        </h3>
-
-        <p className="text-brand-success font-medium mt-2">
-          ✓ Completed
-        </p>
-
-        {course.certificate_id && (
-          <CertificateDownload
-            studentName={userProfileName}
-            courseName={course.title}
-            issuedDate={
-              course.issued_at ||
-              new Date().toISOString()
-            }
-          />
-        )}
+        <CourseCard
+          id={course.id}
+          title={course.title}
+          description={course.description}
+          thumbnail={course.thumbnail_url}
+          variant="user"
+          progressPercentage={100}
+          showProgress={true}
+          onClick={() => router.push(`/courses/${course.id}`)}
+        />
       </div>
     ))}
   </div>

@@ -7,13 +7,13 @@ import { supabase } from "@/app/lib/supabase";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
+import Image from "next/image";
 import {
   PlayCircle,
   CheckCircle2,
   ChevronLeft,
   Clock,
   BookOpen,
-  Lock,
   Loader2,
   AlertCircle,
   HelpCircle,
@@ -24,7 +24,6 @@ import {
   FileText,
   FileArchive,
   FileCode,
-  BarChart3,
   Layers,
   DownloadCloud,
   MoreVertical,
@@ -35,6 +34,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
+import { ICONS } from "@/app/styles/icons";
 
 interface Course {
   id: string;
@@ -170,6 +170,7 @@ export default function CoursePlayerPage() {
   const [completionError, setCompletionError] = useState("");
   const [hasCertificate, setHasCertificate] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [showCourseFinishedPopup, setShowCourseFinishedPopup] = useState(false);
   const [studentName, setStudentName] = useState("Learner");
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
   const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
@@ -330,9 +331,9 @@ export default function CoursePlayerPage() {
         prev.map((a) =>
           a.id === art.id
             ? {
-                ...a,
-                downloadsCount: currentCount + 1,
-              }
+              ...a,
+              downloadsCount: currentCount + 1,
+            }
             : a,
         ),
       );
@@ -840,12 +841,12 @@ export default function CoursePlayerPage() {
               course_id: id,
               issued_at: new Date().toISOString(),
             });
-          
+
           if (error && error.code !== "23505") { // Ignore unique constraint violation
             throw error;
           }
           setHasCertificate(true);
-          setShowCertificateModal(true);
+          setShowCourseFinishedPopup(true);
         } catch (err) {
           console.error("Error generating certificate in DB:", err);
         } finally {
@@ -899,20 +900,19 @@ export default function CoursePlayerPage() {
                 <Button
                   onClick={() => handleMarkAsCompleted(activeModuleId)}
                   disabled={isMarkingCompleted || !activeModule?.video_cf_id}
-                  className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
-                    !activeModule?.video_cf_id
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : isCurrentModuleComplete
-                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                        : !isMarkingCompleted
-                          ? "bg-brand-heading hover:bg-brand-heading-hover text-white"
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${!activeModule?.video_cf_id
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : isCurrentModuleComplete
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : !isMarkingCompleted
+                        ? "bg-brand-heading hover:bg-brand-heading-hover text-white"
+                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    }`}
                 >
                   {isMarkingCompleted
                     ? "Saving..."
                     : isCurrentModuleComplete
-                      ? "Mark as Incomplete(Revert)"
+                      ? "Mark as Incomplete"
                       : isCurrentModuleAcknowledged
                         ? "Mark as Complete"
                         : "Mark as Complete"}
@@ -956,19 +956,19 @@ export default function CoursePlayerPage() {
         {canViewCertificate && (
           <div className="p-5 sm:p-8 bg-amber-50/50 rounded-xl sm:rounded-[2rem] border border-amber-200/50 space-y-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
-              <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2">
-                <Award size={16} className="text-amber-600" />
+              <h4 className={`${TYPOGRAPHY_CLASSES.INNERHEADING} flex items-center gap-2`}>
+                <Image src={ICONS.CHAMPION} alt="Download Certificate" width={20} height={20} />
                 Course Completed!
               </h4>
-              <p className="text-xs text-amber-700/80 leading-relaxed max-w-xl">
+              <p className={TYPOGRAPHY_CLASSES.CAPTION}>
                 Congratulations on masterfully completing this course! Your official certificate of achievement has been issued.
               </p>
             </div>
             <Button
               onClick={() => setShowCertificateModal(true)}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 self-start sm:self-center shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
+              className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 self-start sm:self-center shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
             >
-              <Award size={14} /> View Certificate
+              <Image src={ICONS.CHAMPIONLIGHT} alt="Download Certificate" width={20} height={20} /> Download Certificate
             </Button>
           </div>
         )}
@@ -1111,31 +1111,28 @@ export default function CoursePlayerPage() {
                   selectModule(moduleKey);
                 }
               }}
-              className={`relative w-full cursor-pointer text-left p-5 transition-all flex items-start gap-4 group ${
-                isActive
-                  ? "bg-blue-50/50 border-r-4 border-brand-heading"
-                  : "hover:bg-gray-50"
-              }`}
+              className={`relative w-full cursor-pointer text-left p-5 transition-all flex items-start gap-4 group ${isActive
+                ? "bg-blue-50/50 border-r-4 border-brand-heading"
+                : "hover:bg-gray-50"
+                }`}
             >
               <div
-                className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
-                  isCompleted
-                    ? "bg-emerald-500 border-emerald-500 text-white"
-                    : isActive
-                      ? "bg-brand-heading border-brand-heading text-white"
-                      : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
-                }`}
+                className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${isCompleted
+                  ? "bg-emerald-500 border-emerald-500 text-white"
+                  : isActive
+                    ? "bg-brand-heading border-brand-heading text-white"
+                    : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
+                  }`}
               >
                 {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
               </div>
 
               <div className="flex-1 min-w-0">
                 <h4
-                  className={`text-sm font-bold mb-1 leading-snug transition-colors ${
-                    isActive
-                      ? "text-brand-heading"
-                      : "text-gray-900 group-hover:text-brand-heading"
-                  }`}
+                  className={`text-sm font-bold mb-1 leading-snug transition-colors ${isActive
+                    ? "text-brand-heading"
+                    : "text-gray-900 group-hover:text-brand-heading"
+                    }`}
                 >
                   {mod.title}
                 </h4>
@@ -1262,11 +1259,10 @@ export default function CoursePlayerPage() {
 
               <Button
                 onClick={() => handleStartQuiz(quiz)}
-                className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${
-                  hasAttempted
-                    ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-brand-heading hover:text-brand-heading"
-                    : "bg-brand-heading text-white hover:bg-brand-heading-hover"
-                }`}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold shadow-none transition-all ${hasAttempted
+                  ? "bg-white border-2 border-gray-100 text-gray-600 hover:border-brand-heading hover:text-brand-heading"
+                  : "bg-brand-heading text-white hover:bg-brand-heading-hover"
+                  }`}
               >
                 {hasAttempted ? "Retake Quiz" : "Start Quiz"}
               </Button>
@@ -1397,14 +1393,6 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex items-center gap-6">
-            {canViewCertificate && (
-              <Button
-                onClick={() => setShowCertificateModal(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm border border-amber-600/10 transition-all cursor-pointer"
-              >
-                <Award size={14} /> View Certificate
-              </Button>
-            )}
 
             <div className="hidden md:flex flex-col items-end">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
@@ -1517,33 +1505,30 @@ export default function CoursePlayerPage() {
               <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-6">
                 <button
                   onClick={() => setActiveTab("overview")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                    activeTab === "overview"
-                      ? "border-brand-heading text-brand-heading bg-white"
-                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                  }`}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "overview"
+                    ? "border-brand-heading text-brand-heading bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                    }`}
                 >
                   <BookOpen size={13} />
                   Overview
                 </button>
                 <button
                   onClick={() => setActiveTab("modules")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                    activeTab === "modules"
-                      ? "border-brand-heading text-brand-heading bg-white"
-                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                  }`}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules"
+                    ? "border-brand-heading text-brand-heading bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                    }`}
                 >
                   <Clock size={13} />
                   Modules
                 </button>
                 <button
                   onClick={() => setActiveTab("quizzes")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
-                    activeTab === "quizzes"
-                      ? "border-brand-heading text-brand-heading bg-white"
-                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                  }`}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
+                    ? "border-brand-heading text-brand-heading bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                    }`}
                 >
                   <HelpCircle size={13} />
                   Quizzes
@@ -1556,11 +1541,10 @@ export default function CoursePlayerPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("artifacts")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
-                    activeTab === "artifacts"
-                      ? "border-brand-heading text-brand-heading bg-white"
-                      : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                  }`}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
+                    ? "border-brand-heading text-brand-heading bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                    }`}
                 >
                   <DownloadCloud size={13} />
                   Artifacts
@@ -1593,22 +1577,20 @@ export default function CoursePlayerPage() {
           <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0">
             <button
               onClick={() => setActiveTab("modules")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === "modules" || activeTab === "overview"
-                  ? "border-brand-heading text-brand-heading bg-white"
-                  : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-              }`}
+              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules" || activeTab === "overview"
+                ? "border-brand-heading text-brand-heading bg-white"
+                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                }`}
             >
               <BookOpen size={13} />
               Modules
             </button>
             <button
               onClick={() => setActiveTab("quizzes")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
-                activeTab === "quizzes"
-                  ? "border-brand-heading text-brand-heading bg-white"
-                  : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-              }`}
+              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
+                ? "border-brand-heading text-brand-heading bg-white"
+                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                }`}
             >
               <HelpCircle size={13} />
               Quizzes
@@ -1621,11 +1603,10 @@ export default function CoursePlayerPage() {
             </button>
             <button
               onClick={() => setActiveTab("artifacts")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${
-                activeTab === "artifacts"
-                  ? "border-brand-heading text-brand-heading bg-white"
-                  : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-              }`}
+              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
+                ? "border-brand-heading text-brand-heading bg-white"
+                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                }`}
             >
               <DownloadCloud size={13} />
               Artifacts
@@ -1768,17 +1749,16 @@ export default function CoursePlayerPage() {
                               className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
                             >
                               <div
-                                className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
-                                  isAnswerSubmitted && isCorrectAnswer
-                                    ? "bg-emerald-500 border-emerald-500 text-white"
-                                    : isAnswerSubmitted &&
-                                        isSelected &&
-                                        !isCorrectAnswer
-                                      ? "bg-red-500 border-red-500 text-white"
-                                      : isSelected
-                                        ? "border-brand-heading bg-brand-heading text-white"
-                                        : "border-gray-300"
-                                }`}
+                                className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${isAnswerSubmitted && isCorrectAnswer
+                                  ? "bg-emerald-500 border-emerald-500 text-white"
+                                  : isAnswerSubmitted &&
+                                    isSelected &&
+                                    !isCorrectAnswer
+                                    ? "bg-red-500 border-red-500 text-white"
+                                    : isSelected
+                                      ? "border-brand-heading bg-brand-heading text-white"
+                                      : "border-gray-300"
+                                  }`}
                               >
                                 {isAnswerSubmitted && isCorrectAnswer ? (
                                   <Check size={14} />
@@ -1935,11 +1915,56 @@ export default function CoursePlayerPage() {
         </div>
       )}
 
+      {/* ─── COURSE FINISHED POPUP ─── */}
+      {showCourseFinishedPopup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 sm:p-10 text-center relative animate-[fadeInUp_0.4s_ease-out]">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCourseFinishedPopup(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+            >
+              <XIcon size={20} />
+            </button>
+
+            {/* Trophy / Award Icon */}
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <Award size={40} className="text-white" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              🎉 Course Finished!
+            </h2>
+            <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto leading-relaxed">
+              Congratulations on completing <span className="font-semibold text-gray-800">{course?.title}</span>! Your certificate of achievement has been generated and is ready to download.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button
+                onClick={() => {
+                  setShowCourseFinishedPopup(false);
+                  setShowCertificateModal(true);
+                }}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
+              >
+                <Award size={16} /> Download Certificate
+              </Button>
+              <Button
+                onClick={() => setShowCourseFinishedPopup(false)}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-all cursor-pointer"
+              >
+                Continue Exploring
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCertificateModal && canViewCertificate && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
-              
+
               {/* Close Button */}
               <button
                 onClick={() => setShowCertificateModal(false)}
@@ -1979,7 +2004,7 @@ export default function CoursePlayerPage() {
           </div>
         </div>
       )}
-      
+
     </div>
   );
 }

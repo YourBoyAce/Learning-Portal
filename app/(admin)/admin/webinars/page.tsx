@@ -40,6 +40,11 @@ export default function AdminWebinarsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Delete Confirmation State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingWebinar, setDeletingWebinar] = useState<Webinar | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -141,23 +146,32 @@ export default function AdminWebinarsPage() {
       fetchWebinars();
     } catch (error) {
       console.error("Error saving webinar:", error);
-      alert("Failed to save webinar.");
+      showToast("Failed to save webinar.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteWebinar = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this webinar?")) return;
+  const handleDeleteClick = (webinar: Webinar) => {
+    setDeletingWebinar(webinar);
+    setShowDeleteConfirm(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!deletingWebinar) return;
+    setIsDeleting(true);
     try {
-      const { error } = await supabase.from("webinars").delete().eq("id", id);
+      const { error } = await supabase.from("webinars").delete().eq("id", deletingWebinar.id);
       if (error) throw error;
       showToast("Webinar deleted successfully.");
       fetchWebinars();
     } catch (error) {
       console.error("Error deleting webinar:", error);
-      alert("Failed to delete webinar.");
+      showToast("Failed to delete webinar.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      setDeletingWebinar(null);
     }
   };
 
@@ -209,13 +223,15 @@ export default function AdminWebinarsPage() {
               className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all shadow-sm text-black"
             />
           </div>
-          <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-center gap-3 shadow-sm">
-            <Video className="text-brand-primary" size={20} />
-            <div className="text-center">
-              <span className="block text-lg font-bold text-gray-900 leading-none">
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center shrink-0">
+              <Video className="text-brand-primary" size={24} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-gray-900 leading-none mb-1">
                 {webinars.length}
               </span>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
                 Total Scheduled
               </span>
             </div>
@@ -268,8 +284,12 @@ export default function AdminWebinarsPage() {
                     >
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-100">
-                            {webinar.icon || "ðŸ“‹"}
+                          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            {webinar.icon && webinar.icon.length <= 2 ? (
+                              <span>{webinar.icon}</span>
+                            ) : (
+                              <Image src={ICONS.GLOBE} alt="icon" width={24} height={24} />
+                            )}
                           </div>
                           <div>
                             <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1">
@@ -296,8 +316,8 @@ export default function AdminWebinarsPage() {
                       <td className="py-5 px-6">
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-blue-50 text-blue-700 border-blue-100"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            : "bg-blue-50 text-blue-700 border-blue-100"
                             }`}
                         >
                           <span
@@ -316,7 +336,7 @@ export default function AdminWebinarsPage() {
                             <Edit size={18} className="text-primary" />
                           </Button>
                           <Button
-                            onClick={() => handleDeleteWebinar(webinar.id)}
+                            onClick={() => handleDeleteClick(webinar)}
                             className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
                             title="Delete"
                           >
@@ -347,7 +367,7 @@ export default function AdminWebinarsPage() {
                 </div>
               </div>
 
-              <div className="px-4 sm:px-8 py-5 sm:py-6 max-h-[70vh] overflow-y-auto">
+              <div className="px-4 sm:px-8 py-5 sm:py-6 max-h-[70vh] overflow-y-auto light-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Title */}
                   <div className="md:col-span-2">
@@ -359,7 +379,7 @@ export default function AdminWebinarsPage() {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Masterclass on Neural Networks"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
                     />
                   </div>
 
@@ -373,38 +393,41 @@ export default function AdminWebinarsPage() {
                       value={subtitle}
                       onChange={(e) => setSubtitle(e.target.value)}
                       placeholder="e.g. Prof. Ariadne Â· Seminar Room R12"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
                     />
                   </div>
-
-                  {/* Icon */}
+                  {/* Event Date */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Icon (Emoji)
+                      Event Date & Time
                     </label>
-                    <input
-                      type="text"
-                      value={icon}
-                      onChange={(e) => setIcon(e.target.value)}
-                      placeholder="ðŸ“‹, ðŸ–¥ï¸, â–¶, etc."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
-                    />
-                  </div>
 
-                  {/* Event Date (Text) */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Event Date (Display String)
-                    </label>
                     <input
-                      type="text"
+                      type="datetime-local"
                       value={eventDate}
                       onChange={(e) => setEventDate(e.target.value)}
-                      placeholder="e.g. TOMORROW, 10:00 AM"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
+                      className="
+      w-full
+      bg-[#1682F1]/10
+      border
+      border-[#1682F1]/20
+      rounded-xl
+      px-4
+      py-3
+      text-sm
+      text-[#174778]
+      font-semibold
+      outline-none
+
+      focus:border-[#1682F1]
+      focus:ring-2
+      focus:ring-[#1682F1]/20
+
+      transition-all
+      cursor-pointer
+    "
                     />
                   </div>
-
                   {/* Status */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -413,7 +436,7 @@ export default function AdminWebinarsPage() {
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700 font-normal"
                     >
                       <option value="streaming">Streaming</option>
                       <option value="link">Link</option>
@@ -430,7 +453,7 @@ export default function AdminWebinarsPage() {
                       value={linkText}
                       onChange={(e) => setLinkText(e.target.value)}
                       placeholder="e.g. Register Now, Link Active Soon"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
                     />
                   </div>
 
@@ -445,7 +468,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) =>
                         setAttendeesCount(parseInt(e.target.value) || 0)
                       }
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 font-normal"
                     />
                   </div>
 
@@ -459,7 +482,7 @@ export default function AdminWebinarsPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                       placeholder="Describe what will be covered in this webinar..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all resize-none text-black"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all resize-none text-gray-700 font-normal"
                     />
                   </div>
                 </div>
@@ -484,6 +507,46 @@ export default function AdminWebinarsPage() {
                       ? "Update Webinar"
                       : "Create Webinar"}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- DELETE CONFIRMATION MODAL --- */}
+        {showDeleteConfirm && deletingWebinar && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+              <div className="px-6 py-5">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+                  Delete Webinar
+                </h3>
+                <p className="text-sm text-gray-500 text-center">
+                  Are you sure you want to permanently delete{" "}
+                  <strong className="text-gray-900">{deletingWebinar.title}</strong>?
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                <Button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeletingWebinar(null);
+                  }}
+                  className="flex-1 px-4  bg-gray-50py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
               </div>
             </div>
           </div>
