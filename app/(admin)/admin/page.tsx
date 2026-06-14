@@ -414,7 +414,7 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{log.userName}</p>
-                          <p className="text-xs text-gray-500">{log.email}</p>
+                          <p className={TYPOGRAPHY_CLASSES.CAPTION}>{log.email}</p>
                         </div>
                       </div>
                     </td>

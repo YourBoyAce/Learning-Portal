@@ -90,7 +90,7 @@ export default function AdminLayout({
   },
 
   {
-    label: "Batch Management",
+    label: "Manage Batches",
     href: "/admin/batches",
     active: pathname === "/admin/batches",
     icon: pathname === "/admin/batches"

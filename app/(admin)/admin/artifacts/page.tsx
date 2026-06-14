@@ -97,7 +97,7 @@ export default function AdminArtifacts() {
   const [selectedFile, setSelectedFile] = useState<File | null>(
     null
   );
-  
+
   const [isUploading, setIsUploading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -726,7 +726,7 @@ export default function AdminArtifacts() {
                             {getFileIcon(art.type)}
                           </div>
                           <div className="min-w-0">
-                            <h4 className="font-medium text-gray-800 text-sm truncate">
+                            <h4 className="text-sm p-4 pl-1 font-medium text-gray-500 leading-tight">
                               {art.name}
                             </h4>
                             <p className="text-xs text-gray-400 truncate mt-0.5">
@@ -741,13 +741,13 @@ export default function AdminArtifacts() {
                           {art.courseName}
                         </span>
                       </td>
-                      <td className="p-4 text-sm text-gray-700 text-center font-medium">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {art.size}
                       </td>
                       <td className="p-4 text-sm text-gray-500 text-center">
                         {art.downloadsCount}
                       </td>
-                      <td className="p-4 text-sm text-gray-400 text-center">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {new Date(art.uploadDate).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -1008,7 +1008,7 @@ export default function AdminArtifacts() {
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors"
               >
                 Delete
               </button>

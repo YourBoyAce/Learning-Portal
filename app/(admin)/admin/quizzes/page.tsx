@@ -547,25 +547,25 @@ export default function AdminQuizzes() {
                       key={quiz.id}
                       className="hover:bg-gray-50/30 transition-colors group"
                     >
-                      <td className="p-4 pl-6 text-sm font-medium text-gray-800">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {quiz.title}
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         <span className="flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-gray-400" />
                           {quiz.courseName}
                         </span>
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {quiz.questionsCount}
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {quiz.passingScore}%
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {quiz.attemptsCount}
                       </td>
-                      <td className="p-4 text-sm text-gray-600">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
                         {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
                       </td>
                       <td className="p-4 text-center">

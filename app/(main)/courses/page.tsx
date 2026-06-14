@@ -690,7 +690,7 @@ console.log("COURSE PROGRESS", courseProgress);
             }}
             className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-heading text-white text-sm font-semibold rounded-xl hover:bg-brand-heading/90 transition-colors shadow-sm"
           >
-            <Award size={16} />
+            <Image src={ICONS.CHAMPIONLIGHT} alt="Certificate" width={18} height={18} />
             Download Certificate
           </button>
         )}

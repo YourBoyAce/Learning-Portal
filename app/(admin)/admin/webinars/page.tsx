@@ -187,7 +187,7 @@ export default function AdminWebinarsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
@@ -212,7 +212,7 @@ export default function AdminWebinarsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="md:col-span-3 relative">
             <Search
-              className="absolute left-4 top-5.5 -translate-y-1/2 text-gray-400"
+              className="absolute left-4 top-5.5 -translate-y-1/2 text-gray-600"
               size={18}
             />
             <input
@@ -220,7 +220,7 @@ export default function AdminWebinarsPage() {
               placeholder="Search webinars by title or instructor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all shadow-sm text-black"
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all shadow-sm text-gray-500"
             />
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
@@ -228,10 +228,10 @@ export default function AdminWebinarsPage() {
               <Video className="text-brand-primary" size={24} />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-bold text-gray-900 leading-none mb-1">
+              <span className="text-2xl font-bold text-gray-900 leading-none">
                 {webinars.length}
               </span>
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+              <span className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                 Total Scheduled
               </span>
             </div>
@@ -263,7 +263,7 @@ export default function AdminWebinarsPage() {
                   <tr>
                     <td colSpan={4} className="py-20 text-center">
                       <Loader2 className="w-8 h-8 animate-spin text-brand-primary mx-auto mb-2" />
-                      <p className="text-sm text-black-400 font-medium">
+                      <p className="text-sm text-gray-500 font-medium">
                         Loading webinars...
                       </p>
                     </td>
@@ -271,7 +271,7 @@ export default function AdminWebinarsPage() {
                 ) : filteredWebinars.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-20 text-center">
-                      <p className="text-sm text-black-400 font-medium">
+                      <p className="text-sm text-gray-500 font-medium">
                         No webinars found.
                       </p>
                     </td>
@@ -292,10 +292,10 @@ export default function AdminWebinarsPage() {
                             )}
                           </div>
                           <div>
-                            <h3 className="text-sm font-medium text-gray-800 leading-tight mb-1">
+                            <h3 className="text-sm font-medium text-gray-500 leading-tight mb-1">
                               {webinar.title}
                             </h3>
-                            <p className="text-xs text-gray-500 leading-relaxed max-w-xs line-clamp-1">
+                            <p className={TYPOGRAPHY_CLASSES.CAPTION}>
                               {webinar.subtitle}
                             </p>
                           </div>
@@ -303,7 +303,7 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-xs font-normal text-gray-600">
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
                             <Calendar size={14} className="text-brand-primary" />
                             {webinar.event_date}
                           </div>
@@ -491,14 +491,14 @@ export default function AdminWebinarsPage() {
               <div className="px-4 sm:px-8 py-5 sm:py-6 border-t border-gray-100 bg-gray-50/50 flex flex-col-reverse sm:flex-row gap-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  className="flex-1 px-4 py-3 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveWebinar}
                   disabled={isSaving}
-                  className="flex-2 bg-brand-primary text-white py-3 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="flex-1 bg-brand-primary text-white py-3 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-all shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving
@@ -530,23 +530,23 @@ export default function AdminWebinarsPage() {
                 </p>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-                <Button
+                <button
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setDeletingWebinar(null);
                   }}
-                  className="flex-1 px-4  bg-gray-50py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={handleConfirmDelete}
                   disabled={isDeleting}
                   className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
+                </button>
               </div>
             </div>
           </div>

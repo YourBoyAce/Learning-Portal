@@ -42,7 +42,6 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isModulesLoading, setIsModulesLoading] = useState(false);
-  const [showAllCourses, setShowAllCourses] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -399,7 +398,7 @@ export default function UploadPage() {
     return `Created ${date.toLocaleDateString()}`;
   };
 
-  const displayedCourses = showAllCourses ? courses : courses.slice(0, 4);
+  const displayedCourses = courses;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
@@ -624,14 +623,14 @@ export default function UploadPage() {
                 </h3>
               </div>
 
-              {/* Course Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Course Cards Grid — shows 2×2 visible, scrollable for more */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {isCoursesLoading && (
-                  <p className="text-sm text-gray-500">Loading courses...</p>
+                  <p className="text-sm text-gray-500 col-span-2">Loading courses...</p>
                 )}
 
                 {!isCoursesLoading && courses.length === 0 && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 col-span-2">
                     No courses yet. Initialize your first course to get started.
                   </p>
                 )}
@@ -648,61 +647,6 @@ export default function UploadPage() {
                     showProgress={false}
                   />
                 ))}
-
-                {/* View More Card */}
-                {!showAllCourses && courses.length > 4 && (
-                  <div
-                    onClick={() => setShowAllCourses(true)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-brand-primary hover:bg-gray-50 transition-all cursor-pointer"
-                  >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-brand-primary">
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900 mb-1">
-                      View All Courses
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Show {courses.length - 4} more
-                    </p>
-                  </div>
-                )}
-                {showAllCourses && courses.length > 4 && (
-                  <div
-                    onClick={() => setShowAllCourses(false)}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-brand-primary hover:bg-gray-50 transition-all cursor-pointer"
-                  >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400 group-hover:text-brand-primary">
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900 mb-1">
-                      Show Less
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
