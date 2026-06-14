@@ -372,7 +372,7 @@ export default function AdminCourses() {
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Manage Courses
             </h1>
-            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
+            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600 dark:text-gray-400"}>
               Create, edit, and publish your course catalog.
             </p>
           </div>
@@ -390,7 +390,7 @@ export default function AdminCourses() {
           {stats.map((stat) => (
             <div
               key={stat.label}
-              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+              className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 rounded-xl p-5 shadow-sm flex items-center gap-4"
             >
               <div className="flex items-center justify-center shrink-0">
                 <Image
@@ -436,16 +436,16 @@ export default function AdminCourses() {
               placeholder="Search courses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2.5 border text-gray-600 border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
+              className="pl-9 pr-4 py-2.5 border text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
           </div>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm">
             <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
-            <p className="text-sm font-medium text-gray-500">
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Loading your catalog...
             </p>
           </div>
@@ -453,17 +453,17 @@ export default function AdminCourses() {
 
         {/* Empty State */}
         {!loading && filteredCourses.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-white/20 shadow-sm text-center px-4">
+            <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
+              <BookOpen className="w-8 h-8 text-gray-400 dark:text-gray-500" />
             </div>
-            <p className="text-lg text-gray-900 font-bold mb-2">
+            <p className="text-lg text-gray-900 dark:text-white font-bold mb-2">
               {searchTerm
                 ? "No courses match your search"
                 : "Your catalog is empty"}
             </p>
             {!searchTerm && (
-              <p className="text-sm text-gray-500 mb-6 max-w-md">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md">
                 Get started by creating your first course. You can add modules,
                 descriptions, and publish it right away.
               </p>
@@ -521,33 +521,8 @@ lg:basis-1/3
               </CarouselContent>
 
 
-              <CarouselPrevious
-                className="
-          hidden
-          lg:flex
-          -left-5
-          bg-white
-          shadow-lg
-          border
-          border-gray-100
-          text-brand-primary
-          hover:bg-gray-50
-        "
-              />
-
-              <CarouselNext
-                className="
-          hidden
-          lg:flex
-          -right-5
-          bg-white
-          shadow-lg
-          border
-          border-gray-100
-          text-brand-primary
-          hover:bg-gray-50
-        "
-              />
+              <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+              <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
 
 
             </Carousel>)}
@@ -559,15 +534,15 @@ lg:basis-1/3
       {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-white/10">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {isEditing ? "Edit Course" : "Create New Course"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -576,7 +551,7 @@ lg:basis-1/3
             {/* Modal Body - Scrollable */}
             <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                   Course Title
                 </label>
                 <input
@@ -584,12 +559,12 @@ lg:basis-1/3
                   placeholder="e.g. Playwright Mastery"
                   value={courseTitle}
                   onChange={(e) => setCourseTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                   Description
                 </label>
                 <textarea
@@ -597,13 +572,13 @@ lg:basis-1/3
                   value={courseDescription}
                   onChange={(e) => setCourseDescription(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
                 />
               </div>
 
               {/* Thumbnail Upload */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                   Course Thumbnail
                 </label>
                 {thumbnailPreview ? (
@@ -631,7 +606,7 @@ lg:basis-1/3
 
               <div className="space-y-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Modules (Optional)
                   </label>
                   <button
@@ -645,7 +620,7 @@ lg:basis-1/3
                 </div>
 
                 {modules.map((module, index) => (
-                  <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+                  <div key={index} className="border border-gray-100 dark:border-white/10 rounded-xl p-3 space-y-2 bg-gray-50/50 dark:bg-white/5">
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <input
@@ -655,13 +630,13 @@ lg:basis-1/3
                           onChange={(e) =>
                             handleModuleChange(index, "title", e.target.value)
                           }
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
+                          className="w-full px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white dark:bg-slate-700"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveModule(index)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
                         title="Remove Module"
                       >
                         <X className="w-4 h-4" />
@@ -674,7 +649,7 @@ lg:basis-1/3
                         handleModuleChange(index, "description", e.target.value)
                       }
                       rows={2}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                      className="w-full px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white dark:bg-slate-700"
                     />
                   </div>
                 ))}
@@ -693,10 +668,10 @@ lg:basis-1/3
             </div>
 
             {/* Modal Footer */}
-            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-white/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>
@@ -720,17 +695,17 @@ lg:basis-1/3
       {/* â”€â”€â”€ DELETE CONFIRMATION MODAL â”€â”€â”€ */}
       {showDeleteConfirm && deletingCourse && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-5">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
+              <div className="w-12 h-12 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center mb-2">
                 Delete Course
               </h3>
-              <p className="text-sm text-gray-500 text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
                 Are you sure you want to delete{" "}
-                <strong className="text-gray-900">
+                <strong className="text-gray-900 dark:text-white">
                   {deletingCourse.title}
                 </strong>
                 ? This action cannot be undone.
@@ -741,13 +716,13 @@ lg:basis-1/3
                 </p>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex gap-3">
               <button
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeletingCourse(null);
                 }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>

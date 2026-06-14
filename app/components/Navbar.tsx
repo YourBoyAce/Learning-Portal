@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Logo } from "@/app/components/Logo";
+import ThemeToggle from "@/app/components/ui/ThemeToggle";
 
 export default function Navbar() {
     return (
@@ -17,11 +18,14 @@ export default function Navbar() {
                     <Link href="/courses">Courses</Link>
                 </div>
 
-                <Link href="/login">
-                    <button className="px-4 py-2 bg-brand-primary rounded-md hover:bg-brand-hover transition-colors">
-                        Login
-                    </button>
-                </Link>
+                <div className="flex items-center gap-3">
+                    <ThemeToggle />
+                    <Link href="/login">
+                        <button className="px-4 py-2 bg-brand-primary rounded-md hover:bg-brand-hover transition-colors">
+                            Login
+                        </button>
+                    </Link>
+                </div>
 
             </div>
         </nav>

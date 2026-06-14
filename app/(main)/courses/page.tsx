@@ -540,7 +540,7 @@ console.log("COURSE PROGRESS", courseProgress);
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Continuing Your Journey
             </h1>
-            <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
+            <p className="text-gray-600 dark:text-gray-400 text-[17px] leading-relaxed max-w-2xl">
               Welcome back to{" "}
               <span className="font-bold text-brand-primary">The Automate</span>.
               You have{" "}
@@ -651,42 +651,17 @@ console.log("COURSE PROGRESS", courseProgress);
       ))}
     </CarouselContent>
 
-    {activeCourses.length > 3 && (
+    {activeCourses.length > 1 && (
       <>
-        <CarouselPrevious
-          className="
-            hidden
-            lg:flex
-            -left-5
-            bg-white
-            shadow-lg
-            border
-            border-gray-100
-            text-brand-primary
-            hover:bg-gray-50
-          "
-        />
-
-        <CarouselNext
-          className="
-            hidden
-            lg:flex
-            -right-5
-            bg-white
-            shadow-lg
-            border
-            border-gray-100
-            text-brand-primary
-            hover:bg-gray-50
-          "
-        />
+        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
       </>
     )}
   </Carousel>
 </div>
 
 {/*Completed courses */}
-<section className="mt-12 text-gray-900">
+<section className="mt-12 text-gray-900 dark:text-gray-100">
   <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
     Completed Courses
   </h2>
@@ -742,7 +717,7 @@ console.log("COURSE PROGRESS", courseProgress);
           <div className="mb-6 relative z-10">
             {insights.length > 0 ? (
               <>
-                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
+                <p className="text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed max-w-4xl">
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
@@ -752,7 +727,7 @@ console.log("COURSE PROGRESS", courseProgress);
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Cultivating new insights...
               </p>
             )}
@@ -762,7 +737,7 @@ console.log("COURSE PROGRESS", courseProgress);
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className={`w-1/6 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+              className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
             > Mark as Read
             </Button>
           </div>
@@ -772,13 +747,13 @@ console.log("COURSE PROGRESS", courseProgress);
       {/* ─── CERTIFICATE MODAL ─── */}
       {selectedCertificateCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 dark:border-white/10 relative p-1 bg-gradient-to-br from-amber-400 via-white dark:via-slate-800 to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
               
               {/* Close Button */}
               <button
                 onClick={() => setSelectedCertificateCourse(null)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all"
               >
                 <X size={20} />
               </button>

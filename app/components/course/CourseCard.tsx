@@ -61,9 +61,9 @@ export default function CourseCard({
 
   // Admin footer
   const adminFooter = (
-    <div className="mt-auto border-t border-gray-100 pt-4">
+    <div className="mt-auto border-t border-gray-100 dark:border-white/10 pt-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-400 dark:text-gray-500">
           {createdAt
             ? new Date(createdAt).toLocaleDateString("en-US", {
                 month: "short",
@@ -91,7 +91,7 @@ export default function CourseCard({
             e.stopPropagation();
             onDelete?.();
           }}
-          className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
+          className="flex-1 py-2 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
         >
           Delete
         </button>
@@ -103,18 +103,21 @@ export default function CourseCard({
   const userFooter = showProgress && (
     <>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold text-gray-500 tracking-wide">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 tracking-wide">
           Progress
         </span>
         <span className="text-xs font-bold text-copy-navy">{progressPercentage}%</span>
       </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
+      <div className="w-full h-2 bg-gray-200 dark:bg-slate-600 rounded-full mb-2">
         <div
-          className="h-2 rounded-full bg-gradient-to-r from-brand-primary to-brand-success transition-all"
-          style={{ width: `${progressPercentage}%` }}
+          className="h-2 rounded-full transition-all"
+          style={{
+            width: `${progressPercentage}%`,
+            background: "linear-gradient(to right, var(--color-primary), var(--color-success))",
+          }}
         />
       </div>
-      <span className="text-xs text-gray-400 mt-auto">
+      <span className="text-xs text-gray-400 dark:text-gray-500 mt-auto">
         {progressPercentage === 0
           ? "Start Learning"
           : progressPercentage < 90
@@ -127,17 +130,15 @@ export default function CourseCard({
   return (
     <div
       onClick={onClick}
-      className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white border border-gray-100 cursor-pointer"
+      className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 cursor-pointer"
     >
       <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
         {/* Thumbnail */}
-        <div className="relative w-full aspect-[16/9] bg-surface-subtle overflow-hidden">
+        <div className="relative w-full aspect-[16/9] overflow-hidden">
           <img
             src={thumbnail || PLACEHOLDER_IMAGE}
             alt={title}
-            className={`w-full h-full object-center ${
-              isAdmin ? "object-cover" : "object-contain"
-            }`}
+            className="w-full h-full object-cover object-center"
           />
         </div>
 

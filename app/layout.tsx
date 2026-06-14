@@ -3,10 +3,9 @@ import React from "react";
 import { Roboto } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { LoadingProvider } from "./context/LoadingContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import LoadingManager from "./components/ui/LoadingManager";
 import LoadingWrapper from "./components/ui/LoadingWrapper";
-import { COLOR_CSS_VARIABLES } from "./styles/colors";
-import { TYPOGRAPHY_CSS_VARIABLES } from "./styles/typography";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -23,20 +22,25 @@ export default function RootLayout({
     <html
       lang="en"
       className={cn("font-sans", roboto.variable)}
-      style={
-        {
-          ...COLOR_CSS_VARIABLES,
-          ...TYPOGRAPHY_CSS_VARIABLES,
-        } as React.CSSProperties
-      }
+      suppressHydrationWarning
     >
+      <head>
+        {/* Inline script runs before paint to set .dark class from system preference, preventing flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
-        <LoadingProvider>
-          <LoadingManager />
-          <LoadingWrapper>
-            {children}
-          </LoadingWrapper>
-        </LoadingProvider>
+        <ThemeProvider>
+          <LoadingProvider>
+            <LoadingManager />
+            <LoadingWrapper>
+              {children}
+            </LoadingWrapper>
+          </LoadingProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1127,11 +1127,10 @@ export default function Dashboard() {
                       ))}
                     </CarouselContent>
 
-                    {/* Navigation Arrows (Hidden on Mobile, Visible on Desktop) */}
-                    {activeCourses.length > 3 && (
+                    {activeCourses.length > 1 && (
                       <>
-                        <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
-                        <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-12 w-12 z-10" />
+                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
                       </>
                     )}
                   </Carousel>
@@ -1187,10 +1186,10 @@ export default function Dashboard() {
                       ))}
                     </CarouselContent>
 
-                    {completedCourses.length > 3 && (
+                    {completedCourses.length > 1 && (
                       <>
-                        <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-12 w-12 z-10" />
-                        <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-12 w-12 z-10" />
+                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-green-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-green-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
                       </>
                     )}
                   </Carousel>
@@ -1237,7 +1236,7 @@ export default function Dashboard() {
             <Button
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
-              className={`w-1/6 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+              className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
             > Mark as Read
             </Button>
           </div>

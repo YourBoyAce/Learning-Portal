@@ -54,7 +54,7 @@
 }
 
 .nav-item-inactive:hover {
-  background-color: #f5f7fa;
+  background-color: var(--color-page-subtle, #f5f7fa);
 }
 
 /* Button Styles */

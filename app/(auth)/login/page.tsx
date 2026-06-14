@@ -97,7 +97,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 py-8 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-[#F5F7FA] dark:bg-slate-900 p-4 py-8 flex flex-col items-center justify-center">
       {/* HEADER */}
       <div className="text-center mb-4 shrink-0 flex flex-col items-center">
         <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
@@ -107,21 +107,21 @@ export default function LoginPage() {
       <div className="w-full max-w-md mx-auto shrink-0">
         {/* LOGIN CARD */}
         <form
-          className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm"
+          className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 p-6 rounded-xl shadow-sm"
           onSubmit={handleLogin}
         >
-          <h2 className="text-base font-semibold text-gray-800">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white">
             Welcome Back
           </h2>
-          <p className="text-xs text-gray-500 mt-1 mb-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
             Please enter your credentials to continue your journey.
           </p>
 
           {/* EMAIL */}
-          <label className="text-[11px] font-semibold text-gray-500 tracking-wide">
+          <label className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 tracking-wide">
             EMAIL ADDRESS
           </label>
-          <div className="flex items-center bg-[#F0F2F5] border border-gray-200 rounded-md px-3 mt-1">
+          <div className="flex items-center bg-[#F0F2F5] dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-md px-3 mt-1">
             <svg
               className="w-4 h-4 text-gray-400 mr-2"
               fill="none"
@@ -141,15 +141,15 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className="w-full bg-transparent p-2 text-sm outline-none text-gray-600 placeholder-gray-400"
+              className="w-full bg-transparent p-2 text-sm outline-none text-gray-600 dark:text-gray-200 placeholder-gray-400"
             />
           </div>
 
           {/* PASSWORD */}
-          <label className="text-[11px] font-semibold text-gray-500 tracking-wide block mt-3">
+          <label className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 tracking-wide block mt-3">
             PASSWORD
           </label>
-          <div className="flex items-center bg-[#F0F2F5] border border-gray-200 rounded-md px-3 mt-1">
+          <div className="flex items-center bg-[#F0F2F5] dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-md px-3 mt-1">
             <svg
               className="w-4 h-4 text-gray-400 mr-2"
               fill="none"
@@ -169,7 +169,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className="w-full bg-transparent p-2 text-sm outline-none text-gray-600"
+              className="w-full bg-transparent p-2 text-sm outline-none text-gray-600 dark:text-gray-200"
             />
           </div>
 
@@ -226,10 +226,10 @@ export default function LoginPage() {
               
             
           </div>
-          <h3 className="font-semibold text-xs text-gray-800 mb-1">
+          <h3 className="font-semibold text-xs text-gray-800 dark:text-gray-200 mb-1">
             Did you know?
           </h3>
-          <p className="text-xs text-gray-600 leading-relaxed">
+          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
             Students who review their curriculum at least three times a week
             demonstrate 40% higher retention of abstract concepts.
           </p>
@@ -237,7 +237,7 @@ export default function LoginPage() {
       </div>
 
       {/* ENROLLMENT LINK */}
-      <div className="text-sm text-gray-500 mt-4 shrink-0">
+      <div className="text-sm text-gray-500 dark:text-gray-400 mt-4 shrink-0">
         New to the Sanctuary?{" "}
         <span className="text-[#2283FF] font-semibold cursor-pointer">
           Request Enrollment

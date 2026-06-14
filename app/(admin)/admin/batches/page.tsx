@@ -685,33 +685,8 @@ lg:basis-1/3
                   ))}
                 </CarouselContent>
 
-                <CarouselPrevious
-                  className="
-          hidden
-          lg:flex
-          -left-5
-          bg-white
-          shadow-lg
-          border
-          border-gray-100
-          text-brand-primary
-          hover:bg-gray-50
-        "
-                />
-
-                <CarouselNext
-                  className="
-          hidden
-          lg:flex
-          -right-5
-          bg-white
-          shadow-lg
-          border
-          border-gray-100
-          text-brand-primary
-          hover:bg-gray-50
-        "
-                />
+                <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
               </Carousel>
             </div>
           )}
