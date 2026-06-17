@@ -611,7 +611,7 @@ export default function AdminQuizzes() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 {isEditing ? "Edit Quiz" : "Create New Quiz"}
               </h3>
               <button

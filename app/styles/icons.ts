@@ -31,7 +31,7 @@ export const ICONS = {
   STORAGE: "/icons/storage.svg",
   ITEMS: "/icons/items.svg",
   CHAMPION: "/icons/champion.svg",
-  CHAMPIONLIGHT: "/icons/championLight.svg",
   CLOCK: "/icons/clock.svg",
+  CALENDAR: "/icons/calendar.svg",
 
 };

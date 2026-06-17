@@ -1,10 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { COLOR_CSS_VARIABLES, DARK_COLOR_CSS_VARIABLES } from "@/app/styles/colors";
+import { COLOR_CSS_VARIABLES } from "@/app/styles/colors";
 import { TYPOGRAPHY_CSS_VARIABLES } from "@/app/styles/typography";
 
-type Theme = "light" | "dark";
+type Theme = "light";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function applyThemeVariables(theme: Theme) {
   const root = document.documentElement;
-  const vars = theme === "dark" ? DARK_COLOR_CSS_VARIABLES : COLOR_CSS_VARIABLES;
+  const vars = COLOR_CSS_VARIABLES;
 
   for (const [key, value] of Object.entries(vars)) {
     root.style.setProperty(key, value);
@@ -24,15 +24,6 @@ function applyThemeVariables(theme: Theme) {
     root.style.setProperty(key, String(value));
   }
 
-  if (theme === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
-}
-
-function getSystemTheme(): Theme {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -40,20 +31,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const initial = getSystemTheme();
+    const initial: Theme = "light";
     setTheme(initial);
     applyThemeVariables(initial);
     setMounted(true);
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      const next: Theme = e.matches ? "dark" : "light";
-      setTheme(next);
-      applyThemeVariables(next);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   return (

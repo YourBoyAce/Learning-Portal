@@ -1,4 +1,7 @@
 "use client";
+import Image from "next/image";
+import { ICONS } from "@/app/styles/icons";
+
 type CourseCardProps = {
   id: string | number;
   title: string;
@@ -17,6 +20,8 @@ type CourseCardProps = {
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  isCompleted?: boolean;
+  onCertificateClick?: () => void;
 };
 
 const PLACEHOLDER_IMAGE =
@@ -37,6 +42,8 @@ export default function CourseCard({
   onClick,
   onEdit,
   onDelete,
+  isCompleted = false,
+  onCertificateClick,
 }: CourseCardProps) {
   const isAdmin = variant === "admin";
 
@@ -61,15 +68,15 @@ export default function CourseCard({
 
   // Admin footer
   const adminFooter = (
-    <div className="mt-auto border-t border-gray-100 dark:border-white/10 pt-4">
+    <div className="mt-auto border-t border-gray-100 pt-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-400 dark:text-gray-500">
+        <span className="text-xs text-gray-400">
           {createdAt
             ? new Date(createdAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
             : "Recently Added"}
         </span>
         <span className="px-2.5 py-1 rounded-full bg-brand-primary/10 text-brand-primary text-[10px] font-semibold">
@@ -91,7 +98,7 @@ export default function CourseCard({
             e.stopPropagation();
             onDelete?.();
           }}
-          className="flex-1 py-2 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+          className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
         >
           Delete
         </button>
@@ -103,12 +110,12 @@ export default function CourseCard({
   const userFooter = showProgress && (
     <>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 tracking-wide">
+        <span className="text-xs font-semibold text-gray-500 tracking-wide">
           Progress
         </span>
         <span className="text-xs font-bold text-copy-navy">{progressPercentage}%</span>
       </div>
-      <div className="w-full h-2 bg-gray-200 dark:bg-slate-600 rounded-full mb-2">
+      <div className="w-full h-2 bg-gray-200 rounded-full mb-2">
         <div
           className="h-2 rounded-full transition-all"
           style={{
@@ -117,20 +124,32 @@ export default function CourseCard({
           }}
         />
       </div>
-      <span className="text-xs text-gray-400 dark:text-gray-500 mt-auto">
+      <span className="text-xs text-gray-400 mt-auto">
         {progressPercentage === 0
           ? "Start Learning"
           : progressPercentage < 90
-          ? "Last accessed recently"
-          : "Nearing Completion"}
+            ? "Last accessed recently"
+            : "Nearing Completion"}
       </span>
+      {isCompleted && onCertificateClick && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCertificateClick();
+          }}
+          className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-brand-primary/20 bg-brand-primary/10 px-3 py-1.5 text-xs font-semibold text-brand-heading hover:bg-brand-primary/15 transition-colors"
+        >
+          <Image src={ICONS.CHAMPION} alt="Certificate" width={14} height={14} />
+          Download Certificate
+        </button>
+      )}
     </>
   );
 
   return (
     <div
       onClick={onClick}
-      className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 cursor-pointer"
+      className="h-full min-h-[370px] flex items-stretch w-full shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl bg-white border border-gray-100 cursor-pointer"
     >
       <div className="flex flex-col w-full h-full rounded-xl overflow-hidden">
         {/* Thumbnail */}
@@ -146,7 +165,7 @@ export default function CourseCard({
         <div className="flex-1 flex flex-col px-6 pt-4 pb-5">
           {/* Shared content block */}
           {contentBlock}
-        
+
           {/* Variant-specific footer */}
           {isAdmin ? adminFooter : userFooter}
         </div>

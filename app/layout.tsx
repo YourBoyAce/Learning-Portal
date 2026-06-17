@@ -24,14 +24,6 @@ export default function RootLayout({
       className={cn("font-sans", roboto.variable)}
       suppressHydrationWarning
     >
-      <head>
-        {/* Inline script runs before paint to set .dark class from system preference, preventing flash */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark');}}catch(e){}})();`,
-          }}
-        />
-      </head>
       <body>
         <ThemeProvider>
           <LoadingProvider>

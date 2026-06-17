@@ -153,17 +153,17 @@ export default function AdminLayout({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900 transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:max-w-none lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:max-w-none lg:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-white/10">
+        <div className="p-5 sm:p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}
-              className="ml-auto rounded-lg p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 lg:hidden"
+              className="ml-auto rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
               aria-label="Close admin navigation"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,19 +196,19 @@ export default function AdminLayout({
   ))}
 </nav>
 
-        <div className="p-4 border-t border-gray-100 dark:border-white/10 space-y-3">
+        <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/admin/profile">
-            <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+            <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
               <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
                 <span className="text-white text-lg font-semibold">
                   {userEmail?.[0]?.toUpperCase() || "U"}
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                <p className="text-sm font-semibold text-gray-800 truncate">
                   {userEmail?.split("@")[0]}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{userEmail}</p>
+                <p className="text-xs text-gray-500 truncate">{userEmail}</p>
               </div>
             </div>
           </Link>
@@ -238,11 +238,11 @@ export default function AdminLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-3 lg:hidden">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
           <button
             type="button"
             onClick={() => setIsSidebarOpen(true)}
-            className="rounded-lg p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
             aria-label="Open admin navigation"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,11 +257,11 @@ export default function AdminLayout({
 
       {showSignOutDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
               Sign Out
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to sign out of your account?
             </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row">

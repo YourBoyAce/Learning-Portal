@@ -10,8 +10,7 @@ import { useRouter } from "next/navigation";
 import CourseCard from "@/app/components/course/CourseCard";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
-import {Button} from "@/components/ui/button";
-import {ICONS} from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
@@ -21,7 +20,8 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { BookOpen, PlayCircle, CheckCircle2, Award, ExternalLink, X } from "lucide-react";
+import { BookOpen, PlayCircle, CheckCircle2, ExternalLink, X } from "lucide-react";
+import { ICONS } from "@/app/styles/icons";
 
 // --- Types ---
 interface Insight {
@@ -46,7 +46,7 @@ interface CurriculumCourse {
   modules?: any[]; // Array of modules
   certificate_url?: string | null;
   certificate_id?: string | null;
-issued_at?: string | null;
+  issued_at?: string | null;
 }
 
 interface Webinar {
@@ -180,86 +180,86 @@ export default function MyLearningDashboard() {
       .toUpperCase()}, ${timeLabel}`;
   };
 
-async function loadDashboardData() {
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  async function loadDashboardData() {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (!session?.access_token) return;
+      if (!session?.access_token) return;
 
-    setUserId(session.user.id);
+      setUserId(session.user.id);
 
-    // --------------------------------------------------
-    // HELPER
-    // --------------------------------------------------
-    const normalizeId = (id: string | null | undefined) =>
-      String(id || "")
-        .replace(/-/g, "")
-        .toLowerCase();
+      // --------------------------------------------------
+      // HELPER
+      // --------------------------------------------------
+      const normalizeId = (id: string | null | undefined) =>
+        String(id || "")
+          .replace(/-/g, "")
+          .toLowerCase();
 
-    // --------------------------------------------------
-    // USER PROFILE
-    // --------------------------------------------------
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("current_insight_index, full_name")
-      .eq("id", session.user.id)
-      .single();
+      // --------------------------------------------------
+      // USER PROFILE
+      // --------------------------------------------------
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("current_insight_index, full_name")
+        .eq("id", session.user.id)
+        .single();
 
-    setCurrentInsightIndex(profile?.current_insight_index || 0);
+      setCurrentInsightIndex(profile?.current_insight_index || 0);
 
-    setUserProfileName(
-      profile?.full_name ||
+      setUserProfileName(
+        profile?.full_name ||
         session.user.email?.split("@")[0] ||
         "Learner"
-    );
+      );
 
-    // --------------------------------------------------
-    // INSIGHTS
-    // --------------------------------------------------
-    const { data: insightsData } = await supabase
-      .from("scholarly_insights")
-      .select("*")
-      .order("id", { ascending: true });
+      // --------------------------------------------------
+      // INSIGHTS
+      // --------------------------------------------------
+      const { data: insightsData } = await supabase
+        .from("scholarly_insights")
+        .select("*")
+        .order("id", { ascending: true });
 
-    if (insightsData) {
-      setInsights(insightsData);
-    }
+      if (insightsData) {
+        setInsights(insightsData);
+      }
 
-    // --------------------------------------------------
-    // WEBINARS
-    // --------------------------------------------------
-    const { data: webinarsData } = await supabase
-      .from("webinars")
-      .select("*")
-      .order("created_at", { ascending: true });
+      // --------------------------------------------------
+      // WEBINARS
+      // --------------------------------------------------
+      const { data: webinarsData } = await supabase
+        .from("webinars")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-    const mappedWebinars =
-      webinarsData?.map((w: any) => ({
-        id: w.id,
-        title: w.title,
-        subtitle: w.subtitle,
-        date: w.event_date,
-        icon: w.icon,
-        status: w.status,
-        linkText: w.link_text,
-        attendees: w.attendees_count,
-      })) || [];
+      const mappedWebinars =
+        webinarsData?.map((w: any) => ({
+          id: w.id,
+          title: w.title,
+          subtitle: w.subtitle,
+          date: w.event_date,
+          icon: w.icon,
+          status: w.status,
+          linkText: w.link_text,
+          attendees: w.attendees_count,
+        })) || [];
 
-    setUpcomingWebinars(mappedWebinars);
+      setUpcomingWebinars(mappedWebinars);
 
-    setStats((prev) => ({
-      ...prev,
-      liveSessions: mappedWebinars.length,
-    }));
+      setStats((prev) => ({
+        ...prev,
+        liveSessions: mappedWebinars.length,
+      }));
 
-    // --------------------------------------------------
-    // FETCH ENROLLMENTS + COURSES + MODULES
-    // --------------------------------------------------
-    const { data: enrollmentsData } = await supabase
-      .from("course_enrollments")
-      .select(`
+      // --------------------------------------------------
+      // FETCH ENROLLMENTS + COURSES + MODULES
+      // --------------------------------------------------
+      const { data: enrollmentsData } = await supabase
+        .from("course_enrollments")
+        .select(`
         course_id,
         maincourses (
           id,
@@ -270,201 +270,201 @@ async function loadDashboardData() {
           coursemodules (*)
         )
       `)
-      .eq("user_id", session.user.id);
+        .eq("user_id", session.user.id);
 
-    // --------------------------------------------------
-    // FETCH VIDEO PROGRESS
-    // --------------------------------------------------
-    const { data: progressData } = await supabase
-      .from("user_video_progress")
-      .select("course_id, video_id, completed, updated_at")
-      .eq("user_id", session.user.id);
+      // --------------------------------------------------
+      // FETCH VIDEO PROGRESS
+      // --------------------------------------------------
+      const { data: progressData } = await supabase
+        .from("user_video_progress")
+        .select("course_id, video_id, completed, updated_at")
+        .eq("user_id", session.user.id);
 
-    // --------------------------------------------------
-    // FETCH CERTIFICATES
-    // --------------------------------------------------
-    const { data: certsData } = await supabase
-      .from("certificates")
-      .select("*")
-      .eq("user_id", session.user.id);
+      // --------------------------------------------------
+      // FETCH CERTIFICATES
+      // --------------------------------------------------
+      const { data: certsData } = await supabase
+        .from("certificates")
+        .select("*")
+        .eq("user_id", session.user.id);
 
-    // --------------------------------------------------
-    // NO COURSES
-    // --------------------------------------------------
-    if (!enrollmentsData || enrollmentsData.length === 0) {
-      setCurriculum([]);
-      setCourseProgress({});
-      setWeeklyProgressPct(0);
+      // --------------------------------------------------
+      // NO COURSES
+      // --------------------------------------------------
+      if (!enrollmentsData || enrollmentsData.length === 0) {
+        setCurriculum([]);
+        setCourseProgress({});
+        setWeeklyProgressPct(0);
 
-      setStats((prev) => ({
-        ...prev,
-        pendingModules: 0,
-      }));
+        setStats((prev) => ({
+          ...prev,
+          pendingModules: 0,
+        }));
 
-      return;
-    }
-
-    // --------------------------------------------------
-    // VALID ENROLLMENTS
-    // --------------------------------------------------
-    const validEnrollments = enrollmentsData.filter(
-      (e: any) => e.maincourses
-    );
-
-    // --------------------------------------------------
-    // BUILD CURRICULUM
-    // --------------------------------------------------
-    const progressMap: Record<
-      string,
-      {
-        progressPercentage: number;
-        completedModules: number;
-        totalModules: number;
+        return;
       }
-    > = {};
 
-    const mappedCurriculum = validEnrollments.map((e: any) => {
-      const course = e.maincourses;
-
-      const modules = (course.coursemodules || []).sort(
-        (a: any, b: any) =>
-          (a.order_index ?? 0) - (b.order_index ?? 0)
+      // --------------------------------------------------
+      // VALID ENROLLMENTS
+      // --------------------------------------------------
+      const validEnrollments = enrollmentsData.filter(
+        (e: any) => e.maincourses
       );
 
-      const totalModules = modules.length;
+      // --------------------------------------------------
+      // BUILD CURRICULUM
+      // --------------------------------------------------
+      const progressMap: Record<
+        string,
+        {
+          progressPercentage: number;
+          completedModules: number;
+          totalModules: number;
+        }
+      > = {};
 
-      // ------------------------------------------
-      // COURSE PROGRESS ROWS
-      // ------------------------------------------
-      const courseProgressRows =
-        progressData?.filter(
-          (p: any) =>
-            String(p.course_id) === String(course.id)
-        ) || [];
+      const mappedCurriculum = validEnrollments.map((e: any) => {
+        const course = e.maincourses;
 
-      const moduleCompletion = resolveModuleCompletion(
-        modules,
-        courseProgressRows,
-      );
+        const modules = (course.coursemodules || []).sort(
+          (a: any, b: any) =>
+            (a.order_index ?? 0) - (b.order_index ?? 0)
+        );
 
-      // ------------------------------------------
-      // COMPLETED MODULES
-      // ------------------------------------------
-      const completedModules = modules.filter((m: any) => {
-        return moduleCompletion.get(String(m.id));
-      }).length;
+        const totalModules = modules.length;
 
-      // ------------------------------------------
-      // PERCENTAGE
-      // ------------------------------------------
-      const progressPercentage =
-        totalModules > 0
-          ? Math.round(
+        // ------------------------------------------
+        // COURSE PROGRESS ROWS
+        // ------------------------------------------
+        const courseProgressRows =
+          progressData?.filter(
+            (p: any) =>
+              String(p.course_id) === String(course.id)
+          ) || [];
+
+        const moduleCompletion = resolveModuleCompletion(
+          modules,
+          courseProgressRows,
+        );
+
+        // ------------------------------------------
+        // COMPLETED MODULES
+        // ------------------------------------------
+        const completedModules = modules.filter((m: any) => {
+          return moduleCompletion.get(String(m.id));
+        }).length;
+
+        // ------------------------------------------
+        // PERCENTAGE
+        // ------------------------------------------
+        const progressPercentage =
+          totalModules > 0
+            ? Math.round(
               (completedModules / totalModules) * 100
             )
-          : 0;
+            : 0;
 
-      // ------------------------------------------
-      // STORE PROGRESS MAP
-      // ------------------------------------------
-      progressMap[String(course.id)] = {
-        progressPercentage,
-        completedModules,
-        totalModules,
-      };
+        // ------------------------------------------
+        // STORE PROGRESS MAP
+        // ------------------------------------------
+        progressMap[String(course.id)] = {
+          progressPercentage,
+          completedModules,
+          totalModules,
+        };
 
-      // ------------------------------------------
-      // CERTIFICATE
-      // ------------------------------------------
-      const cert =
-        certsData?.find(
-          (c: any) =>
-            String(c.course_id) === String(course.id)
-        ) || null;
+        // ------------------------------------------
+        // CERTIFICATE
+        // ------------------------------------------
+        const cert =
+          certsData?.find(
+            (c: any) =>
+              String(c.course_id) === String(course.id)
+          ) || null;
 
-      // ------------------------------------------
-      // RETURN COURSE
-      // ------------------------------------------
-      return {
-        id: course.id,
-        title: course.title,
-        description:
-          course.description ||
-          "Course description unavailable.",
-      
-        module_label: course.category
-          ? course.category.toUpperCase()
-          : "GENERAL",
-      
-        thumbnail_url: course.thumbnail_url,
-      
-        progress: progressPercentage,
-      
-        modules,
-      
-        certificate_id: cert?.id || null,
-      
-        issued_at: cert?.issued_at || null,
-      
-        certificate_url:
-          cert?.certificate_url || null,
-      
-        duration:
-          progressPercentage === 0
-            ? "Ready to begin"
-            : progressPercentage === 100
-            ? "Completed"
-            : `${completedModules}/${totalModules} Modules`,
-      };
-    });
+        // ------------------------------------------
+        // RETURN COURSE
+        // ------------------------------------------
+        return {
+          id: course.id,
+          title: course.title,
+          description:
+            course.description ||
+            "Course description unavailable.",
 
-    // --------------------------------------------------
-    // SET STATES
-    // --------------------------------------------------
-    setCurriculum(mappedCurriculum);
+          module_label: course.category
+            ? course.category.toUpperCase()
+            : "GENERAL",
 
-    setCourseProgress(progressMap);
+          thumbnail_url: course.thumbnail_url,
 
-    // --------------------------------------------------
-    // OVERALL PROGRESS
-    // --------------------------------------------------
-    const avgProgress =
-      mappedCurriculum.length > 0
-        ? Math.round(
+          progress: progressPercentage,
+
+          modules,
+
+          certificate_id: cert?.id || null,
+
+          issued_at: cert?.issued_at || null,
+
+          certificate_url:
+            cert?.certificate_url || null,
+
+          duration:
+            progressPercentage === 0
+              ? "Ready to begin"
+              : progressPercentage === 100
+                ? "Completed"
+                : `${completedModules}/${totalModules} Modules`,
+        };
+      });
+
+      // --------------------------------------------------
+      // SET STATES
+      // --------------------------------------------------
+      setCurriculum(mappedCurriculum);
+
+      setCourseProgress(progressMap);
+
+      // --------------------------------------------------
+      // OVERALL PROGRESS
+      // --------------------------------------------------
+      const avgProgress =
+        mappedCurriculum.length > 0
+          ? Math.round(
             mappedCurriculum.reduce(
               (sum, c) => sum + c.progress,
               0
             ) / mappedCurriculum.length
           )
-        : 0;
+          : 0;
 
-    setWeeklyProgressPct(avgProgress);
+      setWeeklyProgressPct(avgProgress);
 
-    // --------------------------------------------------
-    // PENDING MODULES
-    // --------------------------------------------------
-    const totalPendingModules = Object.values(
-      progressMap
-    ).reduce((sum, item) => {
-      return (
-        sum +
-        Math.max(
-          0,
-          item.totalModules - item.completedModules
-        )
-      );
-    }, 0);
+      // --------------------------------------------------
+      // PENDING MODULES
+      // --------------------------------------------------
+      const totalPendingModules = Object.values(
+        progressMap
+      ).reduce((sum, item) => {
+        return (
+          sum +
+          Math.max(
+            0,
+            item.totalModules - item.completedModules
+          )
+        );
+      }, 0);
 
-    setStats((prev) => ({
-      ...prev,
-      pendingModules: totalPendingModules,
-    }));
-  } catch (error) {
-    console.error("Error loading dashboard:", error);
-  } finally {
-    setLoading(false);
+      setStats((prev) => ({
+        ...prev,
+        pendingModules: totalPendingModules,
+      }));
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -496,9 +496,9 @@ async function loadDashboardData() {
     return () => {
       subscription.unsubscribe();
     };
- }, [userId]);
+  }, [userId]);
 
-  
+
   const handleMarkInsightAsRead = async () => {
     if (!userId || insights.length === 0) return;
     const nextIndex = (currentInsightIndex + 1) % insights.length;
@@ -526,9 +526,9 @@ async function loadDashboardData() {
   const completedCourses = curriculum.filter((course) => course.progress === 100);
   console.log("COMPLETED COURSES", completedCourses);
 
-  
-console.log("ACTIVE COURSES", activeCourses);
-console.log("COURSE PROGRESS", courseProgress);
+
+  console.log("ACTIVE COURSES", activeCourses);
+  console.log("COURSE PROGRESS", courseProgress);
 
   return (
     <div className="min-h-screen bg-surface-subtle p-6 lg:p-10 font-sans">
@@ -540,7 +540,7 @@ console.log("COURSE PROGRESS", courseProgress);
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Continuing Your Journey
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 text-[17px] leading-relaxed max-w-2xl">
+            <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
               Welcome back to{" "}
               <span className="font-bold text-brand-primary">The Automate</span>.
               You have{" "}
@@ -608,106 +608,92 @@ console.log("COURSE PROGRESS", courseProgress);
             </section>
           </div>
         </div>
-                    {/* Course Carousel */}
-       <div className="relative">
-  <Carousel
-    opts={{
-      align: "start",
-      loop: false,
-      dragFree: true,
-    }}
-    className="w-full"
-  >
-    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-      {activeCourses.map((course) => (
-        <CarouselItem
-          key={course.id}
-          className="
+        {/* Course Carousel */}
+        <div className="relative">
+          <Carousel
+            opts={{
+              align: "start",
+              loop: false,
+              dragFree: true,
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+              {activeCourses.map((course) => (
+                <CarouselItem
+                  key={course.id}
+                  className="
             pl-4
             sm:pl-6
             basis-[85vw]
             sm:basis-1/2
             lg:basis-1/3
           "
-        >
-          <CourseCard
-            id={course.id}
-            title={course.title}
-            description={course.description}
-            thumbnail={course.thumbnail_url}
-            category={course.module_label}
-            duration={course.duration}
-            progressPercentage={
-              courseProgress[String(course.id)]
-                ?.progressPercentage || 0
-            }
-            showProgress
-            variant="user"
-            onClick={() =>
-              router.push(`/courses/${course.id}`)
-            }
-          />
-        </CarouselItem>
-      ))}
-    </CarouselContent>
+                >
+                  <CourseCard
+                    id={course.id}
+                    title={course.title}
+                    description={course.description}
+                    thumbnail={course.thumbnail_url}
+                    category={course.module_label}
+                    duration={course.duration}
+                    progressPercentage={
+                      courseProgress[String(course.id)]
+                        ?.progressPercentage || 0
+                    }
+                    showProgress
+                    variant="user"
+                    onClick={() =>
+                      router.push(`/courses/${course.id}`)
+                    }
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
 
-    {activeCourses.length > 1 && (
-      <>
-        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-      </>
-    )}
-  </Carousel>
-</div>
+            {activeCourses.length > 1 && (
+              <>
+                <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+              </>
+            )}
+          </Carousel>
+        </div>
 
-{/*Completed courses */}
-<section className="mt-12 text-gray-900 dark:text-gray-100">
-  <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-    Completed Courses
-  </h2>
+        {/*Completed courses */}
+        <section className="mt-12 text-gray-900">
+          <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+            Completed Courses
+          </h2>
 
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-    {completedCourses.map((course) => (
-      <div
-        key={course.id}
-        className="flex flex-col h-full"
-      >
-        <CourseCard
-          id={course.id}
-          title={course.title}
-          description={course.description}
-          thumbnail={course.thumbnail_url}
-          variant="user"
-          progressPercentage={100}
-          showProgress={true}
-          onClick={() => router.push(`/courses/${course.id}`)}
-        />
-        {course.progress === 100 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedCertificateCourse(course);
-            }}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-heading text-white text-sm font-semibold rounded-xl hover:bg-brand-heading/90 transition-colors shadow-sm"
-          >
-            <Image src={ICONS.CHAMPIONLIGHT} alt="Certificate" width={18} height={18} />
-            Download Certificate
-          </button>
-        )}
-      </div>
-    ))}
-  </div>
-</section>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {completedCourses.map((course) => (
+              <CourseCard
+                key={course.id}
+                id={course.id}
+                title={course.title}
+                description={course.description}
+                thumbnail={course.thumbnail_url}
+                variant="user"
+                progressPercentage={100}
+                showProgress={true}
+                isCompleted={course.progress === 100}
+                onCertificateClick={() => setSelectedCertificateCourse(course)}
+                onClick={() => router.push(`/courses/${course.id}`)}
+              />
+            ))}
+          </div>
+        </section>
 
         {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
         <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-brand-primary/10">
-            <BookOpen size={80} />
+          <div className="absolute right-6 opacity-40 top-6 text-brand-primary/10">
+            <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
             <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-              <BookOpen size={18} className="text-white" />
+              <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
             </div>
             <h3 className="font-bold text-brand-heading text-base">
               The Automate Insight
@@ -717,7 +703,7 @@ console.log("COURSE PROGRESS", courseProgress);
           <div className="mb-6 relative z-10">
             {insights.length > 0 ? (
               <>
-                <p className="text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed max-w-4xl">
+                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
                   &quot;{currentInsight.content}&quot;
                 </p>
                 {currentInsight.author && (
@@ -727,7 +713,7 @@ console.log("COURSE PROGRESS", courseProgress);
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500">
                 Cultivating new insights...
               </p>
             )}
@@ -747,13 +733,13 @@ console.log("COURSE PROGRESS", courseProgress);
       {/* ─── CERTIFICATE MODAL ─── */}
       {selectedCertificateCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 dark:border-white/10 relative p-1 bg-gradient-to-br from-amber-400 via-white dark:via-slate-800 to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
-              
+
               {/* Close Button */}
               <button
                 onClick={() => setSelectedCertificateCourse(null)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all"
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
               >
                 <X size={20} />
               </button>

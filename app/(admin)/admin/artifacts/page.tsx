@@ -563,6 +563,28 @@ export default function AdminArtifacts() {
      STATS
   ========================================================= */
 
+  const parseSizeToBytes = (size: string) => {
+    if (!size) return 0;
+    const normalized = size.trim().toUpperCase();
+    const match = normalized.match(/^([\d.]+)\s*(B|BYTES|KB|MB|GB)$/);
+    if (!match) return 0;
+
+    const value = Number(match[1]);
+    if (!Number.isFinite(value)) return 0;
+
+    const unit = match[2];
+    if (unit === "GB") return value * 1024 * 1024 * 1024;
+    if (unit === "MB") return value * 1024 * 1024;
+    if (unit === "KB") return value * 1024;
+    return value;
+  };
+
+  const totalStorageBytes = artifacts.reduce(
+    (total, artifact) => total + parseSizeToBytes(artifact.size),
+    0,
+  );
+  const totalStorageMb = totalStorageBytes / (1024 * 1024);
+
   const stats = [
     {
       label: "Total Artifacts",
@@ -581,7 +603,7 @@ export default function AdminArtifacts() {
     },
     {
       label: "Storage Used",
-      value: "6.4 MB",
+      value: `${totalStorageMb.toFixed(1)} MB`,
       icon: ICONS.STORAGE,
     },
     {
@@ -797,7 +819,7 @@ export default function AdminArtifacts() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 {isEditing ? "Edit Resource" : "Upload New Resource"}
               </h3>
               <button

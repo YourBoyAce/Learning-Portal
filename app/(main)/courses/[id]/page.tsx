@@ -968,7 +968,7 @@ export default function CoursePlayerPage() {
               onClick={() => setShowCertificateModal(true)}
               className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 self-start sm:self-center shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
             >
-              <Image src={ICONS.CHAMPIONLIGHT} alt="Download Certificate" width={20} height={20} /> Download Certificate
+              Download Certificate
             </Button>
           </div>
         )}

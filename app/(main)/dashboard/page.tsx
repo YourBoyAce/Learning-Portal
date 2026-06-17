@@ -5,7 +5,7 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
+import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { BookOpen, CheckCircle2, FolderOpen, Users } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
@@ -716,9 +716,7 @@ export default function Dashboard() {
               {upcomingEvents.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
                   <div className="w-14 h-14 bg-surface-subtle rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                    <svg className="w-8 h-8 text-brand-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <Image src={ICONS.CALENDAR} alt="Certificate" width={20} height={20} />
                   </div>
                   <p className="text-gray-700 font-medium">No live sessions scheduled yet.</p>
                   <p className="text-xs text-gray-500 mt-1">Check back later or visit your calendar.</p>
@@ -997,6 +995,12 @@ export default function Dashboard() {
                         width={radius * 2}
                         className="-rotate-90"
                       >
+                        <defs>
+                          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="var(--color-primary)" />
+                            <stop offset="100%" stopColor="var(--color-success)" />
+                          </linearGradient>
+                        </defs>
                         {/* Background Ring */}
                         <circle
                           stroke="#E5E7EB"
@@ -1009,7 +1013,7 @@ export default function Dashboard() {
 
                         {/* Progress Ring */}
                         <circle
-                          stroke="#1682F1"
+                          stroke="url(#progressGradient)"
                           fill="transparent"
                           strokeWidth={stroke}
                           strokeLinecap="round"
@@ -1025,12 +1029,12 @@ export default function Dashboard() {
                       {/* Center Content */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center">
-                          <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} text-brand-primary`}>
+                          <h1 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary`}>
                             {progressPercentage}%
                           </h1>
 
                           <p className="text-xs tracking-[0.3em] text-brand-primary/70 mt-2 font-bold">
-                            MASTERY
+                            Mastery
                           </p>
                         </div>
                       </div>
@@ -1047,7 +1051,7 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Modules Completed
                     </span>
-                    <span className="text-lg font-bold text-brand-primary">
+                    <span className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}>
                       {completedModules}/{totalModules}
                     </span>
                   </div>
@@ -1056,7 +1060,7 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                    <span className="text-lg font-bold text-brand-primary">
+                    <span className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}>
                       {enrolledCourses.length}
                     </span>
                   </div>
@@ -1129,8 +1133,8 @@ export default function Dashboard() {
 
                     {activeCourses.length > 1 && (
                       <>
-                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
-                        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
                       </>
                     )}
                   </Carousel>
@@ -1188,8 +1192,8 @@ export default function Dashboard() {
 
                     {completedCourses.length > 1 && (
                       <>
-                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-green-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
-                        <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-green-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
+                        <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
                       </>
                     )}
                   </Carousel>
@@ -1200,13 +1204,13 @@ export default function Dashboard() {
         })()}
 
         <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 text-brand-primary/10">
-            <BookOpen size={80} />
+          <div className="absolute right-6 top-6 opacity-40 text-brand-primary/10">
+            <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
           </div>
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
             <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-              <BookOpen size={18} className="text-white" />
+              <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
             </div>
             <h3 className="font-bold text-brand-heading text-base">
               The Automate Insight

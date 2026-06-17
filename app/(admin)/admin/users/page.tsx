@@ -260,7 +260,7 @@ export default function AdminUsers() {
           <div className="flex flex-col gap-6">
             {/* ADD NEW USER FORM */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-5">Add New User</h2>
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Add New User</h3>
 
               <form onSubmit={handleAddUser} className="space-y-5">
                 <div>
@@ -273,7 +273,12 @@ export default function AdminUsers() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="user@example.com"
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   />
                 </div>
 
@@ -288,7 +293,12 @@ export default function AdminUsers() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Min. 8 characters"
-                      className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all pr-10"
+                      className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                      style={{
+                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                      }}
                     />
                     <button
                       type="button"
@@ -307,7 +317,12 @@ export default function AdminUsers() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all appearance-none"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
                   >
                     {ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
@@ -366,7 +381,7 @@ export default function AdminUsers() {
           {/* RIGHT COLUMN: USER REGISTRY TABLE */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-lg font-bold text-gray-900">User Registry</h2>
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-2"}>User Registry</h3>
 
               <div className="flex items-center gap-3">
                 <div className="relative flex items-center">

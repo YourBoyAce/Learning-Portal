@@ -685,8 +685,8 @@ lg:basis-1/3
                   ))}
                 </CarouselContent>
 
-                <CarouselPrevious className="flex left-2 lg:-left-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                <CarouselNext className="flex right-2 lg:-right-5 bg-white dark:bg-slate-800 shadow-lg border border-gray-100 dark:border-white/10 text-brand-primary hover:bg-gray-50 dark:hover:bg-slate-700 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
               </Carousel>
             </div>
           )}
@@ -699,7 +699,7 @@ lg:basis-1/3
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 {isEditing ? "Edit Batch" : "Create New Batch"}
               </h3>
               <button

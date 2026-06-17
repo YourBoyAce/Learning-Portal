@@ -172,7 +172,7 @@ export default function MainLayout({
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 dark:border-white/10 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -182,7 +182,7 @@ export default function MainLayout({
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white focus:outline-none lg:hidden transition-colors"
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none lg:hidden transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -227,11 +227,11 @@ export default function MainLayout({
         </aside>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-white/10 px-4 sm:px-6 py-4 flex items-center justify-between lg:justify-end">
+          <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between lg:justify-end">
             <div className="flex items-center gap-3 lg:hidden">
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-1.5 -ml-1 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white focus:outline-none transition-colors"
+                className="p-1.5 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -242,10 +242,10 @@ export default function MainLayout({
 
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                <p className="text-sm font-medium text-gray-700">
                   {userEmail?.split("@")[0]}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">{userEmail}</p>
+                <p className="text-xs text-gray-400">{userEmail}</p>
               </div>
               <UserAvatar
                 name={fullName}
@@ -264,9 +264,9 @@ export default function MainLayout({
 
       {showSignOutDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Sign Out</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign Out</h3>
+            <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to sign out of your account?
             </p>
             <div className="flex gap-3">
