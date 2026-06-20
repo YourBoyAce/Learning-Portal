@@ -32,6 +32,12 @@ interface Webinar {
   link_text: string;
   attendees_count: number;
   created_at: string;
+  batch_id?: number | string | null;
+}
+
+interface Batch {
+  id: number | string;
+  name: string;
 }
 
 export default function AdminWebinarsPage() {
@@ -60,11 +66,26 @@ export default function AdminWebinarsPage() {
   const [status, setStatus] = useState("streaming");
   const [linkText, setLinkText] = useState("");
   const [attendeesCount, setAttendeesCount] = useState(0);
+  const [batchId, setBatchId] = useState<string | number>("");
+  const [batches, setBatches] = useState<Batch[]>([]);
 
   useEffect(() => {
     /* eslint-disable */
     fetchWebinars();
+    fetchBatches();
   }, []);
+
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("batches")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (data && !error) setBatches(data);
+    } catch (err) {
+      console.error("Failed to fetch batches:", err);
+    }
+  };
 
   const fetchWebinars = async () => {
     try {
@@ -95,6 +116,7 @@ export default function AdminWebinarsPage() {
       setStatus(webinar.status || "streaming");
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
+      setBatchId(webinar.batch_id || "");
     } else {
       setIsEditing(false);
       setEditingId(null);
@@ -106,6 +128,7 @@ export default function AdminWebinarsPage() {
       setStatus("streaming");
       setLinkText("");
       setAttendeesCount(0);
+      setBatchId("");
     }
     setShowModal(true);
   };
@@ -127,6 +150,7 @@ export default function AdminWebinarsPage() {
         status,
         link_text: linkText,
         attendees_count: attendeesCount,
+        batch_id: batchId || null,
       };
 
       if (isEditing && editingId) {
@@ -440,6 +464,25 @@ export default function AdminWebinarsPage() {
                     >
                       <option value="streaming">Streaming</option>
                       <option value="link">Link</option>
+                    </select>
+                  </div>
+
+                  {/* Assigned Batch */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                      Assigned Batch
+                    </label>
+                    <select
+                      value={batchId}
+                      onChange={(e) => setBatchId(e.target.value)}
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
+                    >
+                      <option value="">— No Batch —</option>
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

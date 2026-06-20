@@ -147,6 +147,7 @@ export default function CoursePlayerPage() {
 
   // Added userId to state so we can pass it down to the video player
   const [userId, setUserId] = useState<string | null>(null);
+  const [userBatchIds, setUserBatchIds] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -222,13 +223,15 @@ export default function CoursePlayerPage() {
         }
       }
 
-      // 2. Filter quizzes for this course
-      const filteredQuizzes = allQuizzes.filter(
-        (q: any) =>
-          q.status === "Active" &&
-          (String(q.courseId) === String(id) ||
-            q.courseName.toLowerCase() === course.title.toLowerCase()),
-      );
+      // 2. Filter quizzes for this course + batch access
+      const filteredQuizzes = allQuizzes.filter((q: any) => {
+        if (q.status !== "Active") return false;
+        const courseMatch = String(q.courseId) === String(id) ||
+          q.courseName.toLowerCase() === course.title.toLowerCase();
+        if (!courseMatch) return false;
+        if (!q.batchId) return true;
+        return userBatchIds.includes(String(q.batchId));
+      });
       setCourseQuizzes(filteredQuizzes);
 
       // 3. Fetch artifacts directly from Supabase (admin panel saves to DB, not localStorage)
@@ -241,8 +244,12 @@ export default function CoursePlayerPage() {
             .eq("course_id", id);
 
           if (!error && dbArtifacts && dbArtifacts.length > 0) {
+            const batchFiltered = dbArtifacts.filter((it: any) => {
+              if (!it.batch_id) return true;
+              return userBatchIds.includes(String(it.batch_id));
+            });
             setCourseArtifacts(
-              dbArtifacts.map((it: any) => ({
+              batchFiltered.map((it: any) => ({
                 id: it.id,
                 name: it.name,
                 type: it.type,
@@ -278,7 +285,7 @@ export default function CoursePlayerPage() {
         }
       }
     }
-  }, [course, id]);
+  }, [course, id, userBatchIds]);
 
   const handleDownloadArtifact = async (art: any) => {
     try {
@@ -429,6 +436,15 @@ export default function CoursePlayerPage() {
 
       // Store user ID for the video player component
       setUserId(user.id);
+
+      const userEmail = user.email?.trim().toLowerCase() || "";
+      if (userEmail) {
+        const { data: batchRows } = await supabase
+          .from("batch_members")
+          .select("batch_id")
+          .eq("email", userEmail);
+        setUserBatchIds((batchRows || []).map((r: any) => String(r.batch_id)));
+      }
 
       const { data: courseData, error: courseError } = await supabase
         .from("maincourses")

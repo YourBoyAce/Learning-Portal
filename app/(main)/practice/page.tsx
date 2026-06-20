@@ -118,6 +118,17 @@ export default function StudentPracticeCenter() {
         const enrolledIds = (enrollments || []).map(e => String(e.course_id));
         setEnrolledCourseIds(enrolledIds);
 
+        // 2b. Fetch user's batch memberships
+        const userEmail = session.user.email?.trim().toLowerCase() || "";
+        let userBatchIds: string[] = [];
+        if (userEmail) {
+          const { data: batchRows } = await supabase
+            .from("batch_members")
+            .select("batch_id")
+            .eq("email", userEmail);
+          userBatchIds = (batchRows || []).map((r: any) => String(r.batch_id));
+        }
+
         // 3. Fetch courses to build Name mapping
         const { data: dbCourses } = await supabase
           .from("maincourses")
@@ -142,11 +153,14 @@ export default function StudentPracticeCenter() {
           try { allQuizzes = JSON.parse(savedQuizzes); } catch (e) { console.error(e); }
         }
 
-        const filteredQuizzes = allQuizzes.filter((q: any) =>
-          q.status === "Active" &&
-          (enrolledIds.includes(String(q.courseId)) ||
-           enrolledTitles.includes(q.courseName.toLowerCase()))
-        );
+        const filteredQuizzes = allQuizzes.filter((q: any) => {
+          if (q.status !== "Active") return false;
+          const courseMatch = enrolledIds.includes(String(q.courseId)) ||
+            enrolledTitles.includes(q.courseName.toLowerCase());
+          if (!courseMatch) return false;
+          if (!q.batchId) return true;
+          return userBatchIds.includes(String(q.batchId));
+        });
         setQuizzes(filteredQuizzes);
 
 // 5. Load Artifacts from Supabase
@@ -161,9 +175,11 @@ if (artifactsError) {
 } else {
   const formattedArtifacts =
     artifactsData
-      ?.filter((art: any) =>
-        enrolledIds.includes(String(art.course_id))
-      )
+      ?.filter((art: any) => {
+        if (!enrolledIds.includes(String(art.course_id))) return false;
+        if (!art.batch_id) return true;
+        return userBatchIds.includes(String(art.batch_id));
+      })
       .map((art: any) => ({
         id: art.id,
         name: art.name,

@@ -31,15 +31,19 @@ interface Artifact {
   type: "PDF" | "ZIP" | "Code" | "Sheet" | "Other";
   courseName: string;
   courseId?: string | number;
+  batchId?: string | number | null;
   size: string;
   uploadDate: string;
   downloadsCount: number;
   status: "Published" | "Draft";
   description: string;
-
-  // ADD THESE
   fileUrl?: string;
   filePath?: string;
+}
+
+interface Batch {
+  id: number | string;
+  name: string;
 }
 
 
@@ -113,6 +117,9 @@ export default function AdminArtifacts() {
   const [deletingArtifact, setDeletingArtifact] =
     useState<Artifact | null>(null);
 
+  const [batchId, setBatchId] = useState<string | number>("");
+  const [batches, setBatches] = useState<Batch[]>([]);
+
   // Courses
   const [dbCourses, setDbCourses] = useState<
     { id: string | number; title: string }[]
@@ -125,7 +132,20 @@ export default function AdminArtifacts() {
   useEffect(() => {
     loadCourses();
     loadArtifacts();
+    loadBatches();
   }, []);
+
+  const loadBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("batches")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (data && !error) setBatches(data);
+    } catch (err) {
+      console.error("Failed to load batches:", err);
+    }
+  };
 
   const loadCourses = async () => {
     try {
@@ -170,6 +190,7 @@ export default function AdminArtifacts() {
           courseName:
             item.maincourses?.title || "Unknown Course",
           courseId: item.course_id,
+          batchId: item.batch_id,
           size: item.size,
           uploadDate: item.created_at,
           downloadsCount: item.downloads_count || 0,
@@ -214,6 +235,8 @@ export default function AdminArtifacts() {
 
     setSelectedFile(null);
 
+    setBatchId("");
+
     setShowModal(true);
   };
 
@@ -233,6 +256,8 @@ export default function AdminArtifacts() {
     setCourseName(art.courseName);
 
     setCourseId(art.courseId || "");
+
+    setBatchId(art.batchId || "");
 
     setArtSize(art.size);
 
@@ -383,6 +408,7 @@ export default function AdminArtifacts() {
             type: artType,
             description,
             course_id: courseId,
+            batch_id: batchId || null,
             size: artSize,
             status,
             file_url:
@@ -410,6 +436,7 @@ export default function AdminArtifacts() {
             type: artType,
             description,
             course_id: courseId,
+            batch_id: batchId || null,
             size: artSize,
             status,
             file_url: fileUrl,
@@ -925,6 +952,25 @@ export default function AdminArtifacts() {
                       <option value="Ultimate Automation">Ultimate Automation</option>
                     </>
                   )}
+                </select>
+              </div>
+
+              {/* Assigned Batch */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Assigned Batch
+                </label>
+                <select
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                >
+                  <option value="">— No Batch —</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -137,7 +137,7 @@ export default function LoginPage() {
             </svg>
             <input
               type="email"
-              placeholder="your@email.com"
+              placeholder="example@gmail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
@@ -234,14 +234,6 @@ export default function LoginPage() {
             demonstrate 40% higher retention of abstract concepts.
           </p>
         </div>
-      </div>
-
-      {/* ENROLLMENT LINK */}
-      <div className="text-sm text-gray-500 mt-4 shrink-0">
-        New to the Sanctuary?{" "}
-        <span className="text-[#2283FF] font-semibold cursor-pointer">
-          Request Enrollment
-        </span>
       </div>
     </div>
   );

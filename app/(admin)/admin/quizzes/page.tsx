@@ -28,13 +28,20 @@ interface Quiz {
   id: string;
   title: string;
   courseName: string;
-  courseId?: string | number; // Added to reference Supabase maincourses table
+  courseId?: string | number;
+  batchId?: string | number;
+  batchName?: string;
   questionsCount: number;
-  passingScore: number; // percentage, e.g. 80
+  passingScore: number;
   attemptsCount: number;
-  averageScore: number; // percentage
+  averageScore: number;
   status: "Active" | "Inactive";
   questions: Question[];
+}
+
+interface Batch {
+  id: number | string;
+  name: string;
 }
 
 const INITIAL_QUIZZES: Quiz[] = [
@@ -195,6 +202,9 @@ export default function AdminQuizzes() {
     },
   ]);
 
+  const [batchId, setBatchId] = useState<string | number>("");
+  const [batches, setBatches] = useState<Batch[]>([]);
+
   // Load courses and quizzes on mount
   const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
 
@@ -214,6 +224,19 @@ export default function AdminQuizzes() {
       }
     };
     loadCourses();
+    loadBatches();
+
+    const loadBatches = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("batches")
+          .select("id, name")
+          .order("name", { ascending: true });
+        if (data && !error) setBatches(data);
+      } catch (err) {
+        console.error("Failed to load batches:", err);
+      }
+    };
 
     // 2. Load quizzes from localStorage
     const saved = localStorage.getItem("automate_portal_quizzes");
@@ -252,6 +275,7 @@ export default function AdminQuizzes() {
     }
     setPassingScore(80);
     setStatus("Active");
+    setBatchId("");
     setQuestions([
       {
         id: "q-temp-1",
@@ -269,6 +293,7 @@ export default function AdminQuizzes() {
     setQuizTitle(quiz.title);
     setCourseName(quiz.courseName);
     setCourseId(quiz.courseId || "");
+    setBatchId(quiz.batchId || "");
     setPassingScore(quiz.passingScore);
     setStatus(quiz.status);
     setQuestions(
@@ -347,6 +372,8 @@ export default function AdminQuizzes() {
               title: quizTitle,
               courseName,
               courseId,
+              batchId,
+              batchName: batches.find((b) => String(b.id) === String(batchId))?.name || "",
               passingScore,
               status,
               questionsCount: validQuestions.length,
@@ -361,6 +388,8 @@ export default function AdminQuizzes() {
         title: quizTitle,
         courseName,
         courseId,
+        batchId,
+        batchName: batches.find((b) => String(b.id) === String(batchId))?.name || "",
         passingScore,
         status,
         questionsCount: validQuestions.length,
@@ -672,6 +701,25 @@ export default function AdminQuizzes() {
                     )}
                   </select>
                 </div>
+              </div>
+
+              {/* Assigned Batch */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Assigned Batch
+                </label>
+                <select
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                >
+                  <option value="">— No Batch —</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
