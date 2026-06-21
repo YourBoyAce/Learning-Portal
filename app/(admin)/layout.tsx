@@ -38,6 +38,17 @@ export default function AdminLayout({
         return;
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || profile?.role?.toLowerCase() !== "admin") {
+        router.replace("/dashboard");
+        return;
+      }
+
       if (cancelled) return;
       setUserEmail(user.email ?? null);
       setLoading(false);

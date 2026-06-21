@@ -12,8 +12,6 @@ import {
   deleteUser,
 } from "@/app/actions/create-user";
 import {
-  Eye,
-  EyeOff,
   MoreVertical,
   Download,
   Filter,
@@ -72,9 +70,7 @@ function formatTime(isoString: string) {
 
 export default function AdminUsers() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formFeedback, setFormFeedback] = useState({ type: "", message: "" });
 
@@ -168,15 +164,18 @@ export default function AdminUsers() {
 
     const formData = new FormData();
     formData.append("email", email);
-    formData.append("password", password);
     formData.append("role", role);
 
     const result = await createUser(formData);
 
     if (result.success) {
-      setFormFeedback({ type: "success", message: "User account created." });
+      setFormFeedback({
+        type: result.warning ? "warning" : "success",
+        message:
+          result.message ||
+          "User created. Welcome email sent with temporary credentials.",
+      });
       setEmail("");
-      setPassword("");
       setRole("user");
       fetchUsers();
     } else {
@@ -282,32 +281,9 @@ export default function AdminUsers() {
                   />
                 </div>
 
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Initial Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Min. 8 characters"
-                      className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                      style={{
-                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
+                {/* Password is auto-generated server-side and emailed to the user */}
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                  <p className="text-xs font-semibold text-brand-primary">A temporary password will be auto-generated and emailed to the user.</p>
                 </div>
 
                 <div>
@@ -332,7 +308,13 @@ export default function AdminUsers() {
 
                 {formFeedback.message && (
                   <div
-                    className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === "error" ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}
+                    className={`p-3 rounded-lg text-sm font-medium ${
+                      formFeedback.type === "error"
+                        ? "bg-red-50 text-red-600"
+                        : formFeedback.type === "warning"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-green-50 text-green-700"
+                    }`}
                   >
                     {formFeedback.message}
                   </div>

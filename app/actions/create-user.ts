@@ -1,35 +1,30 @@
 "use server";
 
-// 1. MUST use the standard client for admin tasks, NOT the SSR package
-import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { sendWelcomeEmail } from "@/lib/send-email";
 
-// 2. Initialize the pure Admin Client using your Service Role Key
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
+function generateTemporaryPassword() {
+  const value = randomBytes(4).readUInt32BE(0) % 1_000_000;
+  return `Auto@${String(value).padStart(6, "0")}`;
+}
 
 export async function createUser(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const role = formData.get("role") as string;
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const role = String(formData.get("role") || "user").trim().toLowerCase();
 
-  if (!email || !password || !role) {
+  if (!email || !role) {
     return { success: false, error: "Please fill in all fields" };
   }
 
+  const temporaryPassword = generateTemporaryPassword();
+
   try {
-    // 1. Create the user in auth.users
+    // 1. Create the user in auth.users with temporary password
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password,
+      password: temporaryPassword,
       email_confirm: true,
     });
 
@@ -38,14 +33,16 @@ export async function createUser(formData: FormData) {
       return { success: false, error: authError.message };
     }
 
-    // 2. Safely create or update their profile
+    // 2. Safely create or update their profile with password_updated = false
     if (authData.user) {
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
         .upsert({
           id: authData.user.id,
           email: email,
+          full_name: email.split("@")[0],
           role: role,
+          password_updated: false,
           created_at: new Date().toISOString(),
         });
 
@@ -53,10 +50,23 @@ export async function createUser(formData: FormData) {
         console.error("Profile Error:", profileError.message);
         return { success: false, error: "User created, but profile failed: " + profileError.message };
       }
+
+      // 3. Send welcome email with temporary credentials
+      try {
+        await sendWelcomeEmail(email, temporaryPassword);
+      } catch (emailError) {
+        console.error("Welcome email error:", emailError);
+        revalidatePath("/admin/users");
+        return {
+          success: true,
+          warning: true,
+          message: "User created but email could not be sent. Please check Resend configuration/logs.",
+        };
+      }
     }
 
     revalidatePath("/admin/users");
-    return { success: true, message: "Scholar added successfully!" };
+    return { success: true, message: "User created. Welcome email sent with temporary credentials." };
   } catch (error: unknown) {
     console.error("Server Action Error:", error);
     return { success: false, error: "An unexpected server error occurred." };
