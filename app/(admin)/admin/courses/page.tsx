@@ -24,6 +24,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import CueCard from "@/app/components/course/CueCard";
 interface Course {
   id: number | string;
   title: string;
@@ -31,12 +32,14 @@ interface Course {
   thumbnail_url?: string;
   created_at?: string;
   category?: string;
+  courseType?: string;
 }
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [courseType, setCourseType] = useState<"active" | "upcoming">("active");
   const router = useRouter();
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
@@ -101,6 +104,9 @@ export default function AdminCourses() {
   const handleCreateNew = () => {
     setIsEditing(false);
     setEditingCourseId(null);
+
+    setCourseType("active");
+
     setCourseTitle("");
     setCourseDescription("");
     setModules([{ title: "", description: "" }]);
@@ -173,18 +179,25 @@ export default function AdminCourses() {
   const handleSaveCourse = async () => {
     const title = courseTitle.trim();
     const description = courseDescription.trim();
-    const validModules = modules
-      .filter((m) => m.title.trim())
-      .map((m) => ({
-        ...(m.id && { id: m.id }),
-        title: m.title.trim(),
-        description: m.description.trim(),
-      }));
+    const validModules =
+      courseType === "active"
+        ? modules
+          .filter((m) => m.title.trim())
+          .map((m) => ({
+            ...(m.id && { id: m.id }),
+            title: m.title.trim(),
+            description: m.description.trim(),
+          }))
+        : [];
 
-    if (!title || !description) {
+
+    if (!courseTitle || (courseType === "active" && !courseDescription)) {
       setModalMessage({
         type: "error",
-        text: "Please add both course title and description.",
+        text:
+          courseType === "active"
+            ? "Please add both course title and description."
+            : "Please add a course title.",
       });
       return;
     }
@@ -234,9 +247,10 @@ export default function AdminCourses() {
           body: JSON.stringify({
             id: editingCourseId,
             title,
-            description,
+            description: courseType === "active" ? description : null,
             ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
-            modules: validModules,
+            modules: courseType === "active" ? validModules : [],
+            course_type: courseType,
           }),
         });
 
@@ -256,9 +270,10 @@ export default function AdminCourses() {
           },
           body: JSON.stringify({
             title,
-            description,
+            description: courseType === "active" ? description : null,
             ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
-            modules: validModules,
+            modules: courseType === "active" ? validModules : [],
+            course_type: courseType,
           }),
         });
 
@@ -480,54 +495,131 @@ export default function AdminCourses() {
           </div>
         )}
 
-        {/* Courses Grid */}
-        <div className="relative">
-          {!loading && filteredCourses.length > 0 && (
-            <Carousel
-              opts={{
-                align: "start",
-                loop: false,
-                dragFree: true,
-              }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-                {filteredCourses.map((course) => (
-                  <CarouselItem
-                    key={course.id}
-                    className="
-  pl-4
-  sm:pl-6
-  basis-[85vw]
-sm:basis-1/2
-lg:basis-1/3
-"
+        {/* Derive our split lists right in the JSX */}
+        {(() => {
+          // Split the courses based on course_type
+          const activeCourses = filteredCourses.filter(
+            (c) => c.courseType !== "upcoming"
+          );
+          const upcomingCourses = filteredCourses.filter(
+            (c) => c.courseType === "upcoming"
+          );
+
+          return (
+            <>
+              {/* --- 1. ACTIVE COURSES SECTION --- */}
+              <div className="relative">
+                {!loading && activeCourses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <BookOpen className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-lg text-gray-900 font-bold mb-2">
+                      No active courses found
+                    </p>
+                    <p className="text-sm text-gray-500 mb-6 max-w-md">
+                      Get started by creating your first active course to populate this section.
+                    </p>
+                  </div>
+                ) : (
+                  <Carousel
+                    opts={{
+                      align: "start",
+                      loop: false,
+                      dragFree: true,
+                    }}
+                    className="w-full"
                   >
-                    <CourseCard
-                      id={course.id}
-                      title={course.title}
-                      description={course.description}
-                      thumbnail={course.thumbnail_url}
-                      createdAt={course.created_at}
-                      variant="admin"
-                      onClick={() =>
-                        router.push(`/admin/courses/${course.id}`)
-                      }
-                      onEdit={() => handleEdit(course)}
-                      onDelete={() => handleDeleteClick(course)}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
+                    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                      {activeCourses.map((course) => (
+                        <CarouselItem
+                          key={course.id}
+                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
+                        >
+                          <CourseCard
+                            id={course.id}
+                            title={course.title}
+                            description={course.description}
+                            thumbnail={course.thumbnail_url}
+                            createdAt={course.created_at}
+                            variant="admin"
+                            onClick={() =>
+                              router.push(`/admin/courses/${course.id}`)
+                            }
+                            onEdit={() => handleEdit(course)}
+                            onDelete={() => handleDeleteClick(course)}
+                          />
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
 
+                    <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                    <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                  </Carousel>
+                )}
+              </div>
 
-              <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-              <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+              {/* --- 2. UPCOMING COURSES SECTION --- */}
+              <div className="flex items-center justify-between flex-wrap gap-4 mt-16 mb-6">
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                  Upcoming Courses
+                </h2>
+              </div>
 
+              <div className="relative">
+                {!loading && upcomingCourses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
+                    <p className="text-gray-500 font-medium">
+                      No upcoming courses scheduled.
+                    </p>
+                  </div>
+                ) : (
+                  <Carousel
+                    opts={{
+                      align: "start",
+                      loop: false,
+                      dragFree: true,
+                    }}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
+                      {upcomingCourses.map((course) => (
+                        <CarouselItem
+                          key={course.id}
+                          className="pl-4 sm:pl-6 basis-[90vw] sm:basis-[70%] lg:basis-[50%]"
+                        >
+                          <CueCard
+                            title={course.title}
+                            thumbnail={course.thumbnail_url}
+                            isAdmin={true}
+                            onClick={() =>
+                              router.push(`/admin/courses/${course.id}`)
+                            }
+                            onEdit={(e) => {
+                              e.stopPropagation();
+                              handleEdit(course);
+                            }}
+                            onDelete={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(course);
+                            }}
+                          />
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
 
-            </Carousel>)}
-        </div>
-
+                    {upcomingCourses.length > 2 && (
+                      <>
+                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                        <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                      </>
+                    )}
+                  </Carousel>
+                )}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
 
@@ -550,6 +642,34 @@ lg:basis-1/3
 
             {/* Modal Body - Scrollable */}
             <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
+              {!isEditing && (
+                <div className="flex gap-6">
+
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      checked={courseType === "active"}
+                      onChange={() => setCourseType("active")}
+                      className="accent-brand-primary"
+                    />
+
+                    Active Course
+                  </label>
+
+
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      checked={courseType === "upcoming"}
+                      onChange={() => setCourseType("upcoming")}
+                      className="accent-brand-primary"
+                    />
+
+                    Upcoming Course
+                  </label>
+
+                </div>
+              )}
               <div>
                 <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                   Course Title
@@ -568,12 +688,14 @@ lg:basis-1/3
                   Description
                 </label>
                 <textarea
-                  placeholder="Describe the course content and learning objectives..."
+                  disabled={courseType === "upcoming"}
                   value={courseDescription}
                   onChange={(e) => setCourseDescription(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-none"
-                />
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm text-gray-900 resize-none
+${courseType === "upcoming"
+                      ? "bg-gray-100 cursor-not-allowed"
+                      : "bg-white focus:border-brand-primary"
+                    }`} />
               </div>
 
               {/* Thumbnail Upload */}
@@ -603,57 +725,58 @@ lg:basis-1/3
                   </label>
                 )}
               </div>
-
-              <div className="space-y-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Modules (Optional)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddModule}
-                    className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add Module
-                  </button>
-                </div>
-
-                {modules.map((module, index) => (
-                  <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder={`Module ${index + 1} Title`}
-                          value={module.title}
-                          onChange={(e) =>
-                            handleModuleChange(index, "title", e.target.value)
-                          }
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveModule(index)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                        title="Remove Module"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <textarea
-                      placeholder={`Description for Module ${index + 1} (optional)`}
-                      value={module.description}
-                      onChange={(e) =>
-                        handleModuleChange(index, "description", e.target.value)
-                      }
-                      rows={2}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
-                    />
+              {courseType === "active" && (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Modules (Optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddModule}
+                      className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Module
+                    </button>
                   </div>
-                ))}
-              </div>
+
+                  {modules.map((module, index) => (
+                    <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder={`Module ${index + 1} Title`}
+                            value={module.title}
+                            onChange={(e) =>
+                              handleModuleChange(index, "title", e.target.value)
+                            }
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveModule(index)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                          title="Remove Module"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <textarea
+                        placeholder={`Description for Module ${index + 1} (optional)`}
+                        value={module.description}
+                        onChange={(e) =>
+                          handleModuleChange(index, "description", e.target.value)
+                        }
+                        rows={2}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {modalMessage && (
                 <p

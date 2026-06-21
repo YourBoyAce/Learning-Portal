@@ -18,6 +18,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"; // <-- Update path to match your folder structure
 import { ICONS } from "@/app/styles/icons";
+import CueCard from "@/app/components/course/CueCard";
 
 type Profile = {
   full_name?: string | null;
@@ -107,6 +108,7 @@ export default function Dashboard() {
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [upcomingCoursesList, setUpcomingCoursesList] = useState<any[]>([]);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userProfileName, setUserProfileName] = useState<string>("Learner");
@@ -528,6 +530,15 @@ export default function Dashboard() {
         }
       }
     }
+
+    // Fetch upcoming courses (course_type = 'upcoming')
+    const { data: upcomingCoursesData } = await supabase
+      .from("maincourses")
+      .select("id, title, thumbnail_url")
+      .eq("course_type", "upcoming")
+      .order("created_at", { ascending: false });
+
+    setUpcomingCoursesList(upcomingCoursesData ?? []);
 
     setLoading(false);
   };
@@ -1202,6 +1213,50 @@ export default function Dashboard() {
             </>
           );
         })()}
+
+        {/* Upcoming courses section */}
+
+        {upcomingCoursesList.length > 0 && (
+        <section><div className="mb-12 relative px-0 sm:px-4 md:px-0">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Coming Soon
+            </h2>
+          </div>
+
+          <Carousel
+            opts={{
+              align: "start",
+              loop: false,
+              dragFree: true,
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
+              {upcomingCoursesList.map((course) => (
+                <CarouselItem
+                  key={course.id}
+                  className="pl-4 sm:pl-6 basis-[90vw] sm:basis-[70%] lg:basis-[50%]"
+                >
+                  <CueCard
+                    title={course.title}
+                    thumbnail={course.thumbnail_url}
+                    onClick={() => console.log("Clicked:", course.title)}
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+
+            {/* Navigation Arrows */}
+            {upcomingCoursesList.length > 2 && (
+              <>
+                <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+                <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+              </>
+            )}
+          </Carousel>
+        </div></section>
+        )}
 
         <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
           <div className="absolute right-6 top-6 opacity-40 text-brand-primary/10">

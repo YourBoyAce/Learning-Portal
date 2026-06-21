@@ -34,10 +34,10 @@ export default function LoginPage() {
   }, []);
 
   // Helper function to securely route based on database role
-  const routeUserBasedOnRole = async (userId: string, userEmail: string) => {
+  const routeUserBasedOnRole = async (userId: string) => {
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("role,password_updated")
+      .select("role")
       .eq("id", userId)
       .single();
 
@@ -55,42 +55,8 @@ export default function LoginPage() {
     }
 
     if (profile.role?.toLowerCase() === "admin") {
-      const response = await fetch("/api/auth/send-admin-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          email: userEmail,
-        }),
-      });
-
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        setError(result?.error || "Failed to send admin OTP. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(
-          "admin-otp-context",
-          JSON.stringify({
-            userId,
-            email: userEmail,
-            createdAt: Date.now(),
-          }),
-        );
-      }
-
-      router.push("/verify-admin-otp");
+      router.push("/admin");
     } else {
-      if (profile.password_updated === false) {
-        router.push("/update-password");
-        return;
-      }
-
       router.push("/dashboard");
     }
   };
@@ -126,7 +92,7 @@ export default function LoginPage() {
 
       // Force Next.js to read the new SSR cookies before navigating
       router.refresh();
-      await routeUserBasedOnRole(data.user.id, data.user.email || email);
+      await routeUserBasedOnRole(data.user.id);
     }
   };
 

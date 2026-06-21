@@ -21,10 +21,10 @@ function normalizeId(value: unknown): string | number | null {
 type AuthContext =
   | { error: NextResponse }
   | {
-      token: string;
-      userId: string;
-      supabaseAdmin: SupabaseClient<any, "public", any>;
-    };
+    token: string;
+    userId: string;
+    supabaseAdmin: SupabaseClient<any, "public", any>;
+  };
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -111,6 +111,198 @@ export async function GET(request: Request) {
   );
 }
 
+// export async function POST(request: Request) {
+//   const authContext = await authenticateAdmin(request);
+//   if ("error" in authContext) {
+//     return authContext.error;
+//   }
+
+//   const body = await request.json().catch(() => null);
+//   const title = typeof body?.title === "string" ? body.title.trim() : "";
+//   const description =
+//     typeof body?.description === "string" ? body.description.trim() : "";
+//   const thumbnailUrl =
+//     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
+
+//   if (!title || !description) {
+//     return NextResponse.json(
+//       { error: "Title and description are required." },
+//       { status: 400 },
+//     );
+//   }
+
+//   const { data: newCourse, error: insertError } = await authContext.supabaseAdmin
+//     .from("maincourses")
+//     .insert({
+//       title,
+//       description,
+//       ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+//     })
+//     .select("id")
+//     .single();
+
+//   if (insertError) {
+//     return NextResponse.json({ error: insertError.message }, { status: 500 });
+//   }
+
+//   const modules = Array.isArray(body?.modules) ? body.modules : [];
+//   if (modules.length > 0) {
+//     const modulesToInsert = modules
+//       .map((m: any, index: number) => ({
+//         maincourse_id: newCourse.id,
+//         title: typeof m.title === "string" ? m.title.trim() : "",
+//         description: typeof m.description === "string" ? m.description.trim() : "",
+//         order_index: index + 1,
+//       }))
+//       .filter((m: any) => m.title !== "");
+
+//     if (modulesToInsert.length > 0) {
+//       const { error: modulesError } = await authContext.supabaseAdmin
+//         .from("coursemodules")
+//         .insert(modulesToInsert);
+
+//       if (modulesError) {
+//         return NextResponse.json(
+//           {
+//             error:
+//               "Course created but failed to add modules: " +
+//               modulesError.message,
+//           },
+//           { status: 500 },
+//         );
+//       }
+//     }
+//   }
+
+//   return NextResponse.json({ success: true });
+// }
+
+// export async function PUT(request: Request) {
+//   const authContext = await authenticateAdmin(request);
+//   if ("error" in authContext) {
+//     return authContext.error;
+//   }
+
+//   const body = await request.json().catch(() => null);
+//   const id = normalizeId(body?.id);
+//   const title = typeof body?.title === "string" ? body.title.trim() : "";
+//   const description =
+//     typeof body?.description === "string" ? body.description.trim() : "";
+
+//   // Check if thumbnail_url field was explicitly provided (including null)
+//   const hasThumbnailField = "thumbnail_url" in (body || {});
+//   const thumbnailUrl =
+//     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : (hasThumbnailField ? null : undefined);
+
+//   if (id === null || !title || !description) {
+//     return NextResponse.json(
+//       { error: "id, title and description are required." },
+//       { status: 400 },
+//     );
+//   }
+
+//   const { error: updateError } = await authContext.supabaseAdmin
+//     .from("maincourses")
+//     .update({ title, description, ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }) })
+//     .eq("id", id);
+
+//   if (updateError) {
+//     return NextResponse.json({ error: updateError.message }, { status: 500 });
+//   }
+
+//   const modules = body?.modules;
+//   if (Array.isArray(modules)) {
+//     const validModules = modules.filter(
+//       (m: any) => m && typeof m.title === "string" && m.title.trim() !== ""
+//     );
+
+//     const modulesToUpdate = validModules.filter((m: any) => m.id);
+//     const modulesToInsert = validModules.filter((m: any) => !m.id);
+//     const moduleOrderMap = new Map<any, number>();
+//     validModules.forEach((m: any, index: number) => {
+//       if (m.id) moduleOrderMap.set(m.id, index + 1);
+//     });
+
+//     const keepIds = modulesToUpdate.map((m: any) => m.id);
+
+//     // Fetch all current module IDs for the course
+//     const { data: currentModules, error: fetchError } = await authContext.supabaseAdmin
+//       .from("coursemodules")
+//       .select("id")
+//       .eq("maincourse_id", id);
+
+//     if (fetchError) {
+//       return NextResponse.json(
+//         { error: "Course updated but failed to check existing modules: " + fetchError.message },
+//         { status: 500 },
+//       );
+//     }
+
+//     const currentIds = currentModules?.map((m: any) => m.id) ?? [];
+//     const deleteIds = currentIds.filter((cid: string) => !keepIds.includes(cid));
+
+//     if (deleteIds.length > 0) {
+//       const { error: deleteModulesError } = await authContext.supabaseAdmin
+//         .from("coursemodules")
+//         .delete()
+//         .in("id", deleteIds);
+
+//       if (deleteModulesError) {
+//         return NextResponse.json(
+//           { error: "Course updated but failed to remove modules: " + deleteModulesError.message },
+//           { status: 500 },
+//         );
+//       }
+//     }
+
+//     // Update existing modules
+//     for (const mod of modulesToUpdate) {
+//       const { error: modUpdateError } = await authContext.supabaseAdmin
+//         .from("coursemodules")
+//         .update({
+//           title: mod.title.trim(),
+//           description: (mod.description || "").trim(),
+//           order_index: moduleOrderMap.get(mod.id) ?? null,
+//         })
+//         .eq("id", mod.id)
+//         .eq("maincourse_id", id);
+
+//       if (modUpdateError) {
+//         return NextResponse.json(
+//           { error: "Course updated but failed to update modules: " + modUpdateError.message },
+//           { status: 500 },
+//         );
+//       }
+//     }
+
+//     // Insert new modules
+//     if (modulesToInsert.length > 0) {
+//       const insertData = modulesToInsert.map((mod: any) => {
+//         const orderIndex =
+//           validModules.findIndex((m: any) => m === mod) + 1;
+//         return {
+//         maincourse_id: id,
+//         title: mod.title.trim(),
+//         description: (mod.description || "").trim(),
+//         order_index: orderIndex > 0 ? orderIndex : null,
+//       };
+//       });
+
+//       const { error: insertModulesError } = await authContext.supabaseAdmin
+//         .from("coursemodules")
+//         .insert(insertData);
+
+//       if (insertModulesError) {
+//         return NextResponse.json(
+//           { error: "Course updated but failed to insert new modules: " + insertModulesError.message },
+//           { status: 500 },
+//         );
+//       }
+//     }
+//   }
+
+//   return NextResponse.json({ success: true });
+// }
 export async function POST(request: Request) {
   const authContext = await authenticateAdmin(request);
   if ("error" in authContext) {
@@ -123,10 +315,19 @@ export async function POST(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
+  const courseType = body?.course_type; // Extract course_type from frontend payload
 
-  if (!title || !description) {
+  // 1. Conditional Validation
+  if (!title) {
     return NextResponse.json(
-      { error: "Title and description are required." },
+      { error: "Title is required." },
+      { status: 400 },
+    );
+  }
+
+  if (courseType !== "upcoming" && !description) {
+    return NextResponse.json(
+      { error: "Description is required for active courses." },
       { status: 400 },
     );
   }
@@ -135,8 +336,11 @@ export async function POST(request: Request) {
     .from("maincourses")
     .insert({
       title,
-      description,
+      // Pass null explicitly if it's an upcoming course to keep the DB clean
+      description: courseType === "upcoming" ? null : description,
       ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+      // Optional: Save course_type if you have a column for it in your DB
+      ...(courseType && { course_type: courseType })
     })
     .select("id")
     .single();
@@ -146,7 +350,7 @@ export async function POST(request: Request) {
   }
 
   const modules = Array.isArray(body?.modules) ? body.modules : [];
-  if (modules.length > 0) {
+  if (modules.length > 0 && courseType !== "upcoming") {
     const modulesToInsert = modules
       .map((m: any, index: number) => ({
         maincourse_id: newCourse.id,
@@ -188,22 +392,36 @@ export async function PUT(request: Request) {
   const title = typeof body?.title === "string" ? body.title.trim() : "";
   const description =
     typeof body?.description === "string" ? body.description.trim() : "";
-  
+  const courseType = body?.course_type; // Extract course_type from frontend payload
+
   // Check if thumbnail_url field was explicitly provided (including null)
   const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : (hasThumbnailField ? null : undefined);
 
-  if (id === null || !title || !description) {
+  // 1. Conditional Validation
+  if (id === null || !title) {
     return NextResponse.json(
-      { error: "id, title and description are required." },
+      { error: "id and title are required." },
+      { status: 400 },
+    );
+  }
+
+  if (courseType !== "upcoming" && !description) {
+    return NextResponse.json(
+      { error: "Description is required for active courses." },
       { status: 400 },
     );
   }
 
   const { error: updateError } = await authContext.supabaseAdmin
     .from("maincourses")
-    .update({ title, description, ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }) })
+    .update({
+      title,
+      description: courseType === "upcoming" ? null : description,
+      ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
+      ...(courseType && { course_type: courseType })
+    })
     .eq("id", id);
 
   if (updateError) {
@@ -211,7 +429,8 @@ export async function PUT(request: Request) {
   }
 
   const modules = body?.modules;
-  if (Array.isArray(modules)) {
+  // Only process modules if it's an active course
+  if (Array.isArray(modules) && courseType !== "upcoming") {
     const validModules = modules.filter(
       (m: any) => m && typeof m.title === "string" && m.title.trim() !== ""
     );
@@ -281,11 +500,11 @@ export async function PUT(request: Request) {
         const orderIndex =
           validModules.findIndex((m: any) => m === mod) + 1;
         return {
-        maincourse_id: id,
-        title: mod.title.trim(),
-        description: (mod.description || "").trim(),
-        order_index: orderIndex > 0 ? orderIndex : null,
-      };
+          maincourse_id: id,
+          title: mod.title.trim(),
+          description: (mod.description || "").trim(),
+          order_index: orderIndex > 0 ? orderIndex : null,
+        };
       });
 
       const { error: insertModulesError } = await authContext.supabaseAdmin

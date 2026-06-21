@@ -1,30 +1,22 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { sendWelcomeEmail } from "@/lib/send-email";
-
-function generateTemporaryPassword() {
-  const value = randomBytes(4).readUInt32BE(0) % 1_000_000;
-  return `Auto@${String(value).padStart(6, "0")}`;
-}
 
 export async function createUser(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "").trim();
   const role = String(formData.get("role") || "user").trim().toLowerCase();
 
-  if (!email || !role) {
+  if (!email || !password || !role) {
     return { success: false, error: "Please fill in all fields" };
   }
 
-  const temporaryPassword = generateTemporaryPassword();
-
   try {
-    // 1. Create the user in auth.users with temporary password
+    // 1. Create the user in auth.users
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: temporaryPassword,
+      password,
       email_confirm: true,
     });
 
@@ -33,7 +25,7 @@ export async function createUser(formData: FormData) {
       return { success: false, error: authError.message };
     }
 
-    // 2. Safely create or update their profile with password_updated = false
+    // 2. Create their profile
     if (authData.user) {
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
@@ -42,7 +34,6 @@ export async function createUser(formData: FormData) {
           email: email,
           full_name: email.split("@")[0],
           role: role,
-          password_updated: false,
           created_at: new Date().toISOString(),
         });
 
@@ -50,23 +41,10 @@ export async function createUser(formData: FormData) {
         console.error("Profile Error:", profileError.message);
         return { success: false, error: "User created, but profile failed: " + profileError.message };
       }
-
-      // 3. Send welcome email with temporary credentials
-      try {
-        await sendWelcomeEmail(email, temporaryPassword);
-      } catch (emailError) {
-        console.error("Welcome email error:", emailError);
-        revalidatePath("/admin/users");
-        return {
-          success: true,
-          warning: true,
-          message: "User created but email could not be sent. Please check Resend configuration/logs.",
-        };
-      }
     }
 
     revalidatePath("/admin/users");
-    return { success: true, message: "User created. Welcome email sent with temporary credentials." };
+    return { success: true, message: "User created successfully." };
   } catch (error: unknown) {
     console.error("Server Action Error:", error);
     return { success: false, error: "An unexpected server error occurred." };
