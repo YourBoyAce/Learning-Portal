@@ -32,7 +32,7 @@ interface Course {
   thumbnail_url?: string;
   created_at?: string;
   category?: string;
-  courseType?: string;
+  course_type?: string;
 }
 
 export default function AdminCourses() {
@@ -499,10 +499,10 @@ export default function AdminCourses() {
         {(() => {
           // Split the courses based on course_type
           const activeCourses = filteredCourses.filter(
-            (c) => c.courseType !== "upcoming"
+            (c) => c.course_type !== "upcoming"
           );
           const upcomingCourses = filteredCourses.filter(
-            (c) => c.courseType === "upcoming"
+            (c) => c.course_type === "upcoming"
           );
 
           return (
@@ -586,7 +586,7 @@ export default function AdminCourses() {
                       {upcomingCourses.map((course) => (
                         <CarouselItem
                           key={course.id}
-                          className="pl-4 sm:pl-6 basis-[90vw] sm:basis-[70%] lg:basis-[50%]"
+                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-[45%] lg:basis-[23%]"
                         >
                           <CueCard
                             title={course.title}
@@ -608,7 +608,7 @@ export default function AdminCourses() {
                       ))}
                     </CarouselContent>
 
-                    {upcomingCourses.length > 2 && (
+                    {upcomingCourses.length > 3 && (
                       <>
                         <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
                         <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />

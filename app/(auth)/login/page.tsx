@@ -14,25 +14,6 @@ export default function LoginPage() {
 
   const router = useRouter();
 
-  useEffect(() => {
-    // Rectify "Invalid Refresh Token" error by clearing stale sessions on mount
-    const cleanupSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error?.message?.includes('Refresh Token Not Found') || error || !session) {
-          // Clear invalid tokens from localStorage
-          window.localStorage.removeItem('sb-rqeqcwlchxfboqtghkko-auth-token');
-          window.localStorage.removeItem('sb-' + process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
-          await supabase.auth.signOut();
-        }
-      } catch (err) {
-        console.error('Session cleanup error:', err);
-        await supabase.auth.signOut();
-      }
-    };
-    cleanupSession();
-  }, []);
-
   // Helper function to securely route based on database role
   const routeUserBasedOnRole = async (userId: string) => {
     const { data: profile, error } = await supabase
@@ -60,6 +41,18 @@ export default function LoginPage() {
       router.push("/dashboard");
     }
   };
+
+  useEffect(() => {
+    // If the user already has a valid session, redirect them instead of showing login
+    const checkExistingSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await routeUserBasedOnRole(session.user.id);
+      }
+    };
+    checkExistingSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {

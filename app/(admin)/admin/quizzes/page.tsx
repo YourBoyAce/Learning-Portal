@@ -21,7 +21,7 @@ interface Question {
   id: string;
   text: string;
   options: string[];
-  correctAnswer: number; // Index 0-3
+  correctAnswer: number;
 }
 
 interface Quiz {
@@ -55,51 +55,11 @@ const INITIAL_QUIZZES: Quiz[] = [
     averageScore: 86,
     status: "Active",
     questions: [
-      {
-        id: "q-1-1",
-        text: "Which command is used to run Playwright tests in headless mode?",
-        options: [
-          "npx playwright test",
-          "npx playwright test --headed",
-          "npx playwright run",
-          "npx playwright start",
-        ],
-        correctAnswer: 0,
-      },
-      {
-        id: "q-1-2",
-        text: "What is the default test timeout in Playwright?",
-        options: ["10 seconds", "30 seconds", "45 seconds", "60 seconds"],
-        correctAnswer: 1,
-      },
-      {
-        id: "q-1-3",
-        text: "Which fixture provides a clean browser context for each test?",
-        options: ["browser", "context", "page", "request"],
-        correctAnswer: 2,
-      },
-      {
-        id: "q-1-4",
-        text: "How do you generate codegen scripts in Playwright?",
-        options: [
-          "npx playwright record",
-          "npx playwright codegen",
-          "npx playwright generate",
-          "npx playwright build",
-        ],
-        correctAnswer: 1,
-      },
-      {
-        id: "q-1-5",
-        text: "Which method is used to wait for a network response in Playwright?",
-        options: [
-          "page.waitForLoadState()",
-          "page.waitForNavigation()",
-          "page.waitForResponse()",
-          "page.waitForSelector()",
-        ],
-        correctAnswer: 2,
-      },
+      { id: "q-1-1", text: "Which command is used to run Playwright tests in headless mode?", options: ["npx playwright test", "npx playwright test --headed", "npx playwright run", "npx playwright start"], correctAnswer: 0 },
+      { id: "q-1-2", text: "What is the default test timeout in Playwright?", options: ["10 seconds", "30 seconds", "45 seconds", "60 seconds"], correctAnswer: 1 },
+      { id: "q-1-3", text: "Which fixture provides a clean browser context for each test?", options: ["browser", "context", "page", "request"], correctAnswer: 2 },
+      { id: "q-1-4", text: "How do you generate codegen scripts in Playwright?", options: ["npx playwright record", "npx playwright codegen", "npx playwright generate", "npx playwright build"], correctAnswer: 1 },
+      { id: "q-1-5", text: "Which method is used to wait for a network response in Playwright?", options: ["page.waitForLoadState()", "page.waitForNavigation()", "page.waitForResponse()", "page.waitForSelector()"], correctAnswer: 2 },
     ],
   },
   {
@@ -112,34 +72,9 @@ const INITIAL_QUIZZES: Quiz[] = [
     averageScore: 78,
     status: "Active",
     questions: [
-      {
-        id: "q-2-1",
-        text: "In GitHub Actions, what is the default filename and extension for workflows?",
-        options: [
-          ".github/workflows/main.json",
-          ".github/workflows/main.yml",
-          "config/workflows/main.yml",
-          ".github/actions/main.yml",
-        ],
-        correctAnswer: 1,
-      },
-      {
-        id: "q-2-2",
-        text: "Which keyword defines the triggers for a GitHub Actions workflow?",
-        options: ["trigger", "events", "on", "when"],
-        correctAnswer: 2,
-      },
-      {
-        id: "q-2-3",
-        text: "Where do self-hosted runners execute workflow jobs?",
-        options: [
-          "On GitHub's cloud virtual machines",
-          "On your own local or cloud infrastructure",
-          "Directly in the web browser console",
-          "Inside the GitHub repository's git folder",
-        ],
-        correctAnswer: 1,
-      },
+      { id: "q-2-1", text: "In GitHub Actions, what is the default filename and extension for workflows?", options: [".github/workflows/main.json", ".github/workflows/main.yml", "config/workflows/main.yml", ".github/actions/main.yml"], correctAnswer: 1 },
+      { id: "q-2-2", text: "Which keyword defines the triggers for a GitHub Actions workflow?", options: ["trigger", "events", "on", "when"], correctAnswer: 2 },
+      { id: "q-2-3", text: "Where do self-hosted runners execute workflow jobs?", options: ["On GitHub's cloud virtual machines", "On your own local or cloud infrastructure", "Directly in the web browser console", "Inside the GitHub repository's git folder"], correctAnswer: 1 },
     ],
   },
   {
@@ -152,28 +87,8 @@ const INITIAL_QUIZZES: Quiz[] = [
     averageScore: 74,
     status: "Inactive",
     questions: [
-      {
-        id: "q-3-1",
-        text: "Which Playwright assertion is used to check if an element is visible?",
-        options: [
-          "await expect(locator).toBeVisible()",
-          "await expect(locator).isVisible()",
-          "await expect(locator).toExist()",
-          "await expect(locator).toBePresent()",
-        ],
-        correctAnswer: 0,
-      },
-      {
-        id: "q-3-2",
-        text: "Which locator strategy is highly recommended for accessibility-friendly testing?",
-        options: [
-          "page.locator('xpath=...')",
-          "page.getByRole()",
-          "page.locator('.css-class')",
-          "page.locator('#element-id')",
-        ],
-        correctAnswer: 1,
-      },
+      { id: "q-3-1", text: "Which Playwright assertion is used to check if an element is visible?", options: ["await expect(locator).toBeVisible()", "await expect(locator).isVisible()", "await expect(locator).toExist()", "await expect(locator).toBePresent()"], correctAnswer: 0 },
+      { id: "q-3-2", text: "Which locator strategy is highly recommended for accessibility-friendly testing?", options: ["page.locator('xpath=...')", "page.getByRole()", "page.locator('.css-class')", "page.locator('#element-id')"], correctAnswer: 1 },
     ],
   },
 ];
@@ -181,6 +96,7 @@ const INITIAL_QUIZZES: Quiz[] = [
 export default function AdminQuizzes() {
   const [quizzes, setQuizzes] = useState<Quiz[]>(INITIAL_QUIZZES);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
 
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
@@ -194,37 +110,32 @@ export default function AdminQuizzes() {
   const [passingScore, setPassingScore] = useState(80);
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
   const [questions, setQuestions] = useState<Question[]>([
-    {
-      id: "q-temp-1",
-      text: "",
-      options: ["", "", "", ""],
-      correctAnswer: 0,
-    },
+    { id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 },
   ]);
-
   const [batchId, setBatchId] = useState<string | number>("");
   const [batches, setBatches] = useState<Batch[]>([]);
-
-  // Load courses and quizzes on mount
   const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
 
+  // AI Assist question count
+  const [qCount, setQCount] = useState(5);
+
+  // Delete Confirmation State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingQuiz, setDeletingQuiz] = useState<Quiz | null>(null);
+
   useEffect(() => {
-    // 1. Fetch courses from DB
     const loadCourses = async () => {
       try {
         const { data, error } = await supabase
           .from("maincourses")
           .select("id, title")
           .order("title", { ascending: true });
-        if (data && !error) {
-          setDbCourses(data);
-        }
+        if (data && !error) setDbCourses(data);
       } catch (err) {
         console.error("Failed to load courses:", err);
       }
     };
     loadCourses();
-    loadBatches();
 
     const loadBatches = async () => {
       try {
@@ -237,8 +148,8 @@ export default function AdminQuizzes() {
         console.error("Failed to load batches:", err);
       }
     };
+    loadBatches();
 
-    // 2. Load quizzes from localStorage
     const saved = localStorage.getItem("automate_portal_quizzes");
     if (saved) {
       try {
@@ -251,16 +162,11 @@ export default function AdminQuizzes() {
     }
   }, []);
 
-  // Sync quizzes to localStorage on change
   useEffect(() => {
     if (quizzes && quizzes !== INITIAL_QUIZZES) {
       localStorage.setItem("automate_portal_quizzes", JSON.stringify(quizzes));
     }
   }, [quizzes]);
-
-  // Delete Confirmation State
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingQuiz, setDeletingQuiz] = useState<Quiz | null>(null);
 
   const handleCreateNew = () => {
     setIsEditing(false);
@@ -276,14 +182,7 @@ export default function AdminQuizzes() {
     setPassingScore(80);
     setStatus("Active");
     setBatchId("");
-    setQuestions([
-      {
-        id: "q-temp-1",
-        text: "",
-        options: ["", "", "", ""],
-        correctAnswer: 0,
-      },
-    ]);
+    setQuestions([{ id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 }]);
     setShowModal(true);
   };
 
@@ -299,14 +198,7 @@ export default function AdminQuizzes() {
     setQuestions(
       quiz.questions.length > 0
         ? quiz.questions.map((q) => ({ ...q }))
-        : [
-          {
-            id: "q-temp-1",
-            text: "",
-            options: ["", "", "", ""],
-            correctAnswer: 0,
-          },
-        ]
+        : [{ id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 }]
     );
     setShowModal(true);
   };
@@ -314,19 +206,12 @@ export default function AdminQuizzes() {
   const handleAddQuestion = () => {
     setQuestions([
       ...questions,
-      {
-        id: `q-temp-${Date.now()}-${questions.length}`,
-        text: "",
-        options: ["", "", "", ""],
-        correctAnswer: 0,
-      },
+      { id: `q-temp-${Date.now()}-${questions.length}`, text: "", options: ["", "", "", ""], correctAnswer: 0 },
     ]);
   };
 
   const handleRemoveQuestion = (index: number) => {
-    if (questions.length > 1) {
-      setQuestions(questions.filter((_, i) => i !== index));
-    }
+    if (questions.length > 1) setQuestions(questions.filter((_, i) => i !== index));
   };
 
   const handleQuestionTextChange = (index: number, text: string) => {
@@ -335,11 +220,7 @@ export default function AdminQuizzes() {
     setQuestions(updated);
   };
 
-  const handleOptionChange = (
-    qIndex: number,
-    oIndex: number,
-    value: string
-  ) => {
+  const handleOptionChange = (qIndex: number, oIndex: number, value: string) => {
     const updated = [...questions];
     updated[qIndex].options[oIndex] = value;
     setQuestions(updated);
@@ -356,7 +237,6 @@ export default function AdminQuizzes() {
       alert("Please enter a quiz title and select or enter a course.");
       return;
     }
-
     const validQuestions = questions.filter((q) => q.text.trim() !== "");
     if (validQuestions.length === 0) {
       alert("Please add at least one question with text.");
@@ -399,7 +279,6 @@ export default function AdminQuizzes() {
       };
       setQuizzes((prev) => [newQuiz, ...prev]);
     }
-
     setShowModal(false);
   };
 
@@ -423,48 +302,30 @@ export default function AdminQuizzes() {
   );
 
   const stats = [
-    {
-      label: "Total Quizzes",
-      value: quizzes.length.toString(),
-      icon: ICONS.BULB,
-    },
-    {
-      label: "Active Quizzes",
-      value: quizzes.filter((q) => q.status === "Active").length.toString(),
-      icon: ICONS.CLOCK,
-    },
-    {
-      label: "Total Attempts",
-      value: quizzes
-        .reduce((acc, q) => acc + q.attemptsCount, 0)
-        .toString(),
-      icon: ICONS.ITEMS,
-    },
+    { label: "Total Quizzes", value: quizzes.length.toString(), icon: ICONS.BULB },
+    { label: "Active Quizzes", value: quizzes.filter((q) => q.status === "Active").length.toString(), icon: ICONS.CLOCK },
+    { label: "Total Attempts", value: quizzes.reduce((acc, q) => acc + q.attemptsCount, 0).toString(), icon: ICONS.ITEMS },
     {
       label: "Avg. Passing Grade",
-      value: `${Math.round(
-        quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length
-      )}%`,
+      value: quizzes.length > 0
+        ? `${Math.round(quizzes.reduce((acc, q) => acc + q.averageScore, 0) / quizzes.length)}%`
+        : "0%",
       icon: ICONS.CHAMPION,
     },
   ];
+
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
-              Quiz Management
-            </h1>
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>Quiz Management</h1>
             <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
               Design, manage and assess learner understanding with custom quizzes.
             </p>
           </div>
-          <Button
-            onClick={handleCreateNew}
-            className="w-full justify-center sm:w-auto"
-          >
+          <Button onClick={handleCreateNew} className="w-full justify-center sm:w-auto">
             <Plus className="w-4 h-4" />
             New Quiz
           </Button>
@@ -473,31 +334,15 @@ export default function AdminQuizzes() {
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100"
-            >
+            <div key={stat.label} className="bg-white rounded-[var(--radius-default)] p-6 shadow-sm border border-gray-100">
               <div className="flex items-center gap-4 mb-3">
-
                 <div className="flex items-center justify-center w-12 h-12 rounded-lg">
-                  <Image
-                    src={stat.icon}
-                    alt={stat.label}
-                    width={24}
-                    height={24}
-                  />
+                  <Image src={stat.icon} alt={stat.label} width={24} height={24} />
                 </div>
-
                 <div>
-                  <div className="text-2xl font-bold text-brand-primary">
-                    {stat.value}
-                  </div>
-
-                  <div className="text-sm text-[var(--color-text-secondary)]">
-                    {stat.label}
-                  </div>
+                  <div className="text-2xl font-bold text-brand-primary">{stat.value}</div>
+                  <div className="text-sm text-[var(--color-text-secondary)]">{stat.label}</div>
                 </div>
-
               </div>
             </div>
           ))}
@@ -524,9 +369,7 @@ export default function AdminQuizzes() {
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
               <HelpCircle className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-base font-semibold text-gray-800 mb-2">
-              No quizzes found
-            </p>
+            <p className="text-base font-semibold text-gray-800 mb-2">No quizzes found</p>
             <p className="text-sm text-gray-500 mb-6 max-w-md">
               Create comprehensive questionnaires with multiple choice options to test and grade your student knowledge.
             </p>
@@ -544,84 +387,42 @@ export default function AdminQuizzes() {
               <table className="w-full min-w-[760px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Quiz Title
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Course
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Questions
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Passing Score
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Attempts
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Avg Score
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Status
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Actions
-                    </th>
+                    {["Quiz Title", "Course", "Questions", "Passing Score", "Attempts", "Avg Score", "Status", "Actions"].map((h) => (
+                      <th key={h} className={`${TYPOGRAPHY_CLASSES.INNERHEADING} px-4 py-3 text-left`}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredQuizzes.map((quiz) => (
-                    <tr
-                      key={quiz.id}
-                      className="hover:bg-gray-50/30 transition-colors group"
-                    >
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {quiz.title}
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
+                    <tr key={quiz.id} className="hover:bg-gray-50/30 transition-colors">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.title}</td>
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">
                         <span className="flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-gray-400" />
                           {quiz.courseName}
                         </span>
                       </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {quiz.questionsCount}
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {quiz.passingScore}%
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {quiz.attemptsCount}
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.questionsCount}</td>
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.passingScore}%</td>
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.attemptsCount}</td>
+                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">
                         {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
                       </td>
                       <td className="p-4 text-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${quiz.status === "Active"
-                            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-                            : "bg-gray-50 border-gray-200 text-gray-500"
-                            }`}
-                        >
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${quiz.status === "Active"
+                          ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                          : "bg-gray-50 border-gray-200 text-gray-500"
+                          }`}>
                           {quiz.status}
                         </span>
                       </td>
                       <td className="p-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            onClick={() => handleEdit(quiz)}
-                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
-                            title="Edit Quiz"
-                          >
-                            <Pencil className="w-4 text-primary h-4" />
+                          <Button onClick={() => handleEdit(quiz)} className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0" title="Edit Quiz">
+                            <Pencil className="w-4 h-4 text-primary" />
                           </Button>
-                          <Button
-                            onClick={() => handleDeleteClick(quiz)}
-                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
-                            title="Delete Quiz"
-                          >
-                            <Trash2 className="w-4 text-red-600 h-4" />
+                          <Button onClick={() => handleDeleteClick(quiz)} className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0" title="Delete Quiz">
+                            <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
                         </div>
                       </td>
@@ -653,11 +454,96 @@ export default function AdminQuizzes() {
 
             {/* Scrollable Body */}
             <div className="px-4 sm:px-6 py-5 space-y-6 overflow-y-auto flex-1 bg-gray-50/30">
+
+              {/* AI Assist */}
+              <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">AI Assist</h4>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={qCount}
+                      onChange={(e) => setQCount(Number(e.target.value))}
+                      className="w-12 h-7 text-xs border rounded px-1 text-center"
+                    />
+                    <span className="text-xs text-gray-500">questions</span>
+                  </div>
+                </div>
+                <div className="relative bg-white p-3 rounded-lg mb-3">
+                  <p className="text-[10px] text-gray-600 font-mono pr-12">
+                    Generate {qCount} multiple choice questions on {courseName || "the selected course"}. Format: Question? A) ... B) ... C) ... D) ... Answer: (Randomly select A, B, C, or D).
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const promptText = `Generate ${qCount} multiple choice questions on ${courseName || "the selected course"}. Format: Question? A) ... B) ... C) ... D) ... Answer: (Randomly select A, B, C, or D).`;
+                      navigator.clipboard.writeText(promptText);
+
+                      // Toggle success state
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+                    }}
+                    className="absolute top-2 right-2 text-[10px] text-brand-primary hover:text-white font-bold transition-all p-1"
+                  >
+                    {isCopied ? (
+                      // Show a success icon (you can use your own success icon or a simple SVG)
+                      <span className="text-green-500 font-bold text-[10px]">COPIED!</span>
+                    ) : (
+                      // Show your copy icon
+                      <Image src={ICONS.COPYPASTE} alt="copy-paste" width={40} height={40} />
+                    )}
+                  </button>
+                </div>
+                <textarea
+                  placeholder="Paste AI response here..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:border-brand-primary focus:outline-none"
+                  onBlur={(e) => {
+                    const text = e.target.value;
+                    if (!text.trim()) return;
+
+                    // Split by the pattern "Answer: [A-D]" followed by newlines
+                    // This effectively treats every "Answer: X" as the end of a question block
+                    const rawBlocks = text.split(/Answer:\s*[A-D]/i);
+
+                    const newQuestions = rawBlocks
+                      .filter((block) => block.trim().length > 10) // Ignore small trailing bits
+                      .map((block) => {
+                        const lines = block.split('\n').map((l) => l.trim()).filter((l) => l !== "");
+
+                        // The first line is the question, everything else are options
+                        const questionText = lines[0];
+                        const options = lines.slice(1, 5).map((opt) => opt.replace(/^[A-D][\.\)]\s*/, ''));
+
+                        // Find the answer character by looking at the part of the text we just split
+                        // We search the string to find which A, B, C, or D followed "Answer:"
+                        const match = text.match(new RegExp(`Answer:\\s*([A-D])`, 'gi'));
+                        const currentBlockIndex = rawBlocks.indexOf(block);
+                        const answerChar = match ? match[currentBlockIndex].split(':')[1].trim().toUpperCase() : 'A';
+                        const correctIdx = ['A', 'B', 'C', 'D'].indexOf(answerChar);
+
+                        return {
+                          id: String(Date.now() + Math.random()),
+                          text: questionText,
+                          options: options.length >= 4 ? options : ["", "", "", ""],
+                          correctAnswer: correctIdx >= 0 ? correctIdx : 0
+                        };
+                      });
+
+                    if (questions.length === 1 && questions[0].text === "") {
+                      setQuestions(newQuestions);
+                    } else {
+                      setQuestions([...questions, ...newQuestions]);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {/* Course & Title */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Quiz Title
-                  </label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Quiz Title</label>
                   <input
                     type="text"
                     placeholder="e.g. Playwright Selectors"
@@ -666,23 +552,15 @@ export default function AdminQuizzes() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Associated Course
-                  </label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
                   <select
                     value={courseId || courseName}
                     onChange={(e) => {
                       const val = e.target.value;
                       const match = dbCourses.find((c) => String(c.id) === String(val) || c.title === val);
-                      if (match) {
-                        setCourseId(match.id);
-                        setCourseName(match.title);
-                      } else {
-                        setCourseId("");
-                        setCourseName(val);
-                      }
+                      if (match) { setCourseId(match.id); setCourseName(match.title); }
+                      else { setCourseId(""); setCourseName(val); }
                     }}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
@@ -693,40 +571,29 @@ export default function AdminQuizzes() {
                         <option value="Ultimate Automation">Ultimate Automation</option>
                       </>
                     ) : (
-                      dbCourses.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title}
-                        </option>
-                      ))
+                      dbCourses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)
                     )}
                   </select>
                 </div>
               </div>
 
-              {/* Assigned Batch */}
+              {/* Batch */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                  Assigned Batch
-                </label>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Assigned Batch</label>
                 <select
                   value={batchId}
                   onChange={(e) => setBatchId(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                 >
                   <option value="">— No Batch —</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
 
+              {/* Passing Score & Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Passing Score (%)
-                  </label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Passing Score (%)</label>
                   <input
                     type="number"
                     min="1"
@@ -736,16 +603,11 @@ export default function AdminQuizzes() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Status
-                  </label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Status</label>
                   <select
                     value={status}
-                    onChange={(e) =>
-                      setStatus(e.target.value as "Active" | "Inactive")
-                    }
+                    onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
                     <option value="Active">Active</option>
@@ -754,16 +616,14 @@ export default function AdminQuizzes() {
                 </div>
               </div>
 
-              {/* Questions Section */}
+              {/* Questions List */}
               <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                    Questions List
-                  </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Questions List</label>
                   <button
                     type="button"
                     onClick={handleAddQuestion}
-                    className="text-brand-primary hover:bg-brand-primary/10 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-brand-primary/20"
+                    className="text-brand-primary text-xs font-semibold flex items-center gap-1 border border-brand-primary/20 px-3 py-1.5 rounded-lg hover:bg-brand-primary/10 transition-colors"
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
                     Add Question
@@ -771,31 +631,23 @@ export default function AdminQuizzes() {
                 </div>
 
                 {questions.map((question, qIdx) => (
-                  <div
-                    key={question.id}
-                    className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 relative shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold">
+                  <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-start gap-4">
+                      <span className="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold flex items-center justify-center shrink-0">
                         {qIdx + 1}
                       </span>
-                      <div className="flex-1">
-                        <textarea
-                          placeholder="Type your multiple choice question here..."
-                          value={question.text}
-                          onChange={(e) =>
-                            handleQuestionTextChange(qIdx, e.target.value)
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
-                        />
-                      </div>
+                      <textarea
+                        placeholder="Type your multiple choice question here..."
+                        value={question.text}
+                        onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                        rows={2}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
+                      />
                       {questions.length > 1 && (
                         <button
                           type="button"
                           onClick={() => handleRemoveQuestion(qIdx)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                          title="Remove Question"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -813,25 +665,21 @@ export default function AdminQuizzes() {
                             type="text"
                             placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
                             value={opt}
-                            onChange={(e) =>
-                              handleOptionChange(qIdx, oIdx, e.target.value)
-                            }
+                            onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
                             className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
                           />
                         </div>
                       ))}
                     </div>
 
-                    {/* Correct Answer Dropdown */}
-                    <div className="flex items-center gap-3 pl-10 pt-2 border-t border-dashed border-gray-100">
+                    {/* Correct Answer */}
+                    <div className="flex items-center gap-3 sm:pl-10 pt-2 border-t border-dashed border-gray-100">
                       <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                        Correct Answer Option:
+                        Correct Answer:
                       </label>
                       <select
                         value={question.correctAnswer}
-                        onChange={(e) =>
-                          handleCorrectAnswerChange(qIdx, Number(e.target.value))
-                        }
+                        onChange={(e) => handleCorrectAnswerChange(qIdx, Number(e.target.value))}
                         className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
                       >
                         <option value={0}>Option A</option>
@@ -845,20 +693,22 @@ export default function AdminQuizzes() {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 bg-white">
-              <Button
+            {/* Modal Footer */}
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+              <button
+                type="button"
                 onClick={() => setShowModal(false)}
-                className="w-full text-primary bg-white hover:bg-gray-100 justify-center sm:w-1/2"
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
                 onClick={handleSaveQuiz}
-                className="w-full justify-center sm:w-1/2"
+                className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:opacity-90 transition-opacity"
               >
                 {isEditing ? "Save Changes" : "Create Quiz"}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
@@ -872,21 +722,16 @@ export default function AdminQuizzes() {
               <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
-                Delete Quiz
-              </h3>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Delete Quiz</h3>
               <p className="text-sm text-gray-500 text-center">
                 Are you sure you want to delete{" "}
-                <strong className="text-gray-900">{deletingQuiz.title}</strong>
-                ? All question data and statistics will be removed permanently.
+                <strong className="text-gray-900">{deletingQuiz.title}</strong>?
+                All question data and statistics will be removed permanently.
               </p>
             </div>
             <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3">
               <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeletingQuiz(null);
-                }}
+                onClick={() => { setShowDeleteConfirm(false); setDeletingQuiz(null); }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel

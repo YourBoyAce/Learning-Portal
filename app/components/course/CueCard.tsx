@@ -26,7 +26,7 @@ export default function CueCard({
     return (
         <div
             onClick={onClick}
-            className="group relative w-full aspect-[16/9] sm:aspect-[2/1] lg:aspect-[21/9] rounded-[2rem] overflow-hidden cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-2xl transition-all duration-500 border border-gray-100"
+            className="group relative w-full aspect-[4/3] sm:aspect-[16/9] rounded-[2rem] overflow-hidden cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-2xl transition-all duration-500 border border-gray-300"
         >
             {/* Background Image */}
             <img
@@ -45,13 +45,13 @@ export default function CueCard({
                         onClick={onEdit}
                         className="bg-white/90 backdrop-blur-md text-[#2283FF] hover:bg-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
                     >
-                        <Edit2 className="w-3.5 h-3.5" /> Edit
+                        <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                         onClick={onDelete}
                         className="bg-red-500/90 backdrop-blur-md text-white hover:bg-red-600 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
                     >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                        <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
             )}
@@ -64,10 +64,10 @@ export default function CueCard({
             </div>
 
             {/* Bottom Left Title */}
-            <div className="absolute bottom-6 left-6 right-6 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-150 ease-out z-10">
-                <h3 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight drop-shadow-md line-clamp-2 max-w-[80%]">
+            <div className="absolute bottom-5 left-5 right-5 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-150 ease-out z-10">
+                <h4 className="text-lg md:text-xl lg:text-xl font-bold text-white leading-tight drop-shadow-md line-clamp-2 max-w-[95%]">
                     {title}
-                </h3>
+                </h4>
             </div>
         </div>
     );
