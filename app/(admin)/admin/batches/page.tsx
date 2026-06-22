@@ -37,6 +37,9 @@ interface Batch {
   start_date?: string | null;
   category?: string;
   course_id?: number | string | null;
+  schedule_type?: "weekday" | "weekend" | string | null;
+  batch_members?: { email: string | null }[];
+  batch_courses?: { course_id: string | number | null }[];
 }
 
 interface BatchOption {
@@ -48,6 +51,34 @@ interface Profile {
   id: string;
   email: string | null;
   full_name?: string | null;
+  role?: string | null;
+}
+
+function isAdminProfile(user: Profile): boolean {
+  return user.role?.toLowerCase() === "admin";
+}
+
+function getScholarProfiles(profileUsers: Profile[]): Profile[] {
+  return profileUsers.filter((user) => !isAdminProfile(user));
+}
+
+function getProfileDisplayName(user: Pick<Profile, "full_name" | "email">): string {
+  const username = user.full_name?.trim();
+  if (username) return username;
+
+  const email = user.email?.trim();
+  if (email) return email.split("@")[0] ?? email;
+
+  return "Unknown user";
+}
+
+function findProfileByEmail(
+  profileUsers: Profile[],
+  email: string,
+): Profile | undefined {
+  return profileUsers.find(
+    (user) => user.email?.trim().toLowerCase() === email.toLowerCase(),
+  );
 }
 
 interface Course {
@@ -55,11 +86,129 @@ interface Course {
   title: string;
 }
 
+function extractBatchAssignments(batch: Batch) {
+  const memberEmails = (batch.batch_members ?? [])
+    .map((member) => member.email?.trim().toLowerCase() ?? "")
+    .filter(Boolean);
+  const courseIds = new Set<string>();
+
+  for (const link of batch.batch_courses ?? []) {
+    if (link.course_id != null) {
+      courseIds.add(String(link.course_id));
+    }
+  }
+  if (batch.course_id != null) {
+    courseIds.add(String(batch.course_id));
+  }
+
+  return {
+    memberEmails,
+    courseIds: Array.from(courseIds),
+  };
+}
+
+function buildUserSelectOptions(
+  profileUsers: Profile[],
+  memberEmails: string[] = [],
+): BatchOption[] {
+  const optionsByEmail = new Map<string, BatchOption>();
+  const scholarUsers = getScholarProfiles(profileUsers);
+
+  for (const user of scholarUsers) {
+    if (!user.email) continue;
+    const value = user.email.trim().toLowerCase();
+    optionsByEmail.set(value, {
+      value,
+      label: getProfileDisplayName(user),
+    });
+  }
+
+  for (const email of memberEmails) {
+    if (optionsByEmail.has(email)) continue;
+    const matchedProfile = findProfileByEmail(profileUsers, email);
+    if (matchedProfile && isAdminProfile(matchedProfile)) continue;
+    optionsByEmail.set(email, {
+      value: email,
+      label: matchedProfile
+        ? getProfileDisplayName(matchedProfile)
+        : email,
+    });
+  }
+
+  return Array.from(optionsByEmail.values());
+}
+
+function buildCourseSelectOptions(
+  profileCourses: Course[],
+  courseIds: string[] = [],
+): BatchOption[] {
+  const optionsById = new Map<string, BatchOption>();
+
+  for (const course of profileCourses) {
+    const value = String(course.id);
+    optionsById.set(value, { value, label: course.title });
+  }
+
+  for (const courseId of courseIds) {
+    if (!optionsById.has(courseId)) {
+      optionsById.set(courseId, {
+        value: courseId,
+        label: `Course #${courseId}`,
+      });
+    }
+  }
+
+  return Array.from(optionsById.values());
+}
+
+function buildSelectedUsers(
+  memberEmails: string[],
+  userOptions: BatchOption[],
+  profileUsers: Profile[] = [],
+): BatchOption[] {
+  const optionsByEmail = new Map(userOptions.map((option) => [option.value, option]));
+  const adminEmails = new Set(
+    profileUsers
+      .filter(isAdminProfile)
+      .map((user) => user.email?.trim().toLowerCase() ?? "")
+      .filter(Boolean),
+  );
+
+  return memberEmails
+    .filter((email) => !adminEmails.has(email))
+    .map((email) => {
+      const matchedProfile = findProfileByEmail(profileUsers, email);
+      return (
+        optionsByEmail.get(email) ?? {
+          value: email,
+          label: matchedProfile
+            ? getProfileDisplayName(matchedProfile)
+            : email,
+        }
+      );
+    });
+}
+
+function buildSelectedCourses(
+  courseIds: string[],
+  courseOptions: BatchOption[],
+): BatchOption[] {
+  const optionsById = new Map(courseOptions.map((option) => [option.value, option]));
+  return courseIds.map(
+    (courseId) =>
+      optionsById.get(courseId) ?? {
+        value: courseId,
+        label: `Course #${courseId}`,
+      },
+  );
+}
+
 type SaveBatchBody = {
   id?: number | string;
   name: string;
   description: string;
   start_date: string | null;
+  schedule_type: "weekday" | "weekend";
   assigned_scholars: string[];
   assigned_courses: string[];
   thumbnail_url?: string | null;
@@ -72,6 +221,10 @@ export default function AdminBatches() {
     [],
   );
   const [courses, setCourses] = useState<Course[]>([]);
+  const [userSelectOptions, setUserSelectOptions] = useState<BatchOption[]>([]);
+  const [courseSelectOptions, setCourseSelectOptions] = useState<BatchOption[]>(
+    [],
+  );
   const [selectedCourses, setSelectedCourses] = useState<
     readonly BatchOption[]
   >([]);
@@ -87,7 +240,11 @@ export default function AdminBatches() {
   );
   const [batchName, setBatchName] = useState("");
   const [batchDescription, setBatchDescription] = useState("");
+  const [scheduleType, setScheduleType] = useState<"weekday" | "weekend">("weekday");
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
+  const [isLoadingAssignmentOptions, setIsLoadingAssignmentOptions] =
+    useState(true);
   const [modalMessage, setModalMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -125,19 +282,48 @@ export default function AdminBatches() {
     }
   };
 
+  const applyAssignmentSelections = (
+    memberEmails: string[],
+    courseIds: string[],
+    profileUsers: Profile[],
+    profileCourses: Course[],
+  ) => {
+    const nextUserOptions = buildUserSelectOptions(profileUsers, memberEmails);
+    const nextCourseOptions = buildCourseSelectOptions(
+      profileCourses,
+      courseIds,
+    );
+
+    setUserSelectOptions(nextUserOptions);
+    setCourseSelectOptions(nextCourseOptions);
+    setSelectedUsers(buildSelectedUsers(memberEmails, nextUserOptions, profileUsers));
+    setSelectedCourses(buildSelectedCourses(courseIds, nextCourseOptions));
+  };
+
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("batches")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Failed to fetch batches:", error.message);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        console.error("Auth error:", sessionError);
         return;
       }
-      setBatches(data ?? []);
+
+      const response = await fetch("/api/admin/batches", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
+      }
+
+      setBatches(Array.isArray(result?.batches) ? result.batches : []);
     } catch (error) {
       console.error("Failed to fetch batches:", error);
     } finally {
@@ -152,6 +338,7 @@ export default function AdminBatches() {
 
   const fetchUsers = async () => {
     try {
+      setIsLoadingAssignmentOptions(true);
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
       if (sessionError || !sessionData.session?.access_token) {
@@ -175,13 +362,20 @@ export default function AdminBatches() {
         );
       }
 
-      setUsers(Array.isArray(result?.users) ? result.users : []);
-      setCourses(Array.isArray(result?.courses) ? result.courses : []);
+      const nextUsers = Array.isArray(result?.users) ? result.users : [];
+      const nextCourses = Array.isArray(result?.courses) ? result.courses : [];
+
+      setUsers(nextUsers);
+      setCourses(nextCourses);
+      setUserSelectOptions(buildUserSelectOptions(nextUsers));
+      setCourseSelectOptions(buildCourseSelectOptions(nextCourses));
     } catch (error) {
       console.error(
         "Failed to fetch users/courses for batch assignment:",
         error,
       );
+    } finally {
+      setIsLoadingAssignmentOptions(false);
     }
   };
 
@@ -195,19 +389,33 @@ export default function AdminBatches() {
     setEditingBatchId(batch.id);
     setBatchName(batch.name);
     setBatchDescription(batch.description || "");
+    setScheduleType(batch.schedule_type === "weekend" ? "weekend" : "weekday");
     setCreated_At(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
     setBatchThumbnail(null);
     setBatchThumbnailPreview(batch.thumbnail_url || "");
+    setIsLoadingAssignments(true);
     setModalMessage(null);
     setShowModal(true);
+
+    void fetchUsers();
+
+    const initialAssignments = extractBatchAssignments(batch);
+    applyAssignmentSelections(
+      initialAssignments.memberEmails,
+      initialAssignments.courseIds,
+      users,
+      courses,
+    );
 
     try {
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) return;
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("You must be signed in to edit a batch.");
+      }
 
       const response = await fetch(
-        `/api/admin/batches?includeAssignments=true&includeUsers=true&includeCourses=true&batchId=${batch.id}`,
+        `/api/admin/batches?includeAssignments=true&includeUsers=true&includeCourses=true&batchId=${encodeURIComponent(String(batch.id))}`,
         {
           method: "GET",
           headers: {
@@ -216,50 +424,61 @@ export default function AdminBatches() {
         },
       );
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.assignment) return;
+      if (!response.ok) {
+        throw new Error(
+          result?.error || `Failed to load batch details (${response.status}).`,
+        );
+      }
 
-      const memberEmails: string[] = Array.isArray(result.assignment.memberEmails)
-        ? result.assignment.memberEmails
-          .map((email: unknown) =>
-            typeof email === "string" ? email.trim().toLowerCase() : "",
-          )
-          .filter(Boolean)
-        : [];
-      const courseIds: string[] = Array.isArray(result.assignment.courseIds)
-        ? result.assignment.courseIds
-        : [];
       const latestUsers: Profile[] = Array.isArray(result?.users)
         ? result.users
         : users;
       const latestCourses: Course[] = Array.isArray(result?.courses)
         ? result.courses
         : courses;
+      const latestBatch: Batch | undefined = Array.isArray(result?.batches)
+        ? result.batches.find(
+            (item: Batch) => String(item.id) === String(batch.id),
+          )
+        : undefined;
 
       setUsers(latestUsers);
       setCourses(latestCourses);
 
-      const userOptions = latestUsers
-        .filter((user) => Boolean(user.email))
-        .map((user) => ({
-          value: (user.email as string).trim().toLowerCase(),
-          label: user.email as string,
-        }));
+      const assignmentFromApi = result?.assignment
+        ? {
+            memberEmails: Array.isArray(result.assignment.memberEmails)
+              ? result.assignment.memberEmails
+                  .map((email: unknown) =>
+                    typeof email === "string" ? email.trim().toLowerCase() : "",
+                  )
+                  .filter(Boolean)
+              : [],
+            courseIds: Array.isArray(result.assignment.courseIds)
+              ? result.assignment.courseIds.map((id: unknown) => String(id))
+              : [],
+          }
+        : latestBatch
+          ? extractBatchAssignments(latestBatch)
+          : initialAssignments;
 
-      const courseOptions = latestCourses.map((course) => ({
-        value: String(course.id),
-        label: course.title,
-      }));
-
-      setSelectedUsers(
-        userOptions.filter((option) => memberEmails.includes(option.value)),
-      );
-      setSelectedCourses(
-        courseOptions.filter((option) =>
-          courseIds.includes(String(option.value)),
-        ),
+      applyAssignmentSelections(
+        assignmentFromApi.memberEmails,
+        assignmentFromApi.courseIds,
+        latestUsers,
+        latestCourses,
       );
     } catch (error) {
       console.error("Failed to fetch existing batch assignments:", error);
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to refresh batch assignments. Showing saved batch data.",
+      });
+    } finally {
+      setIsLoadingAssignments(false);
     }
   };
 
@@ -366,6 +585,7 @@ export default function AdminBatches() {
           name,
           description,
           start_date: created_at || null,
+          schedule_type: scheduleType,
           assigned_scholars: selectedUsers.map((user) => user.value),
           assigned_courses: selectedCourses.map((course) => course.value),
         };
@@ -392,6 +612,7 @@ export default function AdminBatches() {
           name,
           description,
           start_date: created_at || null,
+          schedule_type: scheduleType,
           assigned_scholars: selectedUsers.map((user) => user.value),
           assigned_courses: selectedCourses.map((course) => course.value),
         };
@@ -420,6 +641,7 @@ export default function AdminBatches() {
       setShowModal(false);
       setBatchName("");
       setBatchDescription("");
+      setScheduleType("weekday");
       setCreated_At("");
       setSelectedUsers([]);
       setSelectedCourses([]);
@@ -535,12 +757,17 @@ export default function AdminBatches() {
               setEditingBatchId(null);
               setBatchName("");
               setBatchDescription("");
+              setScheduleType("weekday");
               setCreated_At("");
               setSelectedUsers([]);
               setSelectedCourses([]);
+              setUserSelectOptions(buildUserSelectOptions(users));
+              setCourseSelectOptions(buildCourseSelectOptions(courses));
               setBatchThumbnail(null);
               setBatchThumbnailPreview("");
               setModalMessage(null);
+              setIsLoadingAssignments(false);
+              void fetchUsers();
               setShowModal(true);
             }}
             className="w-full justify-center sm:w-auto"
@@ -676,7 +903,9 @@ lg:basis-1/3
                         title={batch.name}
                         description={batch.description}
                         thumbnail={batch.thumbnail_url || undefined}
-                        createdAt={batch.start_date || batch.created_at}
+                        batchScheduleTypes={[
+                          batch.schedule_type === "weekend" ? "weekend" : "weekday",
+                        ]}
                         variant="admin"
                         onEdit={() => handleEdit(batch)}
                         onDelete={() => handleDeleteClick(batch)}
@@ -720,21 +949,18 @@ lg:basis-1/3
             >
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Users size={14} /> Assign Members (Email)
+                  <Users size={14} /> Assign Members
                 </label>
                 <Select
                   isMulti
-                  options={users
-                    .filter((user) => Boolean(user.email))
-                    .map((user) => ({
-                      value: user.email as string,
-                      label: user.email as string,
-                    }))}
+                  isLoading={isLoadingAssignments || isLoadingAssignmentOptions}
+                  isDisabled={isLoadingAssignments || isLoadingAssignmentOptions}
+                  options={userSelectOptions}
                   value={selectedUsers}
                   onChange={(value) =>
                     setSelectedUsers((value ?? []) as readonly BatchOption[])
                   }
-                  placeholder="Select user emails..."
+                  placeholder="Select usernames..."
                   menuPortalTarget={
                     typeof window !== "undefined" ? document.body : null
                   }
@@ -759,10 +985,9 @@ lg:basis-1/3
                 </label>
                 <Select
                   isMulti={true}
-                  options={courses.map((course) => ({
-                    value: String(course.id),
-                    label: course.title,
-                  }))}
+                  isLoading={isLoadingAssignments || isLoadingAssignmentOptions}
+                  isDisabled={isLoadingAssignments || isLoadingAssignmentOptions}
+                  options={courseSelectOptions}
                   value={selectedCourses}
                   onChange={(value) =>
                     setSelectedCourses((value ?? []) as readonly BatchOption[])
@@ -814,6 +1039,35 @@ lg:basis-1/3
                   className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all resize-y text-black"
                 />
               </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
+                  Batch Schedule
+                </label>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="batchScheduleType"
+                      checked={scheduleType === "weekday"}
+                      onChange={() => setScheduleType("weekday")}
+                      className="accent-brand-primary"
+                    />
+                    Weekday Batch
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="batchScheduleType"
+                      checked={scheduleType === "weekend"}
+                      onChange={() => setScheduleType("weekend")}
+                      className="accent-brand-primary"
+                    />
+                    Weekend Batch
+                  </label>
+                </div>
+              </div>
+
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <FileText size={14} /> Date
               </label>
@@ -896,7 +1150,12 @@ lg:basis-1/3
               )}
               <button
                 onClick={handleSaveBatch}
-                disabled={isSaving || isUploadingThumbnail}
+                disabled={
+                  isSaving ||
+                  isUploadingThumbnail ||
+                  isLoadingAssignments ||
+                  isLoadingAssignmentOptions
+                }
                 className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2 disabled:opacity-60"
               >
                 {isSaving || isUploadingThumbnail

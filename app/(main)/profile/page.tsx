@@ -358,7 +358,8 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
-import { Lock, Loader2 } from "lucide-react"; // Make sure to import these from lucide-react
+import { Lock, Loader2 } from "lucide-react";
+import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -455,6 +456,7 @@ export default function ProfilePage() {
 
       if (error) throw error;
 
+      dispatchProfileUpdated();
       alert("Profile updated successfully.");
     } catch (err: unknown) {
       console.error(err);

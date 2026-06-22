@@ -92,13 +92,16 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { transporter } from "@/app/lib/mailer";
 
 export async function createUser(formData: FormData) {
+  const username = String(formData.get("username") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "").trim();
   const role = String(formData.get("role") || "user").trim().toLowerCase();
 
-  if (!email || !password || !role) {
+  if (!username || !email || !password || !role) {
     return { success: false, error: "Please fill in all fields" };
   }
+
+  const displayName = username;
 
   try {
     // 1. Create the user in auth.users
@@ -120,7 +123,7 @@ export async function createUser(formData: FormData) {
         .upsert({
           id: authData.user.id,
           email: email,
-          full_name: email.split("@")[0],
+          full_name: displayName,
           role: role,
           created_at: new Date().toISOString(),
         });
@@ -133,12 +136,12 @@ export async function createUser(formData: FormData) {
       // 3. Send the Welcome Email
       try {
         await transporter.sendMail({
-          from: `"Academic Atelier" <${process.env.ADMIN_EMAIL}>`,
+          from: `"The Automate Learning Portal" <${process.env.ADMIN_EMAIL}>`,
           to: email,
-          subject: "Welcome to Academic Atelier! Your Login Details",
+          subject: "Welcome to The Automate Learning Portal! Your Login Details",
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
-              <h2 style="color: #174778;">Welcome, ${email.split("@")[0]}!</h2>
+              <h2 style="color: #174778;">Welcome, ${displayName}!</h2>
               <p style="color: #374151; font-size: 16px; line-height: 1.5;">
                 Your account has been successfully created. You can now log in to access your courses.
               </p>
@@ -154,7 +157,7 @@ export async function createUser(formData: FormData) {
                 <strong>Go to Profile -> Security & Authentication -> Update Password.</strong>
               </p>
 
-              <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://your-app-url.vercel.app'}/login" 
+              <a href="${process.env.NEXT_PUBLIC_SITE_URL}/login" 
                  style="display: inline-block; background-color: #2283FF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">
                 Log In Now
               </a>

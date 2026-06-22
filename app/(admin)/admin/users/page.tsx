@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
@@ -24,6 +25,7 @@ import {
   Trash2,
   Loader2,
 } from "lucide-react";
+import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 
 interface LoginSession {
   loginAt: string;
@@ -69,6 +71,8 @@ function formatTime(isoString: string) {
 }
 
 export default function AdminUsers() {
+  const pathname = usePathname();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
@@ -156,7 +160,14 @@ export default function AdminUsers() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+
+    const onProfileUpdated = () => {
+      void fetchUsers();
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, [pathname]);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +175,7 @@ export default function AdminUsers() {
     setFormFeedback({ type: "", message: "" });
 
     const formData = new FormData();
+    formData.append("username", username);
     formData.append("email", email);
     formData.append("password", password);
     formData.append("role", role);
@@ -177,6 +189,7 @@ export default function AdminUsers() {
           result.message ||
           "User created successfully.",
       });
+      setUsername("");
       setEmail("");
       setPassword("");
       setRole("user");
@@ -265,6 +278,25 @@ export default function AdminUsers() {
               <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Add New User</h3>
 
               <form onSubmit={handleAddUser} className="space-y-5">
+                <div>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter display name"
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
+                  />
+                </div>
+
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Email Address

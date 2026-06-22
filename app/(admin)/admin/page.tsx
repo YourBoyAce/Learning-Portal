@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
+import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import { Loader2, Clock, LogIn, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
@@ -27,8 +28,13 @@ interface LoginLog {
   totalSeconds: number;
 }
 
+function isActiveCourse(course: { course_type?: string | null }) {
+  return course.course_type !== "upcoming";
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [courses, setCourses] = useState<any[]>([]);
   const [activeCoursesCount, setActiveCoursesCount] = useState(0);
@@ -51,13 +57,14 @@ export default function AdminDashboard() {
           });
           const result = await res.json().catch(() => null);
           if (res.ok && Array.isArray(result?.courses)) {
-            const sortedCourses = result.courses.sort(
+            const activeCourses = result.courses.filter(isActiveCourse);
+            const sortedCourses = activeCourses.sort(
               (a: any, b: any) =>
                 new Date(b.created_at || 0).getTime() -
                 new Date(a.created_at || 0).getTime(),
             );
             setCourses(sortedCourses.slice(0, 3));
-            setActiveCoursesCount(result.courses.length);
+            setActiveCoursesCount(activeCourses.length);
           }
         }
 
@@ -121,7 +128,14 @@ export default function AdminDashboard() {
     };
 
     fetchData();
-  }, []);
+
+    const onProfileUpdated = () => {
+      void fetchData();
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, [pathname]);
 
   const formatDuration = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -138,7 +152,7 @@ export default function AdminDashboard() {
     },
     {
       label: "Active Courses",
-      value: courses.length.toString(),
+      value: activeCoursesCount.toString(),
       icon: ICONS.GLOBE,
     },
 
@@ -310,7 +324,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                Recently Added Courses
+                Active Courses
               </h2>
               <button
                 onClick={() => router.push("/admin/courses")}
@@ -328,7 +342,7 @@ export default function AdminDashboard() {
               )}
               {!loading && courses.length === 0 && (
                 <div className="py-8 text-center text-gray-400 text-sm">
-                  No courses found.
+                  No active courses found.
                 </div>
               )}
               {!loading && courses.length > 0 && (
@@ -347,8 +361,10 @@ export default function AdminDashboard() {
                           title={course.title}
                           description={course.description}
                           thumbnail={course.thumbnail_url}
+                          batchName={course.batch_name}
+                          batchScheduleTypes={course.batch_schedule_types}
+                          courseStatus="active"
                           variant="admin"
-                          createdAt={course.created_at}
                           onClick={() => router.push("/admin/courses")}
                           onEdit={() => router.push("/admin/courses")}
                           onDelete={() => router.push("/admin/courses")}

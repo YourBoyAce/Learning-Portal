@@ -91,6 +91,109 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
   };
 }
 
+async function attachBatchNamesToCourses(
+  supabaseAdmin: SupabaseClient,
+  courses: Array<{ id: string | number }>,
+) {
+  if (courses.length === 0) return courses;
+
+  const courseIds = courses.map((course) => course.id);
+  const infoByCourseId = new Map<
+    string,
+    {
+      names: string[];
+      scheduleTypes: Set<"weekday" | "weekend">;
+      startDate: string | null;
+    }
+  >();
+
+  const addBatchToCourse = (
+    courseId: unknown,
+    batch: {
+      name?: string | null;
+      schedule_type?: unknown;
+      start_date?: string | null;
+    },
+  ) => {
+    if (courseId == null || typeof batch.name !== "string" || !batch.name.trim()) {
+      return;
+    }
+
+    const key = String(courseId);
+    const info = infoByCourseId.get(key) ?? {
+      names: [],
+      scheduleTypes: new Set<"weekday" | "weekend">(),
+      startDate: null,
+    };
+
+    if (!info.names.includes(batch.name)) {
+      info.names.push(batch.name);
+    }
+
+    info.scheduleTypes.add(
+      batch.schedule_type === "weekend" ? "weekend" : "weekday",
+    );
+
+    if (batch.start_date && !info.startDate) {
+      info.startDate = batch.start_date;
+    }
+
+    infoByCourseId.set(key, info);
+  };
+
+  const { data: directBatches } = await supabaseAdmin
+    .from("batches")
+    .select("name, course_id, schedule_type, start_date")
+    .in("course_id", courseIds);
+
+  for (const batch of directBatches ?? []) {
+    addBatchToCourse(batch.course_id, batch);
+  }
+
+  const { data: batchCourses } = await supabaseAdmin
+    .from("batch_courses")
+    .select("course_id, batch_id")
+    .in("course_id", courseIds);
+
+  const junctionBatchIds = [
+    ...new Set(
+      (batchCourses ?? [])
+        .map((row) => row.batch_id)
+        .filter((id): id is string | number => id != null),
+    ),
+  ];
+
+  if (junctionBatchIds.length > 0) {
+    const { data: junctionBatches } = await supabaseAdmin
+      .from("batches")
+      .select("id, name, schedule_type, start_date")
+      .in("id", junctionBatchIds);
+
+    const batchById = new Map(
+      (junctionBatches ?? []).map((batch) => [String(batch.id), batch]),
+    );
+
+    for (const row of batchCourses ?? []) {
+      const batch = batchById.get(String(row.batch_id));
+      if (batch) {
+        addBatchToCourse(row.course_id, batch);
+      }
+    }
+  }
+
+  return courses.map((course) => {
+    const info = infoByCourseId.get(String(course.id));
+    return {
+      ...course,
+      batch_name: info?.names.join(", ") || null,
+      batch_schedule_types: info
+        ? Array.from(info.scheduleTypes)
+        : [],
+      batch_start_date: info?.startDate ?? null,
+    };
+  });
+}
+
 export async function GET(request: Request) {
   const authContext = await authenticateAdmin(request);
   if ("error" in authContext) {
@@ -105,8 +208,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const coursesWithBatches = await attachBatchNamesToCourses(
+    authContext.supabaseAdmin,
+    data ?? [],
+  );
+
   return NextResponse.json(
-    { success: true, courses: data ?? [] },
+    { success: true, courses: coursesWithBatches },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

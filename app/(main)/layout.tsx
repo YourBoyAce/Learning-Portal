@@ -9,6 +9,7 @@ import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
 import {ICONS} from "@/app/styles/icons";
 import {Button} from "@/components/ui/button";
+import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 export default function MainLayout({
   children,
 }: {
@@ -51,14 +52,18 @@ export default function MainLayout({
         .eq("id", user.id)
         .single();
 
-      if (profile?.full_name) {
-        setFullName(profile.full_name);
-      }
+      setFullName(profile?.full_name?.trim() || null);
       
       setLoading(false);
     };
 
     load();
+
+    const onProfileUpdated = () => {
+      void load();
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -70,9 +75,12 @@ export default function MainLayout({
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
       listener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, pathname]);
+
+  const displayName = fullName || userEmail?.split("@")[0] || "User";
 
   // Session heartbeat
   useEffect(() => {
@@ -243,7 +251,7 @@ export default function MainLayout({
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-700">
-                  {userEmail?.split("@")[0]}
+                  {displayName}
                 </p>
                 <p className="text-xs text-gray-400">{userEmail}</p>
               </div>

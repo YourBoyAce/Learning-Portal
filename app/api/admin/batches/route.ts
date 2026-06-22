@@ -6,6 +6,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function normalizeScheduleType(value: unknown): "weekday" | "weekend" {
+  return value === "weekend" ? "weekend" : "weekday";
+}
+
 function normalizeCourseId(value: unknown): string | number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string") {
@@ -31,7 +35,48 @@ type ProfileRow = {
   id: string;
   email: string | null;
   full_name: string | null;
+  role: string | null;
 };
+
+function isAdminRole(role: string | null | undefined): boolean {
+  return role?.toLowerCase() === "admin";
+}
+
+async function filterAssignableMemberEmails(
+  supabaseAdmin: SupabaseClient,
+  emails: string[],
+): Promise<string[]> {
+  if (emails.length === 0) return emails;
+
+  const { data: profileRows, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, role");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const authUsersResult =
+    await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const authEmailById = new Map(
+    (authUsersResult.data?.users ?? []).map((user) => [
+      user.id,
+      user.email?.trim().toLowerCase() ?? "",
+    ]),
+  );
+
+  const adminEmails = new Set<string>();
+  for (const row of (profileRows ?? []) as Pick<ProfileRow, "id" | "email" | "role">[]) {
+    if (!isAdminRole(row.role)) continue;
+    const email =
+      row.email?.trim().toLowerCase() ||
+      authEmailById.get(row.id) ||
+      "";
+    if (email) adminEmails.add(email);
+  }
+
+  return emails.filter((email) => !adminEmails.has(email.toLowerCase()));
+}
 
 type CourseRow = {
   id: string | number;
@@ -49,6 +94,73 @@ type BatchCourseRow = {
 type CourseEnrollmentRow = {
   user_id: string;
 };
+
+function normalizeBatchId(value: unknown): string | number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const asNumber = Number(trimmed);
+    return Number.isFinite(asNumber) && String(asNumber) === trimmed
+      ? asNumber
+      : trimmed;
+  }
+  return null;
+}
+
+type BatchWithRelations = {
+  course_id?: string | number | null;
+  batch_members?: BatchMemberRow[] | null;
+  batch_courses?: BatchCourseRow[] | null;
+};
+
+function extractBatchAssignments(batch: BatchWithRelations) {
+  const memberEmails = ((batch.batch_members ?? []) as BatchMemberRow[])
+    .map((row) => row.email?.trim().toLowerCase() ?? "")
+    .filter((email): email is string => Boolean(email));
+
+  const courseIds = new Set<string>();
+  for (const row of (batch.batch_courses ?? []) as BatchCourseRow[]) {
+    if (row.course_id != null) {
+      courseIds.add(String(row.course_id));
+    }
+  }
+  if (batch.course_id != null) {
+    courseIds.add(String(batch.course_id));
+  }
+
+  return {
+    memberEmails,
+    courseIds: Array.from(courseIds),
+  };
+}
+
+async function getBatchAssignments(
+  supabaseAdmin: SupabaseClient,
+  batchId: string | number,
+) {
+  const { data: batchRow, error: batchError } = await supabaseAdmin
+    .from("batches")
+    .select(
+      `
+      course_id,
+      batch_members (email),
+      batch_courses (course_id)
+    `,
+    )
+    .eq("id", batchId)
+    .maybeSingle();
+
+  if (batchError) {
+    throw new Error(batchError.message);
+  }
+
+  if (!batchRow) {
+    return { memberEmails: [], courseIds: [] };
+  }
+
+  return extractBatchAssignments(batchRow as BatchWithRelations);
+}
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
@@ -129,7 +241,13 @@ export async function GET(request: Request) {
 
   const { data, error } = await authContext.supabaseAdmin
     .from("batches")
-    .select("*")
+    .select(
+      `
+      *,
+      batch_members (email),
+      batch_courses (course_id)
+    `,
+    )
     .order("start_date", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -147,7 +265,7 @@ export async function GET(request: Request) {
   if (includeUsers) {
     const { data: profileRows, error: usersError } = await authContext.supabaseAdmin
       .from("profiles")
-      .select("id, email, full_name")
+      .select("id, email, full_name, role")
       .order("created_at", { ascending: false });
 
     if (usersError) {
@@ -161,11 +279,14 @@ export async function GET(request: Request) {
       (authUsersResult.data?.users ?? []).map((u) => [u.id, u.email ?? null]),
     );
 
-    users = ((profileRows ?? []) as ProfileRow[]).map((row) => ({
-      id: row.id,
-      full_name: row.full_name ?? null,
-      email: row.email ?? authEmailById.get(row.id) ?? null,
-    }));
+    users = ((profileRows ?? []) as ProfileRow[])
+      .filter((row) => !isAdminRole(row.role))
+      .map((row) => ({
+        id: row.id,
+        full_name: row.full_name ?? null,
+        email: row.email ?? authEmailById.get(row.id) ?? null,
+        role: row.role ?? null,
+      }));
   }
 
   if (includeCourses) {
@@ -192,43 +313,36 @@ export async function GET(request: Request) {
     });
   }
 
-  const batchId = Number(batchIdParam);
-  if (!Number.isFinite(batchId)) {
+  const batchId = normalizeBatchId(batchIdParam);
+  if (batchId === null) {
     return NextResponse.json({ error: "Invalid batchId." }, { status: 400 });
   }
 
-  const { data: memberRows, error: membersError } = await authContext.supabaseAdmin
-    .from("batch_members")
-    .select("email")
-    .eq("batch_id", batchId);
+  try {
+    const assignment = await getBatchAssignments(authContext.supabaseAdmin, batchId);
+    assignment.memberEmails = await filterAssignableMemberEmails(
+      authContext.supabaseAdmin,
+      assignment.memberEmails,
+    );
 
-  if (membersError) {
-    return NextResponse.json({ error: membersError.message }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      batches: data ?? [],
+      users,
+      courses,
+      assignment,
+    });
+  } catch (assignmentError) {
+    return NextResponse.json(
+      {
+        error:
+          assignmentError instanceof Error
+            ? assignmentError.message
+            : "Failed to load batch assignments.",
+      },
+      { status: 500 },
+    );
   }
-
-  const { data: batchCoursesRows, error: batchCoursesError } = await authContext.supabaseAdmin
-    .from("batch_courses")
-    .select("course_id")
-    .eq("batch_id", batchId);
-
-  if (batchCoursesError) {
-    return NextResponse.json({ error: batchCoursesError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    success: true,
-    batches: data ?? [],
-    users,
-    courses,
-    assignment: {
-      memberEmails: ((memberRows ?? []) as BatchMemberRow[])
-        .map((row) => row.email)
-        .filter((email): email is string => Boolean(email)),
-      courseIds: ((batchCoursesRows ?? []) as BatchCourseRow[])
-        .map((row) => String(row.course_id))
-        .filter((id): id is string => Boolean(id)),
-    },
-  });
 }
 
 export async function POST(request: Request) {
@@ -243,6 +357,7 @@ export async function POST(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const scheduleType = normalizeScheduleType(body?.schedule_type);
   const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string"
@@ -252,13 +367,17 @@ export async function POST(request: Request) {
         : undefined;
 
   // 1. Get the array of IDs sent from the frontend
-  const assignedMembers = Array.isArray(body?.assigned_scholars)
+  let assignedMembers = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((value: unknown) =>
           typeof value === "string" ? value.trim().toLowerCase() : "",
         )
         .filter((email: string) => EMAIL_RE.test(email))
     : [];
+  assignedMembers = await filterAssignableMemberEmails(
+    authContext.supabaseAdmin,
+    assignedMembers,
+  );
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
@@ -281,6 +400,7 @@ export async function POST(request: Request) {
       name,
       description,
       start_date: startDate || null,
+      schedule_type: scheduleType,
       course_id: selectedCourseId,
       ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
@@ -377,7 +497,23 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, batch });
+  const { data: createdBatch, error: reloadError } = await authContext.supabaseAdmin
+    .from("batches")
+    .select(
+      `
+      *,
+      batch_members (email),
+      batch_courses (course_id)
+    `,
+    )
+    .eq("id", batch.id)
+    .single();
+
+  if (reloadError) {
+    return NextResponse.json({ success: true, batch });
+  }
+
+  return NextResponse.json({ success: true, batch: createdBatch });
 }
 
 export async function PUT(request: Request) {
@@ -399,6 +535,7 @@ export async function PUT(request: Request) {
     typeof body?.description === "string" ? body.description.trim() : "";
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
+  const scheduleType = normalizeScheduleType(body?.schedule_type);
   const hasThumbnailField = "thumbnail_url" in (body || {});
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string"
@@ -406,13 +543,17 @@ export async function PUT(request: Request) {
       : hasThumbnailField
         ? null
         : undefined;
-  const assignedMembers = Array.isArray(body?.assigned_scholars)
+  let assignedMembers = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((value: unknown) =>
           typeof value === "string" ? value.trim().toLowerCase() : "",
         )
         .filter((email: string) => EMAIL_RE.test(email))
     : [];
+  assignedMembers = await filterAssignableMemberEmails(
+    authContext.supabaseAdmin,
+    assignedMembers,
+  );
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
@@ -434,6 +575,7 @@ export async function PUT(request: Request) {
       name,
       description,
       start_date: startDate || null,
+      schedule_type: scheduleType,
       course_id: selectedCourseId,
       ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
@@ -561,6 +703,15 @@ export async function DELETE(request: Request) {
       { error: "Valid batch id is required." },
       { status: 400 },
     );
+  }
+
+  const { error: deleteCoursesError } = await authContext.supabaseAdmin
+    .from("batch_courses")
+    .delete()
+    .eq("batch_id", id);
+
+  if (deleteCoursesError) {
+    return NextResponse.json({ error: deleteCoursesError.message }, { status: 500 });
   }
 
   const { error: deleteMembersError } = await authContext.supabaseAdmin

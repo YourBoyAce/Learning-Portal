@@ -33,6 +33,8 @@ interface Course {
   created_at?: string;
   category?: string;
   course_type?: string;
+  batch_name?: string | null;
+  batch_schedule_types?: ("weekday" | "weekend")[];
 }
 
 export default function AdminCourses() {
@@ -541,7 +543,9 @@ export default function AdminCourses() {
                             title={course.title}
                             description={course.description}
                             thumbnail={course.thumbnail_url}
-                            createdAt={course.created_at}
+                            batchName={course.batch_name}
+                            batchScheduleTypes={course.batch_schedule_types}
+                            courseStatus="active"
                             variant="admin"
                             onClick={() =>
                               router.push(`/admin/courses/${course.id}`)

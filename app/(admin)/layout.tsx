@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
+import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
 import {ICONS} from "@/app/styles/icons";
 import { Button } from "@/components/ui/button";
+import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 
 export default function AdminLayout({
   children,
@@ -17,6 +19,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -40,7 +43,7 @@ export default function AdminLayout({
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, full_name")
         .eq("id", user.id)
         .single();
 
@@ -51,10 +54,17 @@ export default function AdminLayout({
 
       if (cancelled) return;
       setUserEmail(user.email ?? null);
+      setFullName(profile.full_name ?? null);
       setLoading(false);
     };
 
     load();
+
+    const onProfileUpdated = () => {
+      void load();
+    };
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -66,9 +76,12 @@ export default function AdminLayout({
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
       listener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, pathname]);
+
+  const displayName = fullName?.trim() || userEmail?.split("@")[0] || "User";
 
   if (loading) return null;
 
@@ -210,14 +223,15 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/admin/profile">
             <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
-              <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-                <span className="text-white text-lg font-semibold">
-                  {userEmail?.[0]?.toUpperCase() || "U"}
-                </span>
-              </div>
+              <UserAvatar
+                name={fullName}
+                email={userEmail}
+                size={40}
+                textSize="text-sm"
+              />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">
-                  {userEmail?.split("@")[0]}
+                  {displayName}
                 </p>
                 <p className="text-xs text-gray-500 truncate">{userEmail}</p>
               </div>
@@ -261,9 +275,12 @@ export default function AdminLayout({
             </svg>
           </button>
           <Image src="/logo.svg" alt="Auto-Mate" width={130} height={40} className="object-contain" />
-          <div className="h-10 w-10 rounded-full bg-brand-primary text-white flex items-center justify-center font-semibold">
-            {userEmail?.[0]?.toUpperCase() || "U"}
-          </div>
+          <UserAvatar
+            name={fullName}
+            email={userEmail}
+            size={40}
+            textSize="text-sm"
+          />
         </header>
 
       {showSignOutDialog && (
