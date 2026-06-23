@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import CourseCard from "@/app/components/course/CourseCard";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ type Module = {
 };
 
 export default function UploadPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCourseId = searchParams.get("courseId") || "";
   const preselectedBatchId = searchParams.get("batchId") || "";
@@ -767,6 +768,16 @@ export default function UploadPage() {
                     courseStatus="active"
                     variant="admin"
                     showProgress={false}
+                    onEdit={() =>
+                      router.push(
+                        `/admin/courses?action=edit&courseId=${encodeURIComponent(String(course.id))}`,
+                      )
+                    }
+                    onDelete={() =>
+                      router.push(
+                        `/admin/courses?action=delete&courseId=${encodeURIComponent(String(course.id))}`,
+                      )
+                    }
                   />
                 ))}
               </div>

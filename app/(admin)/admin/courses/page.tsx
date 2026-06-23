@@ -23,7 +23,7 @@ import {
   Loader2,
   Upload,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CueCard from "@/app/components/course/CueCard";
 interface Course {
   id: number | string;
@@ -41,6 +41,7 @@ export default function AdminCourses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [courseType, setCourseType] = useState<"active" | "upcoming">("active");
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -288,6 +289,29 @@ export default function AdminCourses() {
     setModalMessage(null);
     setShowDeleteConfirm(true);
   };
+
+  useEffect(() => {
+    const action = searchParams.get("action");
+    const courseId = searchParams.get("courseId");
+
+    if (!action || !courseId || loading) {
+      return;
+    }
+
+    const course = courses.find((c) => String(c.id) === String(courseId));
+
+    router.replace("/admin/courses", { scroll: false });
+
+    if (!course) {
+      return;
+    }
+
+    if (action === "edit") {
+      void handleEdit(course);
+    } else if (action === "delete") {
+      handleDeleteClick(course);
+    }
+  }, [searchParams, courses, loading, router]);
 
   const handleConfirmDelete = async () => {
     if (!deletingCourse) return;

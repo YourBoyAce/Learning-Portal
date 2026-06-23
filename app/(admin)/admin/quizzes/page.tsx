@@ -44,6 +44,23 @@ interface Batch {
   name: string;
 }
 
+const DEFAULT_QUESTION_COUNT = 5;
+const MIN_QUESTION_COUNT = 1;
+const MAX_QUESTION_COUNT = 50;
+
+function createEmptyQuestion(index = 0): Question {
+  return {
+    id: `q-temp-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+    text: "",
+    options: ["", "", "", ""],
+    correctAnswer: 0,
+  };
+}
+
+function createEmptyQuestions(count: number): Question[] {
+  return Array.from({ length: count }, (_, i) => createEmptyQuestion(i));
+}
+
 const INITIAL_QUIZZES: Quiz[] = [
   {
     id: "quiz-1",
@@ -109,15 +126,15 @@ export default function AdminQuizzes() {
   const [courseId, setCourseId] = useState<string | number>("");
   const [passingScore, setPassingScore] = useState(80);
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
-  const [questions, setQuestions] = useState<Question[]>([
-    { id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 },
-  ]);
+  const [questions, setQuestions] = useState<Question[]>(() =>
+    createEmptyQuestions(DEFAULT_QUESTION_COUNT),
+  );
   const [batchId, setBatchId] = useState<string | number>("");
   const [batches, setBatches] = useState<Batch[]>([]);
   const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
 
-  // AI Assist question count
-  const [qCount, setQCount] = useState(5);
+  // AI Assist question count — drives how many question slots appear below
+  const [qCount, setQCount] = useState(DEFAULT_QUESTION_COUNT);
 
   // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -182,8 +199,32 @@ export default function AdminQuizzes() {
     setPassingScore(80);
     setStatus("Active");
     setBatchId("");
-    setQuestions([{ id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 }]);
+    setQCount(DEFAULT_QUESTION_COUNT);
+    setQuestions(createEmptyQuestions(DEFAULT_QUESTION_COUNT));
     setShowModal(true);
+  };
+
+  const syncQuestionCount = (count: number) => {
+    const normalized = Math.min(
+      MAX_QUESTION_COUNT,
+      Math.max(MIN_QUESTION_COUNT, count),
+    );
+
+    setQCount(normalized);
+    setQuestions((prev) => {
+      if (prev.length === normalized) {
+        return prev;
+      }
+      if (prev.length < normalized) {
+        return [
+          ...prev,
+          ...Array.from({ length: normalized - prev.length }, (_, i) =>
+            createEmptyQuestion(prev.length + i),
+          ),
+        ];
+      }
+      return prev.slice(0, normalized);
+    });
   };
 
   const handleEdit = (quiz: Quiz) => {
@@ -195,23 +236,26 @@ export default function AdminQuizzes() {
     setBatchId(quiz.batchId || "");
     setPassingScore(quiz.passingScore);
     setStatus(quiz.status);
-    setQuestions(
+    const loadedQuestions =
       quiz.questions.length > 0
         ? quiz.questions.map((q) => ({ ...q }))
-        : [{ id: "q-temp-1", text: "", options: ["", "", "", ""], correctAnswer: 0 }]
-    );
+        : createEmptyQuestions(MIN_QUESTION_COUNT);
+    setQuestions(loadedQuestions);
+    setQCount(loadedQuestions.length);
     setShowModal(true);
   };
 
   const handleAddQuestion = () => {
-    setQuestions([
-      ...questions,
-      { id: `q-temp-${Date.now()}-${questions.length}`, text: "", options: ["", "", "", ""], correctAnswer: 0 },
-    ]);
+    syncQuestionCount(qCount + 1);
   };
 
   const handleRemoveQuestion = (index: number) => {
-    if (questions.length > 1) setQuestions(questions.filter((_, i) => i !== index));
+    if (questions.length <= MIN_QUESTION_COUNT) {
+      return;
+    }
+    const next = questions.filter((_, i) => i !== index);
+    setQuestions(next);
+    setQCount(next.length);
   };
 
   const handleQuestionTextChange = (index: number, text: string) => {
@@ -462,8 +506,15 @@ export default function AdminQuizzes() {
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
+                      min={MIN_QUESTION_COUNT}
+                      max={MAX_QUESTION_COUNT}
                       value={qCount}
-                      onChange={(e) => setQCount(Number(e.target.value))}
+                      onChange={(e) => {
+                        const next = parseInt(e.target.value, 10);
+                        if (!Number.isNaN(next)) {
+                          syncQuestionCount(next);
+                        }
+                      }}
                       className="w-12 h-7 text-xs border rounded px-1 text-center"
                     />
                     <span className="text-xs text-gray-500">questions</span>
@@ -530,10 +581,9 @@ export default function AdminQuizzes() {
                         };
                       });
 
-                    if (questions.length === 1 && questions[0].text === "") {
+                    if (newQuestions.length > 0) {
                       setQuestions(newQuestions);
-                    } else {
-                      setQuestions([...questions, ...newQuestions]);
+                      setQCount(newQuestions.length);
                     }
                     e.target.value = "";
                   }}
@@ -643,7 +693,7 @@ export default function AdminQuizzes() {
                         rows={2}
                         className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
                       />
-                      {questions.length > 1 && (
+                      {questions.length > MIN_QUESTION_COUNT && (
                         <button
                           type="button"
                           onClick={() => handleRemoveQuestion(qIdx)}
