@@ -290,17 +290,18 @@ export async function GET(request: Request) {
   }
 
   if (includeCourses) {
+    // Only return active courses (not upcoming) for batch assignment
     const { data: courseRows, error: coursesError } = await authContext.supabaseAdmin
       .from("maincourses")
-      .select("id, title")
+      .select("id, title, course_type")
       .order("created_at", { ascending: false });
 
     if (coursesError) {
       return NextResponse.json({ error: coursesError.message }, { status: 500 });
     }
 
-    courses = ((courseRows ?? []) as CourseRow[]).filter((course) =>
-      Boolean(course.title),
+    courses = ((courseRows ?? []) as (CourseRow & { course_type?: string | null })[]).filter(
+      (course) => Boolean(course.title) && course.course_type !== "upcoming",
     );
   }
 
@@ -358,13 +359,6 @@ export async function POST(request: Request) {
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
   const scheduleType = normalizeScheduleType(body?.schedule_type);
-  const hasThumbnailField = "thumbnail_url" in (body || {});
-  const thumbnailUrl =
-    typeof body?.thumbnail_url === "string"
-      ? body.thumbnail_url.trim()
-      : hasThumbnailField
-        ? null
-        : undefined;
 
   // 1. Get the array of IDs sent from the frontend
   let assignedMembers = Array.isArray(body?.assigned_scholars)
@@ -402,7 +396,6 @@ export async function POST(request: Request) {
       start_date: startDate || null,
       schedule_type: scheduleType,
       course_id: selectedCourseId,
-      ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
     .select()
     .single();
@@ -530,19 +523,10 @@ export async function PUT(request: Request) {
       : typeof rawId === "string"
         ? rawId.trim()
         : "";
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const description =
-    typeof body?.description === "string" ? body.description.trim() : "";
+  const scheduleType = normalizeScheduleType(body?.schedule_type);
   const startDate =
     typeof body?.start_date === "string" ? body.start_date.trim() : "";
-  const scheduleType = normalizeScheduleType(body?.schedule_type);
-  const hasThumbnailField = "thumbnail_url" in (body || {});
-  const thumbnailUrl =
-    typeof body?.thumbnail_url === "string"
-      ? body.thumbnail_url.trim()
-      : hasThumbnailField
-        ? null
-        : undefined;
+
   let assignedMembers = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((value: unknown) =>
@@ -562,22 +546,60 @@ export async function PUT(request: Request) {
   const selectedCourseId =
     assignedCourses.length > 0 ? assignedCourses[0] : null;
 
-  if ((typeof id === "string" && !id) || !name || !description) {
+  if (typeof id === "string" && !id) {
     return NextResponse.json(
-      { error: "id, name and description are required." },
+      { error: "A valid batch id is required." },
       { status: 400 },
     );
+  }
+
+  // Derive name and description from the parent course when possible
+  let batchName = typeof body?.name === "string" ? body.name.trim() : "";
+  let batchDescription = typeof body?.description === "string" ? body.description.trim() : "";
+
+  if (selectedCourseId) {
+    const { data: courseRow } = await authContext.supabaseAdmin
+      .from("maincourses")
+      .select("title, description")
+      .eq("id", selectedCourseId)
+      .maybeSingle();
+
+    if (courseRow) {
+      // Re-generate name if not provided by frontend
+      if (!batchName && courseRow.title && startDate) {
+        const d = new Date(startDate);
+        if (!isNaN(d.getTime())) {
+          const month = d.toLocaleString("en-US", { month: "long" });
+          const year = d.getFullYear();
+          const scheduleLabel = scheduleType === "weekend" ? "Weekend" : "Weekday";
+          batchName = `${courseRow.title} ${month} ${year} ${scheduleLabel} Batch`;
+        }
+      }
+      if (!batchDescription) {
+        batchDescription = courseRow.description ?? "";
+      }
+    }
+  }
+
+  // Final fallback — keep existing name/description if still empty
+  if (!batchName) {
+    const { data: existing } = await authContext.supabaseAdmin
+      .from("batches")
+      .select("name, description")
+      .eq("id", id)
+      .maybeSingle();
+    if (existing?.name) batchName = existing.name;
+    if (!batchDescription && existing?.description) batchDescription = existing.description;
   }
 
   const { error: updateError } = await authContext.supabaseAdmin
     .from("batches")
     .update({
-      name,
-      description,
+      name: batchName,
+      description: batchDescription,
       start_date: startDate || null,
       schedule_type: scheduleType,
       course_id: selectedCourseId,
-      ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
     })
     .eq("id", id);
 

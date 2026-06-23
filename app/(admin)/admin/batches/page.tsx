@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import Select from "react-select";
 import { Button } from "@/components/ui/button";
@@ -24,22 +25,24 @@ import {
   Trash2,
   X,
   Loader2,
-  LayoutTemplate,
   FileText,
 } from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Batch {
   id: number | string;
   name: string;
   description: string;
-  thumbnail_url?: string | null;
   created_at?: string;
   start_date?: string | null;
-  category?: string;
   course_id?: number | string | null;
   schedule_type?: "weekday" | "weekend" | string | null;
   batch_members?: { email: string | null }[];
   batch_courses?: { course_id: string | number | null }[];
+  // Enriched from the parent course
+  course_title?: string | null;
+  course_thumbnail_url?: string | null;
 }
 
 interface BatchOption {
@@ -54,617 +57,345 @@ interface Profile {
   role?: string | null;
 }
 
+interface Course {
+  id: number | string;
+  title: string;
+  thumbnail_url?: string | null;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function isAdminProfile(user: Profile): boolean {
   return user.role?.toLowerCase() === "admin";
 }
 
-function getScholarProfiles(profileUsers: Profile[]): Profile[] {
-  return profileUsers.filter((user) => !isAdminProfile(user));
-}
-
 function getProfileDisplayName(user: Pick<Profile, "full_name" | "email">): string {
-  const username = user.full_name?.trim();
-  if (username) return username;
-
+  const name = user.full_name?.trim();
+  if (name) return name;
   const email = user.email?.trim();
   if (email) return email.split("@")[0] ?? email;
-
   return "Unknown user";
 }
 
-function findProfileByEmail(
-  profileUsers: Profile[],
-  email: string,
-): Profile | undefined {
-  return profileUsers.find(
-    (user) => user.email?.trim().toLowerCase() === email.toLowerCase(),
-  );
+function findProfileByEmail(users: Profile[], email: string): Profile | undefined {
+  return users.find((u) => u.email?.trim().toLowerCase() === email.toLowerCase());
 }
 
-interface Course {
-  id: number | string;
-  title: string;
-}
-
-function extractBatchAssignments(batch: Batch) {
-  const memberEmails = (batch.batch_members ?? [])
-    .map((member) => member.email?.trim().toLowerCase() ?? "")
-    .filter(Boolean);
-  const courseIds = new Set<string>();
-
-  for (const link of batch.batch_courses ?? []) {
-    if (link.course_id != null) {
-      courseIds.add(String(link.course_id));
-    }
+function buildUserSelectOptions(profileUsers: Profile[], memberEmails: string[] = []): BatchOption[] {
+  const map = new Map<string, BatchOption>();
+  for (const u of profileUsers.filter((u) => !isAdminProfile(u))) {
+    if (!u.email) continue;
+    const v = u.email.trim().toLowerCase();
+    map.set(v, { value: v, label: getProfileDisplayName(u) });
   }
-  if (batch.course_id != null) {
-    courseIds.add(String(batch.course_id));
-  }
-
-  return {
-    memberEmails,
-    courseIds: Array.from(courseIds),
-  };
-}
-
-function buildUserSelectOptions(
-  profileUsers: Profile[],
-  memberEmails: string[] = [],
-): BatchOption[] {
-  const optionsByEmail = new Map<string, BatchOption>();
-  const scholarUsers = getScholarProfiles(profileUsers);
-
-  for (const user of scholarUsers) {
-    if (!user.email) continue;
-    const value = user.email.trim().toLowerCase();
-    optionsByEmail.set(value, {
-      value,
-      label: getProfileDisplayName(user),
-    });
-  }
-
   for (const email of memberEmails) {
-    if (optionsByEmail.has(email)) continue;
-    const matchedProfile = findProfileByEmail(profileUsers, email);
-    if (matchedProfile && isAdminProfile(matchedProfile)) continue;
-    optionsByEmail.set(email, {
-      value: email,
-      label: matchedProfile
-        ? getProfileDisplayName(matchedProfile)
-        : email,
-    });
+    if (map.has(email)) continue;
+    const matched = findProfileByEmail(profileUsers, email);
+    if (matched && isAdminProfile(matched)) continue;
+    map.set(email, { value: email, label: matched ? getProfileDisplayName(matched) : email });
   }
-
-  return Array.from(optionsByEmail.values());
+  return Array.from(map.values());
 }
 
-function buildCourseSelectOptions(
-  profileCourses: Course[],
-  courseIds: string[] = [],
-): BatchOption[] {
-  const optionsById = new Map<string, BatchOption>();
-
-  for (const course of profileCourses) {
-    const value = String(course.id);
-    optionsById.set(value, { value, label: course.title });
-  }
-
-  for (const courseId of courseIds) {
-    if (!optionsById.has(courseId)) {
-      optionsById.set(courseId, {
-        value: courseId,
-        label: `Course #${courseId}`,
-      });
-    }
-  }
-
-  return Array.from(optionsById.values());
-}
-
-function buildSelectedUsers(
-  memberEmails: string[],
-  userOptions: BatchOption[],
-  profileUsers: Profile[] = [],
-): BatchOption[] {
-  const optionsByEmail = new Map(userOptions.map((option) => [option.value, option]));
+function buildSelectedUsers(memberEmails: string[], userOptions: BatchOption[], profileUsers: Profile[] = []): BatchOption[] {
+  const optMap = new Map(userOptions.map((o) => [o.value, o]));
   const adminEmails = new Set(
-    profileUsers
-      .filter(isAdminProfile)
-      .map((user) => user.email?.trim().toLowerCase() ?? "")
-      .filter(Boolean),
+    profileUsers.filter(isAdminProfile).map((u) => u.email?.trim().toLowerCase() ?? "").filter(Boolean),
   );
-
   return memberEmails
-    .filter((email) => !adminEmails.has(email))
-    .map((email) => {
-      const matchedProfile = findProfileByEmail(profileUsers, email);
-      return (
-        optionsByEmail.get(email) ?? {
-          value: email,
-          label: matchedProfile
-            ? getProfileDisplayName(matchedProfile)
-            : email,
-        }
-      );
+    .filter((e) => !adminEmails.has(e))
+    .map((e) => {
+      const matched = findProfileByEmail(profileUsers, e);
+      return optMap.get(e) ?? { value: e, label: matched ? getProfileDisplayName(matched) : e };
     });
 }
 
-function buildSelectedCourses(
-  courseIds: string[],
-  courseOptions: BatchOption[],
-): BatchOption[] {
-  const optionsById = new Map(courseOptions.map((option) => [option.value, option]));
-  return courseIds.map(
-    (courseId) =>
-      optionsById.get(courseId) ?? {
-        value: courseId,
-        label: `Course #${courseId}`,
-      },
-  );
+/** Derive batch name: "<CourseTitle> <MonthYear> <Schedule> Batch"
+ *  Example: "Playwright June 2026 Weekday Batch"
+ */
+function deriveBatchName(courseTitle: string, dateStr: string, schedule: "weekday" | "weekend"): string {
+  const scheduleLabel = schedule === "weekend" ? "Weekend" : "Weekday";
+  if (!dateStr) return `${courseTitle} ${scheduleLabel} Batch`;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return `${courseTitle} ${scheduleLabel} Batch`;
+  const month = d.toLocaleString("en-US", { month: "long" });
+  const year = d.getFullYear();
+  return `${courseTitle} ${month} ${year} ${scheduleLabel} Batch`;
 }
 
-type SaveBatchBody = {
-  id?: number | string;
-  name: string;
-  description: string;
-  start_date: string | null;
-  schedule_type: "weekday" | "weekend";
-  assigned_scholars: string[];
-  assigned_courses: string[];
-  thumbnail_url?: string | null;
-};
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminBatches() {
+  const router = useRouter();
+
   const [batches, setBatches] = useState<Batch[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<readonly BatchOption[]>(
-    [],
-  );
   const [courses, setCourses] = useState<Course[]>([]);
-  const [userSelectOptions, setUserSelectOptions] = useState<BatchOption[]>([]);
-  const [courseSelectOptions, setCourseSelectOptions] = useState<BatchOption[]>(
-    [],
-  );
-  const [selectedCourses, setSelectedCourses] = useState<
-    readonly BatchOption[]
-  >([]);
-  const [created_at, setCreated_At] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [totalStudents, setTotalStudents] = useState(0);
 
-  // Create/Edit Modal State
+  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingBatchId, setEditingBatchId] = useState<number | string | null>(
-    null,
-  );
-  const [batchName, setBatchName] = useState("");
-  const [batchDescription, setBatchDescription] = useState("");
+  const [editingBatchId, setEditingBatchId] = useState<number | string | null>(null);
+
+  // Form fields
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [scheduleType, setScheduleType] = useState<"weekday" | "weekend">("weekday");
+  const [startDate, setStartDate] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<readonly BatchOption[]>([]);
+  const [userSelectOptions, setUserSelectOptions] = useState<BatchOption[]>([]);
+
+  // Loading flags
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
-  const [isLoadingAssignmentOptions, setIsLoadingAssignmentOptions] =
-    useState(true);
-  const [modalMessage, setModalMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [batchThumbnail, setBatchThumbnail] = useState<File | null>(null);
-  const [batchThumbnailPreview, setBatchThumbnailPreview] = useState<string>("");
-  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [isLoadingAssignmentOptions, setIsLoadingAssignmentOptions] = useState(true);
+  const [modalMessage, setModalMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Delete Confirmation State
+  // Delete state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingBatch, setDeletingBatch] = useState<Batch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [totalStudents, setTotalStudents] = useState(0);
+
+  // Derived: auto-generated batch name shown in modal preview
+  const previewBatchName = useMemo(() => {
+    const course = courses.find((c) => String(c.id) === selectedCourseId);
+    if (!course) return "";
+    return deriveBatchName(course.title, startDate, scheduleType);
+  }, [selectedCourseId, startDate, scheduleType, courses]);
+
+  // Course options for single-select (active courses only — API already filters upcoming)
+  const courseSelectOptions: BatchOption[] = useMemo(
+    () => courses.map((c) => ({ value: String(c.id), label: c.title })),
+    [courses],
+  );
+
+  // ─── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchTotalStudents = async () => {
     try {
-      const { data, error } = await supabase
-        .from("batch_members")
-        .select("email");
-
-      if (error) {
-        console.error("Failed to fetch total students:", error.message);
-        return;
-      }
-
-      const uniqueEmails = new Set(
-        (data ?? [])
-          .map((row: { email: string | null }) => row.email)
-          .filter((email): email is string => Boolean(email))
+      const { data } = await supabase.from("batch_members").select("email");
+      const unique = new Set(
+        (data ?? []).map((r: any) => r.email).filter(Boolean),
       );
-      setTotalStudents(uniqueEmails.size);
-    } catch (error) {
-      console.error("Failed to fetch total students:", error);
+      setTotalStudents(unique.size);
+    } catch (e) {
+      console.error("Failed to fetch total students:", e);
     }
-  };
-
-  const applyAssignmentSelections = (
-    memberEmails: string[],
-    courseIds: string[],
-    profileUsers: Profile[],
-    profileCourses: Course[],
-  ) => {
-    const nextUserOptions = buildUserSelectOptions(profileUsers, memberEmails);
-    const nextCourseOptions = buildCourseSelectOptions(
-      profileCourses,
-      courseIds,
-    );
-
-    setUserSelectOptions(nextUserOptions);
-    setCourseSelectOptions(nextCourseOptions);
-    setSelectedUsers(buildSelectedUsers(memberEmails, nextUserOptions, profileUsers));
-    setSelectedCourses(buildSelectedCourses(courseIds, nextCourseOptions));
   };
 
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        console.error("Auth error:", sessionError);
-        return;
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) return;
 
-      const response = await fetch("/api/admin/batches", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
+      const res = await fetch("/api/admin/batches", {
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
       });
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          result?.error || `Request failed (${response.status}).`,
-        );
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(result?.error || "Failed to fetch batches.");
+
+      const rawBatches: any[] = Array.isArray(result?.batches) ? result.batches : [];
+
+      // Enrich each batch with its parent course thumbnail + title
+      const courseIds = [...new Set(rawBatches.map((b) => b.course_id).filter(Boolean))];
+      let courseMap = new Map<string, { title: string; thumbnail_url: string | null }>();
+
+      if (courseIds.length > 0) {
+        const { data: courseRows } = await supabase
+          .from("maincourses")
+          .select("id, title, thumbnail_url")
+          .in("id", courseIds);
+        for (const c of courseRows ?? []) {
+          courseMap.set(String(c.id), { title: c.title, thumbnail_url: c.thumbnail_url ?? null });
+        }
       }
 
-      setBatches(Array.isArray(result?.batches) ? result.batches : []);
-    } catch (error) {
-      console.error("Failed to fetch batches:", error);
+      const enriched: Batch[] = rawBatches.map((b) => {
+        const courseInfo = b.course_id ? courseMap.get(String(b.course_id)) : undefined;
+        return {
+          ...b,
+          course_title: courseInfo?.title ?? null,
+          course_thumbnail_url: courseInfo?.thumbnail_url ?? null,
+        };
+      });
+
+      setBatches(enriched);
+    } catch (e) {
+      console.error("Failed to fetch batches:", e);
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchBatches();
-    fetchTotalStudents();
-  }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsersAndCourses = async () => {
     try {
       setIsLoadingAssignmentOptions(true);
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        console.error("Auth error:", sessionError);
-        return;
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) return;
 
-      const response = await fetch(
-        "/api/admin/batches?includeUsers=true&includeCourses=true",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-        },
-      );
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          result?.error || `Request failed (${response.status}).`,
-        );
-      }
+      const res = await fetch("/api/admin/batches?includeUsers=true&includeCourses=true", {
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(result?.error || "Failed to fetch options.");
 
-      const nextUsers = Array.isArray(result?.users) ? result.users : [];
-      const nextCourses = Array.isArray(result?.courses) ? result.courses : [];
+      const nextUsers: Profile[] = Array.isArray(result?.users) ? result.users : [];
+      const nextCourses: Course[] = Array.isArray(result?.courses) ? result.courses : [];
 
       setUsers(nextUsers);
       setCourses(nextCourses);
       setUserSelectOptions(buildUserSelectOptions(nextUsers));
-      setCourseSelectOptions(buildCourseSelectOptions(nextCourses));
-    } catch (error) {
-      console.error(
-        "Failed to fetch users/courses for batch assignment:",
-        error,
-      );
+    } catch (e) {
+      console.error("Failed to fetch assignment options:", e);
     } finally {
       setIsLoadingAssignmentOptions(false);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchUsers();
+    fetchBatches();
+    fetchTotalStudents();
   }, []);
 
+  useEffect(() => {
+    fetchUsersAndCourses();
+  }, []);
+
+  // ─── Modal open/reset helpers ───────────────────────────────────────────────
+
+  function resetModal() {
+    setIsEditing(false);
+    setEditingBatchId(null);
+    setSelectedCourseId("");
+    setScheduleType("weekday");
+    setStartDate("");
+    setSelectedUsers([]);
+    setModalMessage(null);
+    setIsLoadingAssignments(false);
+  }
+
+  const handleOpenCreate = () => {
+    resetModal();
+    void fetchUsersAndCourses();
+    setShowModal(true);
+  };
+
   const handleEdit = async (batch: Batch) => {
+    resetModal();
     setIsEditing(true);
     setEditingBatchId(batch.id);
-    setBatchName(batch.name);
-    setBatchDescription(batch.description || "");
     setScheduleType(batch.schedule_type === "weekend" ? "weekend" : "weekday");
-    setCreated_At(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
-    setBatchThumbnail(null);
-    setBatchThumbnailPreview(batch.thumbnail_url || "");
+    setStartDate(batch.start_date ? String(batch.start_date).slice(0, 10) : "");
+
+    // Course ID
+    const cId = batch.course_id ? String(batch.course_id) : "";
+    setSelectedCourseId(cId);
+
     setIsLoadingAssignments(true);
     setModalMessage(null);
     setShowModal(true);
-
-    void fetchUsers();
-
-    const initialAssignments = extractBatchAssignments(batch);
-    applyAssignmentSelections(
-      initialAssignments.memberEmails,
-      initialAssignments.courseIds,
-      users,
-      courses,
-    );
+    void fetchUsersAndCourses();
 
     try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("You must be signed in to edit a batch.");
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) throw new Error("Not authenticated.");
 
-      const response = await fetch(
+      const res = await fetch(
         `/api/admin/batches?includeAssignments=true&includeUsers=true&includeCourses=true&batchId=${encodeURIComponent(String(batch.id))}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-        },
+        { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } },
       );
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          result?.error || `Failed to load batch details (${response.status}).`,
-        );
-      }
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(result?.error || "Failed to load batch details.");
 
-      const latestUsers: Profile[] = Array.isArray(result?.users)
-        ? result.users
-        : users;
-      const latestCourses: Course[] = Array.isArray(result?.courses)
-        ? result.courses
-        : courses;
-      const latestBatch: Batch | undefined = Array.isArray(result?.batches)
-        ? result.batches.find(
-            (item: Batch) => String(item.id) === String(batch.id),
-          )
-        : undefined;
-
+      const latestUsers: Profile[] = Array.isArray(result?.users) ? result.users : users;
+      const latestCourses: Course[] = Array.isArray(result?.courses) ? result.courses : courses;
       setUsers(latestUsers);
       setCourses(latestCourses);
+      setUserSelectOptions(buildUserSelectOptions(latestUsers));
 
-      const assignmentFromApi = result?.assignment
-        ? {
-            memberEmails: Array.isArray(result.assignment.memberEmails)
-              ? result.assignment.memberEmails
-                  .map((email: unknown) =>
-                    typeof email === "string" ? email.trim().toLowerCase() : "",
-                  )
-                  .filter(Boolean)
-              : [],
-            courseIds: Array.isArray(result.assignment.courseIds)
-              ? result.assignment.courseIds.map((id: unknown) => String(id))
-              : [],
-          }
-        : latestBatch
-          ? extractBatchAssignments(latestBatch)
-          : initialAssignments;
+      const memberEmails: string[] = Array.isArray(result?.assignment?.memberEmails)
+        ? result.assignment.memberEmails.map((e: unknown) =>
+            typeof e === "string" ? e.trim().toLowerCase() : "",
+          ).filter(Boolean)
+        : (batch.batch_members ?? []).map((m) => m.email?.trim().toLowerCase() ?? "").filter(Boolean);
 
-      applyAssignmentSelections(
-        assignmentFromApi.memberEmails,
-        assignmentFromApi.courseIds,
-        latestUsers,
-        latestCourses,
-      );
-    } catch (error) {
-      console.error("Failed to fetch existing batch assignments:", error);
-      setModalMessage({
-        type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to refresh batch assignments. Showing saved batch data.",
-      });
+      const opts = buildUserSelectOptions(latestUsers, memberEmails);
+      setUserSelectOptions(opts);
+      setSelectedUsers(buildSelectedUsers(memberEmails, opts, latestUsers));
+    } catch (e) {
+      console.error("Failed to fetch batch assignments:", e);
+      setModalMessage({ type: "error", text: "Failed to load assignments. Showing saved data." });
     } finally {
       setIsLoadingAssignments(false);
     }
   };
 
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      setModalMessage({
-        type: "error",
-        text: "Please select a valid image file (JPG, PNG, WebP, etc.)",
-      });
-      return;
-    }
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      setModalMessage({
-        type: "error",
-        text: "File size must be less than 5MB",
-      });
-      return;
-    }
-
-    setBatchThumbnail(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setBatchThumbnailPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    setModalMessage(null);
-  };
-
-  const uploadThumbnailToStorage = async (file: File): Promise<string | null> => {
-    try {
-      setIsUploadingThumbnail(true);
-      const timestamp = Date.now();
-      const fileName = `batch-thumbnail-${timestamp}.${file.name.split(".").pop()}`;
-
-      const { error } = await supabase.storage
-        .from("course-thumbnails")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (error) {
-        console.error("Upload error:", error);
-        return null;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from("course-thumbnails")
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error("Failed to upload thumbnail:", error);
-      return null;
-    } finally {
-      setIsUploadingThumbnail(false);
-    }
-  };
+  // ─── Save ───────────────────────────────────────────────────────────────────
 
   const handleSaveBatch = async () => {
-    const name = batchName.trim();
-    const description = batchDescription.trim();
-
-    if (!name || !description) {
-      setModalMessage({
-        type: "error",
-        text: "Please add both batch name and description.",
-      });
+    if (!selectedCourseId) {
+      setModalMessage({ type: "error", text: "Please select a course." });
       return;
     }
+    if (!startDate) {
+      setModalMessage({ type: "error", text: "Please pick a start date so the batch name can be generated." });
+      return;
+    }
+
+    const course = courses.find((c) => String(c.id) === selectedCourseId);
+    const generatedName = deriveBatchName(course?.title ?? "Batch", startDate, scheduleType);
 
     try {
       setIsSaving(true);
       setModalMessage(null);
 
-      // Upload thumbnail if provided
-      let thumbnailUrl: string | null | undefined;
-      if (batchThumbnail) {
-        thumbnailUrl = await uploadThumbnailToStorage(batchThumbnail);
-        if (!thumbnailUrl) {
-          throw new Error("Failed to upload thumbnail. Please try again.");
-        }
-      } else if (isEditing && !batchThumbnailPreview) {
-        thumbnailUrl = null;
-      } else {
-        thumbnailUrl = undefined;
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) throw new Error("Please log in again.");
 
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("Please log in again to continue.");
-      }
+      // Use course description as the batch description
+      const courseDescription = course
+        ? (courses.find((c) => String(c.id) === selectedCourseId) as any)?.description ?? ""
+        : "";
 
-      if (isEditing && editingBatchId) {
-        const body: SaveBatchBody = {
-          id: editingBatchId,
-          name,
-          description,
-          start_date: created_at || null,
-          schedule_type: scheduleType,
-          assigned_scholars: selectedUsers.map((user) => user.value),
-          assigned_courses: selectedCourses.map((course) => course.value),
-        };
-        if (thumbnailUrl !== undefined) {
-          body.thumbnail_url = thumbnailUrl;
-        }
+      const body = {
+        ...(isEditing && editingBatchId ? { id: editingBatchId } : {}),
+        name: generatedName,
+        description: courseDescription,
+        start_date: startDate || null,
+        schedule_type: scheduleType,
+        assigned_scholars: selectedUsers.map((u) => u.value),
+        assigned_courses: [selectedCourseId],
+      };
 
-        const response = await fetch("/api/admin/batches", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify(body),
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(
-            result?.error || `Request failed (${response.status}).`,
-          );
-        }
-      } else {
-        const body: SaveBatchBody = {
-          name,
-          description,
-          start_date: created_at || null,
-          schedule_type: scheduleType,
-          assigned_scholars: selectedUsers.map((user) => user.value),
-          assigned_courses: selectedCourses.map((course) => course.value),
-        };
-        if (thumbnailUrl) {
-          body.thumbnail_url = thumbnailUrl;
-        }
-
-        const response = await fetch("/api/admin/batches", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify(body),
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(
-            result?.error || `Request failed (${response.status}).`,
-          );
-        }
-      }
+      const res = await fetch("/api/admin/batches", {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(result?.error || `Request failed (${res.status}).`);
 
       await fetchBatches();
       await fetchTotalStudents();
       setShowModal(false);
-      setBatchName("");
-      setBatchDescription("");
-      setScheduleType("weekday");
-      setCreated_At("");
-      setSelectedUsers([]);
-      setSelectedCourses([]);
-      setBatchThumbnail(null);
-      setBatchThumbnailPreview("");
-      setToastMessage(
-        isEditing
-          ? "Batch updated successfully."
-          : "Batch created successfully.",
-      );
+      resetModal();
+      setToastMessage(isEditing ? "Batch updated successfully." : "Batch created successfully.");
       setTimeout(() => setToastMessage(null), 3000);
-    } catch (error) {
-      setModalMessage({
-        type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to save batch. Please try again.",
-      });
+    } catch (e) {
+      setModalMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to save batch." });
     } finally {
       setIsSaving(false);
     }
   };
+
+  // ─── Delete ─────────────────────────────────────────────────────────────────
 
   const handleDeleteClick = (batch: Batch) => {
     setDeletingBatch(batch);
@@ -673,144 +404,77 @@ export default function AdminBatches() {
 
   const handleConfirmDelete = async () => {
     if (!deletingBatch) return;
-
     try {
       setIsDeleting(true);
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("Please log in again to continue.");
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) throw new Error("Please log in again.");
 
-      const response = await fetch(
-        `/api/admin/batches?id=${encodeURIComponent(String(deletingBatch.id))}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify({ id: deletingBatch.id }),
+      const res = await fetch(`/api/admin/batches?id=${encodeURIComponent(String(deletingBatch.id))}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
         },
-      );
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          result?.error || `Request failed (${response.status}).`,
-        );
-      }
+        body: JSON.stringify({ id: deletingBatch.id }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(result?.error || "Failed to delete batch.");
 
       await fetchBatches();
       await fetchTotalStudents();
       setShowDeleteConfirm(false);
       setDeletingBatch(null);
-    } catch (error) {
-      console.error("Failed to delete batch:", error);
+    } catch (e) {
+      console.error("Failed to delete batch:", e);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const filteredBatches = batches.filter((batch) =>
-    batch.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-  const sortedBatches = [...filteredBatches].sort((a, b) => {
-    const aDate = a.start_date || a.created_at || "";
-    const bDate = b.start_date || b.created_at || "";
-    return aDate.localeCompare(bDate);
-  });
+  // ─── Derived lists ──────────────────────────────────────────────────────────
+
+  const filteredBatches = batches
+    .filter((b) => b.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => (a.start_date || a.created_at || "").localeCompare(b.start_date || b.created_at || ""));
 
   const stats = [
-    {
-      label: "Total Batches",
-      value: batches.length.toString(),
-      icon: ICONS.BATCH,
-    },
-    {
-      label: "Total Students",
-      value: totalStudents.toString(),
-      icon: ICONS.USERS,
-    },
-    {
-      label: "Published",
-      value: batches.length.toString(),
-      icon: ICONS.GLOBE,
-    },
+    { label: "Total Batches", value: String(batches.length), icon: ICONS.BATCH },
+    { label: "Total Students", value: String(totalStudents), icon: ICONS.USERS },
+    { label: "Published", value: String(batches.length), icon: ICONS.GLOBE },
   ];
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8">
+
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
-              Manage Batches
-            </h1>
-            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
-              Create, edit, and publish your batch catalog.
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>Manage Batches</h1>
+            <p className={`${TYPOGRAPHY.BODY.fontSize} ${TYPOGRAPHY.BODY.lineHeight} ${TYPOGRAPHY.BODY.fontWeight} text-gray-600`}>
+              Create, edit, and manage your batch catalog.
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setIsEditing(false);
-              setEditingBatchId(null);
-              setBatchName("");
-              setBatchDescription("");
-              setScheduleType("weekday");
-              setCreated_At("");
-              setSelectedUsers([]);
-              setSelectedCourses([]);
-              setUserSelectOptions(buildUserSelectOptions(users));
-              setCourseSelectOptions(buildCourseSelectOptions(courses));
-              setBatchThumbnail(null);
-              setBatchThumbnailPreview("");
-              setModalMessage(null);
-              setIsLoadingAssignments(false);
-              void fetchUsers();
-              setShowModal(true);
-            }}
-            className="w-full justify-center sm:w-auto"
-          >
+          <Button onClick={handleOpenCreate} className="w-full justify-center sm:w-auto">
             <Plus className="w-4 h-4" />
             New Batch
           </Button>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
-            >
+            <div key={stat.label} className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4">
               <div className="flex items-center justify-center shrink-0">
-                <Image
-                  src={stat.icon}
-                  alt={stat.label}
-                  width={40}
-                  height={40}
-                />
+                <Image src={stat.icon} alt={stat.label} width={40} height={40} />
               </div>
-
               <div className="flex flex-col">
-                <span
-                  className="text-2xl font-bold"
-                  style={{
-                    color: "var(--color-primary)",
-                    fontFamily: "var(--font-primary)",
-                  }}
-                >
+                <span className="text-2xl font-bold" style={{ color: "var(--color-primary)", fontFamily: "var(--font-primary)" }}>
                   {stat.value}
                 </span>
-
-                <span
-                  className="text-sm"
-                  style={{
-                    color: "var(--color-text-secondary)",
-                    fontFamily: "var(--font-primary)",
-                  }}
-                >
+                <span className="text-sm" style={{ color: "var(--color-text-secondary)", fontFamily: "var(--font-primary)" }}>
                   {stat.label}
                 </span>
               </div>
@@ -818,13 +482,10 @@ export default function AdminBatches() {
           ))}
         </div>
 
-        {/* Batches Grid */}
+        {/* Batch Catalog */}
         <div>
-          {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-4 mt-12 mb-6">
-            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-              Batch Catalog
-            </h2>
+            <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Batch Catalog</h2>
             <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -837,83 +498,55 @@ export default function AdminBatches() {
             </div>
           </div>
 
-          {/* Loading State */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
               <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
-              <p className="text-sm font-medium text-gray-500">
-                Loading your catalog...
-              </p>
+              <p className="text-sm font-medium text-gray-500">Loading your catalog...</p>
             </div>
           )}
 
-          {/* Empty State */}
           {!loading && filteredBatches.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                 <BookOpen className="w-8 h-8 text-gray-400" />
               </div>
               <p className="text-lg text-gray-900 font-bold mb-2">
-                {searchTerm
-                  ? "No batches match your search"
-                  : "Your catalog is empty"}
+                {searchTerm ? "No batches match your search" : "Your catalog is empty"}
               </p>
               {!searchTerm && (
-                <p className="text-sm text-gray-500 mb-6 max-w-md">
-                  Create your first batch to get started.
-                </p>
-              )}
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2 shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Batch
-                </button>
+                <>
+                  <p className="text-sm text-gray-500 mb-6 max-w-md">Create your first batch to get started.</p>
+                  <button
+                    onClick={handleOpenCreate}
+                    className="bg-brand-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors inline-flex items-center gap-2 shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Create Batch
+                  </button>
+                </>
               )}
             </div>
           )}
 
-          {/* Batches Carousel */}
           {!loading && filteredBatches.length > 0 && (
             <div className="relative">
-              <Carousel
-                opts={{
-                  align: "start",
-                  loop: false,
-                  dragFree: true,
-                }}
-                className="w-full"
-              >
+              <Carousel opts={{ align: "start", loop: false, dragFree: true }} className="w-full">
                 <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-                  {sortedBatches.map((batch) => (
-                    <CarouselItem
-                      key={batch.id}
-                      className="
-  pl-4
-  sm:pl-6
-  basis-[85vw]
-sm:basis-1/2
-lg:basis-1/3
-"
-                    >
+                  {filteredBatches.map((batch) => (
+                    <CarouselItem key={batch.id} className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3">
                       <CourseCard
                         id={batch.id}
                         title={batch.name}
-                        description={batch.description}
-                        thumbnail={batch.thumbnail_url || undefined}
-                        batchScheduleTypes={[
-                          batch.schedule_type === "weekend" ? "weekend" : "weekday",
-                        ]}
+                        description={batch.description || batch.course_title || ""}
+                        thumbnail={batch.course_thumbnail_url ?? undefined}
+                        batchScheduleTypes={[batch.schedule_type === "weekend" ? "weekend" : "weekday"]}
                         variant="admin"
+                        onClick={() => router.push(`/admin/batches/${batch.id}`)}
                         onEdit={() => handleEdit(batch)}
                         onDelete={() => handleDeleteClick(batch)}
                       />
                     </CarouselItem>
                   ))}
                 </CarouselContent>
-
                 <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
                 <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
               </Carousel>
@@ -922,31 +555,46 @@ lg:basis-1/3
         </div>
       </div>
 
-      {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
+      {/* ─── CREATE / EDIT MODAL ─── */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
               <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                 {isEditing ? "Edit Batch" : "Create New Batch"}
               </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
+              <button onClick={() => setShowModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div
-              className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400"
-              style={{
-                maxHeight: "calc(90vh - 180px)",
-                scrollBehavior: "smooth",
-              }}
-            >
+            <div className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400" style={{ maxHeight: "calc(90vh - 130px)" }}>
+
+              {/* 1. Course selector (single) */}
+              <div>
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <BookOpen size={14} /> Course
+                </label>
+                <Select
+                  isLoading={isLoadingAssignmentOptions}
+                  isDisabled={isLoadingAssignmentOptions}
+                  options={courseSelectOptions}
+                  value={courseSelectOptions.find((o) => o.value === selectedCourseId) ?? null}
+                  onChange={(opt) => setSelectedCourseId(opt?.value ?? "")}
+                  placeholder="Select course..."
+                  isClearable
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                  styles={{
+                    menuPortal: (b) => ({ ...b, zIndex: 9999 }),
+                    option: (b) => ({ ...b, color: "#000" }),
+                    input: (b) => ({ ...b, color: "#000" }),
+                    singleValue: (b) => ({ ...b, color: "#000" }),
+                    control: (b) => ({ ...b, minHeight: "46px", borderColor: "#e5e7eb", boxShadow: "none" }),
+                  }}
+                />
+              </div>
+
+              {/* 2. Assign Members */}
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Users size={14} /> Assign Members
@@ -957,219 +605,76 @@ lg:basis-1/3
                   isDisabled={isLoadingAssignments || isLoadingAssignmentOptions}
                   options={userSelectOptions}
                   value={selectedUsers}
-                  onChange={(value) =>
-                    setSelectedUsers((value ?? []) as readonly BatchOption[])
-                  }
-                  placeholder="Select usernames..."
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : null
-                  }
+                  onChange={(v) => setSelectedUsers((v ?? []) as readonly BatchOption[])}
+                  placeholder="Select members..."
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : null}
                   styles={{
-                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                    option: (base) => ({ ...base, color: "#000000" }),
-                    input: (base) => ({ ...base, color: "#000000" }),
-                    singleValue: (base) => ({ ...base, color: "#000000" }),
-                    multiValueLabel: (base) => ({ ...base, color: "#000000" }),
-                    control: (base) => ({
-                      ...base,
-                      minHeight: "46px",
-                      borderColor: "#e5e7eb",
-                      boxShadow: "none",
-                    }),
-                  }}
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <BookOpen size={14} /> Courses
-                </label>
-                <Select
-                  isMulti={true}
-                  isLoading={isLoadingAssignments || isLoadingAssignmentOptions}
-                  isDisabled={isLoadingAssignments || isLoadingAssignmentOptions}
-                  options={courseSelectOptions}
-                  value={selectedCourses}
-                  onChange={(value) =>
-                    setSelectedCourses((value ?? []) as readonly BatchOption[])
-                  }
-                  placeholder="Select one or more courses..."
-                  menuPortalTarget={
-                    typeof window !== "undefined" ? document.body : null
-                  }
-                  styles={{
-                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                    option: (base) => ({ ...base, color: "#000000" }),
-                    input: (base) => ({ ...base, color: "#000000" }),
-                    singleValue: (base) => ({ ...base, color: "#000000" }),
-                    multiValueLabel: (base) => ({ ...base, color: "#000000" }),
-                    control: (base) => ({
-                      ...base,
-                      minHeight: "46px",
-                      borderColor: "#e5e7eb",
-                      boxShadow: "none",
-                    }),
+                    menuPortal: (b) => ({ ...b, zIndex: 9999 }),
+                    option: (b) => ({ ...b, color: "#000" }),
+                    input: (b) => ({ ...b, color: "#000" }),
+                    multiValueLabel: (b) => ({ ...b, color: "#000" }),
+                    control: (b) => ({ ...b, minHeight: "46px", borderColor: "#e5e7eb", boxShadow: "none" }),
                   }}
                 />
               </div>
 
-              {/* Title */}
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <LayoutTemplate size={14} /> Batch Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Advanced Epistemology"
-                  value={batchName}
-                  onChange={(e) => setBatchName(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText size={14} /> Description
-                </label>
-                <textarea
-                  placeholder="Brief details about the event..."
-                  value={batchDescription}
-                  onChange={(e) => setBatchDescription(e.target.value)}
-                  rows={3}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all resize-y text-black"
-                />
-              </div>
-
+              {/* 3. Schedule */}
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
                   Batch Schedule
                 </label>
                 <div className="flex flex-wrap gap-6">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="batchScheduleType"
-                      checked={scheduleType === "weekday"}
-                      onChange={() => setScheduleType("weekday")}
-                      className="accent-brand-primary"
-                    />
+                    <input type="radio" name="batchScheduleType" checked={scheduleType === "weekday"} onChange={() => setScheduleType("weekday")} className="accent-brand-primary" />
                     Weekday Batch
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="batchScheduleType"
-                      checked={scheduleType === "weekend"}
-                      onChange={() => setScheduleType("weekend")}
-                      className="accent-brand-primary"
-                    />
+                    <input type="radio" name="batchScheduleType" checked={scheduleType === "weekend"} onChange={() => setScheduleType("weekend")} className="accent-brand-primary" />
                     Weekend Batch
                   </label>
                 </div>
               </div>
 
-              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileText size={14} /> Date
-              </label>
-              <input
-                type="date"
-                value={created_at}
-                onChange={(e) => setCreated_At(e.target.value)}
-                className="
-                  w-full
-                  bg-[#1682F1]/10
-                  border
-                  border-[#1682F1]/20
-                  rounded-xl
-                  px-4
-                  py-3
-                  text-sm
-                  text-[#174778]
-                  font-semibold
-                  outline-none
-                  focus:border-[#1682F1]
-                  focus:ring-2
-                  focus:ring-[#1682F1]/20
-                  transition-all
-                  cursor-pointer
-                "
-              />
-
-              {/* Thumbnail Upload */}
+              {/* 4. Start date */}
               <div>
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText size={14} /> Batch Thumbnail (Optional)
+                  <FileText size={14} /> Start Date
                 </label>
-                <div className="space-y-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleThumbnailChange}
-                    disabled={isUploadingThumbnail}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50/50 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-all text-black file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-primary file:text-white hover:file:bg-brand-hover disabled:opacity-60"
-                  />
-                  {batchThumbnailPreview && (
-                    <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                      <div
-                        role="img"
-                        aria-label="Batch thumbnail preview"
-                        className="w-full h-32 bg-cover bg-center"
-                        style={{
-                          backgroundImage: `url("${batchThumbnailPreview}")`,
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBatchThumbnail(null);
-                          setBatchThumbnailPreview("");
-                        }}
-                        className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                  <p className="text-[10px] text-gray-500">
-                    Max file size: 5MB. Recommended: 1200×675px. JPG, PNG, WebP
-                    supported.
-                  </p>
-                </div>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-semibold outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
+                />
               </div>
 
-              {/* Submit Button */}
+              {/* Generated batch name preview */}
+              {previewBatchName && (
+                <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Generated Batch Name</p>
+                  <p className="text-sm font-bold text-gray-900">{previewBatchName}</p>
+                </div>
+              )}
+
               {modalMessage && (
-                <div
-                  className={`text-sm px-3 py-2 rounded-lg ${modalMessage.type === "success"
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-                    }`}
-                >
+                <div className={`text-sm px-3 py-2 rounded-lg ${modalMessage.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
                   {modalMessage.text}
                 </div>
               )}
+
               <button
                 onClick={handleSaveBatch}
-                disabled={
-                  isSaving ||
-                  isUploadingThumbnail ||
-                  isLoadingAssignments ||
-                  isLoadingAssignmentOptions
-                }
+                disabled={isSaving || isLoadingAssignments || isLoadingAssignmentOptions}
                 className="w-full bg-brand-primary hover:bg-brand-hover text-white py-3.5 rounded-lg text-sm font-semibold transition-all shadow-sm mt-2 disabled:opacity-60"
               >
-                {isSaving || isUploadingThumbnail
-                  ? "Saving..."
-                  : isEditing
-                    ? "Update Batch"
-                    : "Create Batch"}
+                {isSaving ? "Saving..." : isEditing ? "Update Batch" : "Create Batch"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* â”€â”€â”€ DELETE CONFIRMATION MODAL â”€â”€â”€ */}
+      {/* ─── DELETE CONFIRMATION MODAL ─── */}
       {showDeleteConfirm && deletingBatch && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -1177,21 +682,14 @@ lg:basis-1/3
               <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
-                Delete Batch
-              </h3>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Delete Batch</h3>
               <p className="text-sm text-gray-500 text-center">
-                Are you sure you want to delete{" "}
-                <strong className="text-gray-900">{deletingBatch.name}</strong>?
-                This action cannot be undone.
+                Are you sure you want to delete <strong className="text-gray-900">{deletingBatch.name}</strong>? This action cannot be undone.
               </p>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeletingBatch(null);
-                }}
+                onClick={() => { setShowDeleteConfirm(false); setDeletingBatch(null); }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -1209,9 +707,9 @@ lg:basis-1/3
         </div>
       )}
 
-      {/* â”€â”€â”€ TOAST NOTIFICATION â”€â”€â”€ */}
+      {/* ─── TOAST ─── */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-[100] transform transition-all duration-300 translate-y-0 opacity-100">
+        <div className="fixed bottom-6 right-6 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-[100]">
           <CheckCircle className="w-5 h-5" />
           <span className="font-medium text-sm">{toastMessage}</span>
         </div>

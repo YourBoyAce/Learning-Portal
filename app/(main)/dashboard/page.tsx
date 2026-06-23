@@ -192,6 +192,36 @@ export default function Dashboard() {
 
     setProfile((fetchedProfile ?? null) as Profile | null);
 
+    // Build a map of courseId → batchId for this user's batch memberships
+    const userBatchIdsByCourseId = new Map<string, string>();
+    const userEmailForBatch = user.email?.trim().toLowerCase() || "";
+    if (userEmailForBatch) {
+      const { data: batchMemberRows } = await supabase
+        .from("batch_members")
+        .select("batch_id")
+        .eq("email", userEmailForBatch);
+
+      if (batchMemberRows && batchMemberRows.length > 0) {
+        const batchIds = batchMemberRows.map((r: any) => String(r.batch_id));
+        const { data: batchRows } = await supabase
+          .from("batches")
+          .select("id, course_id")
+          .in("id", batchIds);
+
+        for (const batch of batchRows ?? []) {
+          if (batch.course_id) {
+            userBatchIdsByCourseId.set(String(batch.course_id), String(batch.id));
+          }
+        }
+      }
+    }
+
+    // Helper: modules belong to the course, not the batch.
+    // All modules from the parent course are available to all batches.
+    const scopeModulesToBatch = (_courseId: string, modules: any[]): any[] => {
+      return modules;
+    };
+
     // Fetch enrolled courses
     const { data: enrollmentsData } = await supabase
       .from("course_enrollments")
@@ -241,11 +271,13 @@ export default function Dashboard() {
 
         // First pass: partially completed courses
         for (const course of mappedCourses) {
-          const { data: modules } = await supabase
+          const { data: rawModules } = await supabase
             .from("coursemodules")
             .select("*")
             .eq("maincourse_id", course.id)
             .order("order_index", { ascending: true });
+
+          const modules = scopeModulesToBatch(String(course.id), rawModules ?? []);
 
           if (!modules?.length) continue;
 
@@ -285,11 +317,13 @@ export default function Dashboard() {
         // If no partially completed course found, find first course with incomplete module
         if (!selectedCourse) {
           for (const course of mappedCourses) {
-            const { data: modules } = await supabase
+            const { data: rawModules } = await supabase
               .from("coursemodules")
               .select("*")
               .eq("maincourse_id", course.id)
               .order("order_index", { ascending: true });
+
+            const modules = scopeModulesToBatch(String(course.id), rawModules ?? []);
 
             if (!modules?.length) continue;
 
@@ -332,13 +366,15 @@ export default function Dashboard() {
         let allCompletedVideoIds: string[] = [];
 
         for (const course of mappedCourses) {
-          const { data: courseModules } = await supabase
+          const { data: rawCourseModules } = await supabase
             .from("coursemodules")
             .select("*")
             .eq("maincourse_id", course.id)
             .order("order_index", { ascending: true, nullsFirst: false })
             .order("created_at", { ascending: true })
             .order("id", { ascending: true });
+
+          const courseModules = scopeModulesToBatch(String(course.id), rawCourseModules ?? []);
 
           if (courseModules && courseModules.length > 0) {
             allModules = [...allModules, ...courseModules];
@@ -436,13 +472,15 @@ export default function Dashboard() {
         const courseProgressMap = new Map<string, Map<string, { completed: boolean }>>();
 
         for (const course of mappedCourses) {
-          const { data: courseModules } = await supabase
+          const { data: rawCourseModules2 } = await supabase
             .from("coursemodules")
             .select("*")
             .eq("maincourse_id", course.id)
             .order("order_index", { ascending: true, nullsFirst: false })
             .order("created_at", { ascending: true })
             .order("id", { ascending: true });
+
+          const courseModules = scopeModulesToBatch(String(course.id), rawCourseModules2 ?? []);
 
           if (courseModules && courseModules.length > 0) {
             courseModulesMap.set(course.id, courseModules);
@@ -1083,66 +1121,57 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Active Studies Grid / Carousel */}
+        {/* Active Studies Grid / Carousel — driven by batch enrollments */}
         {(() => {
-          const activeCourses = enrolledCourses.filter(
-            (course) => (courseProgress[String(course.id)]?.progressPercentage || 0) < 100
+          // Use batch-based enrollments as the primary data source.
+          // Progress is still keyed by courseId (that's where user_video_progress rows live).
+          const activeEnrollments = enrollments.filter(
+            (e) => (courseProgress[String(e.courseId)]?.progressPercentage || 0) < 100
           );
-          const completedCourses = enrolledCourses.filter(
-            (course) => (courseProgress[String(course.id)]?.progressPercentage || 0) === 100
+          const completedEnrollments = enrollments.filter(
+            (e) => (courseProgress[String(e.courseId)]?.progressPercentage || 0) === 100
           );
 
           return (
             <>
-              {activeCourses.length > 0 && (
+              {activeEnrollments.length > 0 && (
                 <div className="mb-12 relative px-0 sm:px-4 md:px-0">
                   <div className="flex items-center justify-between mb-5">
                     <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
                       Active Studies
                     </h2>
                     <span className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">
-                      {activeCourses.length} Courses in Progress
+                      {activeEnrollments.length} Batches in Progress
                     </span>
                   </div>
 
                   <Carousel
-                    opts={{
-                      align: "start",
-                      loop: false,
-                      dragFree: true, // Allows smooth swiping like native mobile apps
-                    }}
+                    opts={{ align: "start", loop: false, dragFree: true }}
                     className="w-full"
                   >
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-                      {activeCourses.map((course) => (
+                      {activeEnrollments.map((enrollment) => (
                         <CarouselItem
-                          key={course.id}
-                          className="
-            pl-4
-            sm:pl-6
-            basis-[85vw]
-            sm:basis-1/2
-            lg:basis-1/3
-          "
+                          key={String(enrollment.batchId)}
+                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard
-                            id={course.id}
-                            title={course.title}
-                            description={course.description}
-                            thumbnail={course.thumbnail_url}
+                            id={String(enrollment.courseId ?? enrollment.batchId)}
+                            title={enrollment.batchName}
+                            description={enrollment.courseTitle}
+                            thumbnail={(enrollment as any).courseThumbnail || undefined}
                             progressPercentage={
-                              courseProgress[String(course.id)]
-                                ?.progressPercentage || 0
+                              courseProgress[String(enrollment.courseId)]?.progressPercentage || 0
                             }
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(course.id)}
+                            onClick={() => handleOpenCourse(enrollment.courseId ?? enrollment.batchId)}
                           />
                         </CarouselItem>
                       ))}
                     </CarouselContent>
 
-                    {activeCourses.length > 1 && (
+                    {activeEnrollments.length > 1 && (
                       <>
                         <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
                         <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 hover:text-brand-hover h-8 w-8 lg:h-12 lg:w-12 z-10" />
@@ -1153,7 +1182,7 @@ export default function Dashboard() {
               )}
 
               {/* Completed Courses Section */}
-              {completedCourses.length > 0 && (
+              {completedEnrollments.length > 0 && (
                 <div className="mb-12 relative px-0 sm:px-4 md:px-0">
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2">
@@ -1163,45 +1192,35 @@ export default function Dashboard() {
                       <CheckCircle2 className="w-6 h-6 text-green-500" />
                     </div>
                     <span className="text-[10px] font-black text-green-600 uppercase tracking-[0.3em]">
-                      {completedCourses.length} Completed
+                      {completedEnrollments.length} Completed
                     </span>
                   </div>
 
                   <Carousel
-                    opts={{
-                      align: "start",
-                      loop: false,
-                      dragFree: true,
-                    }}
+                    opts={{ align: "start", loop: false, dragFree: true }}
                     className="w-full"
                   >
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-                      {completedCourses.map((course) => (
+                      {completedEnrollments.map((enrollment) => (
                         <CarouselItem
-                          key={course.id}
-                          className="
-            pl-4
-            sm:pl-6
-            basis-[85vw]
-            sm:basis-1/2
-            lg:basis-1/3
-          "
+                          key={String(enrollment.batchId)}
+                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard
-                            id={course.id}
-                            title={course.title}
-                            description={course.description}
-                            thumbnail={course.thumbnail_url}
+                            id={String(enrollment.courseId ?? enrollment.batchId)}
+                            title={enrollment.batchName}
+                            description={enrollment.courseTitle}
+                            thumbnail={(enrollment as any).courseThumbnail || undefined}
                             progressPercentage={100}
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(course.id)}
+                            onClick={() => handleOpenCourse(enrollment.courseId ?? enrollment.batchId)}
                           />
                         </CarouselItem>
                       ))}
                     </CarouselContent>
 
-                    {completedCourses.length > 1 && (
+                    {completedEnrollments.length > 1 && (
                       <>
                         <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />
                         <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-green-600 hover:bg-gray-50 hover:text-green-700 h-8 w-8 lg:h-12 lg:w-12 z-10" />

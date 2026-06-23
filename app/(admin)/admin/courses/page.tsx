@@ -33,8 +33,6 @@ interface Course {
   created_at?: string;
   category?: string;
   course_type?: string;
-  batch_name?: string | null;
-  batch_schedule_types?: ("weekday" | "weekend")[];
 }
 
 export default function AdminCourses() {
@@ -53,7 +51,7 @@ export default function AdminCourses() {
   const [courseDescription, setCourseDescription] = useState("");
   const [modules, setModules] = useState<
     Array<{ id?: string | number; title: string; description: string }>
-  >([{ title: "", description: "" }]);
+  >([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -106,12 +104,10 @@ export default function AdminCourses() {
   const handleCreateNew = () => {
     setIsEditing(false);
     setEditingCourseId(null);
-
     setCourseType("active");
-
     setCourseTitle("");
     setCourseDescription("");
-    setModules([{ title: "", description: "" }]);
+    setModules([]);
     setThumbnailFile(null);
     setThumbnailPreview("");
     setModalMessage(null);
@@ -129,42 +125,32 @@ export default function AdminCourses() {
     setModalMessage(null);
     setShowModal(true);
 
+    // Load existing modules for this course
     try {
       const { data, error } = await supabase
         .from("coursemodules")
-        .select("*")
+        .select("id, title, description")
         .eq("maincourse_id", course.id)
         .order("order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true });
-
-      if (error) throw error;
-      if (data && data.length > 0) {
-        setModules(
-          data.map((m) => ({
-            id: m.id,
-            title: m.title,
-            description: m.description || "",
-          }))
-        );
-      } else {
-        setModules([]);
+      if (!error && data && data.length > 0) {
+        setModules(data.map((m) => ({ id: m.id, title: m.title, description: m.description || "" })));
       }
     } catch (err) {
       console.error("Failed to fetch modules:", err);
-      setModules([]);
     }
   };
 
-  const handleAddModule = () => {
-    setModules([...modules, { title: "", description: "" }]);
-  };
+  const handleAddModule = () => setModules([...modules, { title: "", description: "" }]);
 
   const handleModuleChange = (index: number, field: "title" | "description", value: string) => {
-    const newModules = [...modules];
-    newModules[index][field] = value;
-    setModules(newModules);
+    const next = [...modules];
+    next[index] = { ...next[index], [field]: value };
+    setModules(next);
   };
+
+  const handleRemoveModule = (index: number) => setModules(modules.filter((_, i) => i !== index));
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -174,24 +160,9 @@ export default function AdminCourses() {
     }
   };
 
-  const handleRemoveModule = (index: number) => {
-    setModules(modules.filter((_, i) => i !== index));
-  };
-
   const handleSaveCourse = async () => {
     const title = courseTitle.trim();
     const description = courseDescription.trim();
-    const validModules =
-      courseType === "active"
-        ? modules
-          .filter((m) => m.title.trim())
-          .map((m) => ({
-            ...(m.id && { id: m.id }),
-            title: m.title.trim(),
-            description: m.description.trim(),
-          }))
-        : [];
-
 
     if (!courseTitle || (courseType === "active" && !courseDescription)) {
       setModalMessage({
@@ -239,7 +210,6 @@ export default function AdminCourses() {
       }
 
       if (isEditing && editingCourseId) {
-        // Update existing course
         const response = await fetch("/api/admin/courses", {
           method: "PUT",
           headers: {
@@ -251,19 +221,22 @@ export default function AdminCourses() {
             title,
             description: courseType === "active" ? description : null,
             ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
-            modules: courseType === "active" ? validModules : [],
             course_type: courseType,
+            modules: courseType === "active"
+              ? modules.filter((m) => m.title.trim()).map((m) => ({
+                  ...(m.id && { id: m.id }),
+                  title: m.title.trim(),
+                  description: m.description.trim(),
+                }))
+              : [],
           }),
         });
 
         const result = await response.json().catch(() => null);
         if (!response.ok) {
-          throw new Error(
-            result?.error || `Request failed (${response.status}).`,
-          );
+          throw new Error(result?.error || `Request failed (${response.status}).`);
         }
       } else {
-        // Create new course
         const response = await fetch("/api/admin/courses", {
           method: "POST",
           headers: {
@@ -274,16 +247,19 @@ export default function AdminCourses() {
             title,
             description: courseType === "active" ? description : null,
             ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
-            modules: courseType === "active" ? validModules : [],
             course_type: courseType,
+            modules: courseType === "active"
+              ? modules.filter((m) => m.title.trim()).map((m) => ({
+                  title: m.title.trim(),
+                  description: m.description.trim(),
+                }))
+              : [],
           }),
         });
 
         const result = await response.json().catch(() => null);
         if (!response.ok) {
-          throw new Error(
-            result?.error || `Request failed (${response.status}).`,
-          );
+          throw new Error(result?.error || `Request failed (${response.status}).`);
         }
       }
 
@@ -291,6 +267,7 @@ export default function AdminCourses() {
       setShowModal(false);
       setCourseTitle("");
       setCourseDescription("");
+      setModules([]);
       setThumbnailFile(null);
       setThumbnailPreview("");
     } catch (error) {
@@ -543,8 +520,6 @@ export default function AdminCourses() {
                             title={course.title}
                             description={course.description}
                             thumbnail={course.thumbnail_url}
-                            batchName={course.batch_name}
-                            batchScheduleTypes={course.batch_schedule_types}
                             courseStatus="active"
                             variant="admin"
                             onClick={() =>
@@ -729,9 +704,11 @@ ${courseType === "upcoming"
                   </label>
                 )}
               </div>
+
+              {/* Modules — only for active courses */}
               {courseType === "active" && (
                 <div className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center justify-between">
                     <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                       Modules (Optional)
                     </label>
@@ -740,30 +717,23 @@ ${courseType === "upcoming"
                       onClick={handleAddModule}
                       className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
                     >
-                      <Plus className="w-3 h-3" />
-                      Add Module
+                      <Plus className="w-3 h-3" /> Add Module
                     </button>
                   </div>
-
                   {modules.map((module, index) => (
                     <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <input
-                            type="text"
-                            placeholder={`Module ${index + 1} Title`}
-                            value={module.title}
-                            onChange={(e) =>
-                              handleModuleChange(index, "title", e.target.value)
-                            }
-                            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          placeholder={`Module ${index + 1} Title`}
+                          value={module.title}
+                          onChange={(e) => handleModuleChange(index, "title", e.target.value)}
+                          className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
+                        />
                         <button
                           type="button"
                           onClick={() => handleRemoveModule(index)}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                          title="Remove Module"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -771,14 +741,17 @@ ${courseType === "upcoming"
                       <textarea
                         placeholder={`Description for Module ${index + 1} (optional)`}
                         value={module.description}
-                        onChange={(e) =>
-                          handleModuleChange(index, "description", e.target.value)
-                        }
+                        onChange={(e) => handleModuleChange(index, "description", e.target.value)}
                         rows={2}
                         className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
                       />
                     </div>
                   ))}
+                  {modules.length === 0 && (
+                    <p className="text-xs text-gray-400 italic">
+                      No modules yet. All batches will inherit modules from this course.
+                    </p>
+                  )}
                 </div>
               )}
 

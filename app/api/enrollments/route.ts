@@ -14,7 +14,6 @@ type BatchRow = {
   name: string | null;
   course_id: number | string | null;
   start_date: string | null;
-  thumbnail_url?: string | null;
 };
 
 type CourseRow = {
@@ -98,7 +97,7 @@ export async function GET(request: Request) {
 
   const { data: batchRows, error: batchError } = await authContext.supabaseAdmin
     .from("batches")
-    .select("id, name, course_id, start_date, thumbnail_url")
+    .select("id, name, course_id, start_date")
     .in("id", batchIds)
     .order("start_date", { ascending: true });
 
@@ -133,9 +132,7 @@ export async function GET(request: Request) {
 
   const enrollments = ((batchRows ?? []) as BatchRow[]).map((batch) => {
     const course = batch.course_id ? courseById.get(String(batch.course_id)) : null;
-    
-    // Prioritize batch thumbnail, fall back to course thumbnail
-    const thumbnailUrl = batch.thumbnail_url || course?.thumbnail_url || "";
+    const thumbnailUrl = course?.thumbnail_url || "";
 
     return {
       batchId: batch.id,

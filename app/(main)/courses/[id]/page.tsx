@@ -12,6 +12,7 @@ import {
   PlayCircle,
   CheckCircle2,
   ChevronLeft,
+  ChevronDown,
   Clock,
   BookOpen,
   Loader2,
@@ -53,6 +54,13 @@ interface Module {
   created_at?: string | null;
   duration: string;
   order_index: number;
+}
+
+interface BatchGroup {
+  id: string;
+  name: string;
+  schedule_type: string | null;
+  modules: Module[];
 }
 
 const ARTIFACT_STORAGE_BUCKET =
@@ -148,6 +156,10 @@ export default function CoursePlayerPage() {
   // Added userId to state so we can pass it down to the video player
   const [userId, setUserId] = useState<string | null>(null);
   const [userBatchIds, setUserBatchIds] = useState<string[]>([]);
+
+  // Batch accordion state
+  const [batchGroups, setBatchGroups] = useState<BatchGroup[]>([]);
+  const [expandedBatchIds, setExpandedBatchIds] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
 
@@ -438,12 +450,24 @@ export default function CoursePlayerPage() {
       setUserId(user.id);
 
       const userEmail = user.email?.trim().toLowerCase() || "";
+      let userBatchIdsForCourse: string[] = [];
       if (userEmail) {
         const { data: batchRows } = await supabase
           .from("batch_members")
           .select("batch_id")
           .eq("email", userEmail);
-        setUserBatchIds((batchRows || []).map((r: any) => String(r.batch_id)));
+        const allBatchIds = (batchRows || []).map((r: any) => String(r.batch_id));
+        setUserBatchIds(allBatchIds);
+
+        // Find which of the user's batches belong to this specific course
+        if (allBatchIds.length > 0) {
+          const { data: courseBatches } = await supabase
+            .from("batches")
+            .select("id")
+            .in("id", allBatchIds)
+            .eq("course_id", String(id));
+          userBatchIdsForCourse = (courseBatches || []).map((b: any) => String(b.id));
+        }
       }
 
       const { data: courseData, error: courseError } = await supabase
@@ -456,17 +480,80 @@ export default function CoursePlayerPage() {
         throw courseError || new Error("Course not found");
       setCourse(courseData);
 
-      const { data: modulesData, error: modulesError } = await supabase
-        .from("coursemodules")
-        .select("*")
-        .eq("maincourse_id", id)
-        .order("order_index", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
+      // ── NEW: Fetch batches for this course, then modules per batch ──────────
+      // For admin: show ALL batches with their modules.
+      // For user:  only show batches the user belongs to.
+      const { data: allCourseBatches } = await supabase
+        .from("batches")
+        .select("id, name, schedule_type")
+        .eq("course_id", String(id))
+        .order("start_date", { ascending: true });
 
-      if (modulesError) throw modulesError;
-      const orderedModules = modulesData || [];
+      const batchesToShow = isAdminCoursePage
+        ? (allCourseBatches ?? [])
+        : (allCourseBatches ?? []).filter((b: any) =>
+            userBatchIdsForCourse.includes(String(b.id)),
+          );
+
+      const newBatchGroups: BatchGroup[] = [];
+      let allModulesFlat: any[] = [];
+
+      for (const batch of batchesToShow) {
+        // Modules belong to the course (via maincourse_id), not the batch directly.
+        // Load all course-level modules for each batch.
+        const { data: batchModules } = await supabase
+          .from("coursemodules")
+          .select("*")
+          .eq("maincourse_id", id)
+          .order("order_index", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+
+        const mods = batchModules ?? [];
+        newBatchGroups.push({
+          id: String(batch.id),
+          name: batch.name,
+          schedule_type: batch.schedule_type ?? null,
+          modules: mods,
+        });
+        // Only add modules once to the flat list (they're the same for all batches)
+        if (allModulesFlat.length === 0) {
+          allModulesFlat = [...mods];
+        }
+      }
+
+      // Fallback: if no batches found, load legacy course-level modules
+      if (newBatchGroups.length === 0) {
+        const { data: legacyModules, error: legacyError } = await supabase
+          .from("coursemodules")
+          .select("*")
+          .eq("maincourse_id", id)
+          .order("order_index", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+
+        if (legacyError) throw legacyError;
+        allModulesFlat = legacyModules ?? [];
+        // Wrap in a single unnamed group so the accordion still renders
+        if (allModulesFlat.length > 0) {
+          newBatchGroups.push({
+            id: "__legacy__",
+            name: courseData.title,
+            schedule_type: null,
+            modules: allModulesFlat,
+          });
+        }
+      }
+
+      setBatchGroups(newBatchGroups);
+      // Expand the first batch by default
+      if (newBatchGroups.length > 0) {
+        setExpandedBatchIds(new Set([newBatchGroups[0].id]));
+      }
+
+      const orderedModules = allModulesFlat;
       setModules(orderedModules);
+      // ── END batch fetch ──────────────────────────────────────────────────────
 
       let { data: progressData, error: progressError }: {
         data: any[] | null;
@@ -1046,6 +1133,13 @@ export default function CoursePlayerPage() {
         (moduleItem) => getModuleKey(moduleItem) !== deletedKey,
       );
       setModules(nextModules);
+      // Also remove from batchGroups so the accordion reflects the deletion
+      setBatchGroups((prev) =>
+        prev.map((bg) => ({
+          ...bg,
+          modules: bg.modules.filter((m) => getModuleKey(m) !== deletedKey),
+        })),
+      );
       setUserProgress((prev) => {
         const next = { ...prev };
         for (const progressId of getModuleProgressIds(mod)) {
@@ -1086,15 +1180,38 @@ export default function CoursePlayerPage() {
   };
 
   const renderModulesList = () => {
+    const toggleBatch = (batchId: string) => {
+      setExpandedBatchIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(batchId)) {
+          next.delete(batchId);
+        } else {
+          next.add(batchId);
+        }
+        return next;
+      });
+    };
+
+    // Flat module count across all batch groups
+    const totalModuleCount = batchGroups.reduce(
+      (sum, bg) => sum + bg.modules.length,
+      0,
+    );
+
+    // Per-batch completed count
+    const batchCompletedCount = (bg: BatchGroup) =>
+      bg.modules.filter((m) => userProgress[getModuleKey(m)]).length;
+
     return (
       <>
+        {/* Header */}
         <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
             Curriculum Outline
           </h3>
           <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
             <span className="flex items-center gap-1.5">
-              <BookOpen size={14} /> {modules.length} Modules
+              <BookOpen size={14} /> {totalModuleCount} Modules
             </span>
             <span className="flex items-center gap-1.5">
               <Clock size={14} /> {totalDuration || "—"}
@@ -1108,115 +1225,199 @@ export default function CoursePlayerPage() {
           </div>
         )}
 
-        {modules.map((mod, index) => {
-          const moduleKey = getModuleKey(mod);
-          const isActive = moduleKey === activeModuleId;
-          const isCompleted = userProgress[moduleKey];
+        {/* No content at all */}
+        {batchGroups.length === 0 && (
+          <div className="p-10 text-center text-gray-400">
+            <Loader2 size={32} className="mx-auto mb-4 animate-spin opacity-20" />
+            <p className="text-xs font-bold uppercase tracking-widest">
+              No modules available
+            </p>
+          </div>
+        )}
+
+        {/* Batch accordion sections */}
+        {batchGroups.map((bg) => {
+          const isExpanded = expandedBatchIds.has(bg.id);
+          const completed = batchCompletedCount(bg);
+          const total = bg.modules.length;
+          const scheduleLabel =
+            bg.schedule_type === "weekend"
+              ? "Weekend"
+              : bg.schedule_type === "weekday"
+              ? "Weekday"
+              : null;
+
+          // Accumulate a global module index across all batches for display numbers
+          const batchStartIndex = batchGroups
+            .slice(0, batchGroups.indexOf(bg))
+            .reduce((sum, b) => sum + b.modules.length, 0);
 
           return (
-            <div
-              key={mod.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                selectModule(moduleKey);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  selectModule(moduleKey);
-                }
-              }}
-              className={`relative w-full cursor-pointer text-left p-5 transition-all flex items-start gap-4 group ${isActive
-                ? "bg-blue-50/50 border-r-4 border-brand-heading"
-                : "hover:bg-gray-50"
+            <div key={bg.id} className="border-b border-gray-50 last:border-0">
+              {/* Accordion header */}
+              <button
+                type="button"
+                onClick={() => toggleBatch(bg.id)}
+                className={`w-full flex items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-gray-50 ${
+                  isExpanded ? "bg-blue-50/30" : ""
                 }`}
-            >
-              <div
-                className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${isCompleted
-                  ? "bg-emerald-500 border-emerald-500 text-white"
-                  : isActive
-                    ? "bg-brand-heading border-brand-heading text-white"
-                    : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
-                  }`}
               >
-                {isCompleted ? <CheckCircle2 size={14} /> : index + 1}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h4
-                  className={`text-sm font-bold mb-1 leading-snug transition-colors ${isActive
-                    ? "text-brand-heading"
-                    : "text-gray-900 group-hover:text-brand-heading"
-                    }`}
-                >
-                  {mod.title}
-                </h4>
-                {mod.description && (
-                  <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1.5">
-                    {mod.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                    <Clock size={10} /> {mod.duration || "—"}
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 text-gray-400 transition-transform duration-200 ${
+                    isExpanded ? "rotate-0" : "-rotate-90"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`text-sm font-bold leading-snug truncate ${
+                        isExpanded ? "text-brand-heading" : "text-gray-800"
+                      }`}
+                    >
+                      {bg.name}
+                    </span>
+                    {scheduleLabel && (
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                          bg.schedule_type === "weekend"
+                            ? "bg-purple-50 text-purple-700 border-purple-100"
+                            : "bg-amber-50 text-amber-800 border-amber-100"
+                        }`}
+                      >
+                        {scheduleLabel}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-semibold mt-0.5 block">
+                    {completed}/{total} completed
                   </span>
                 </div>
-              </div>
-
-              {isAdminCoursePage && (
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setOpenModuleMenuId((current) =>
-                        current === moduleKey ? null : moduleKey,
-                      );
-                    }}
-                    onKeyDown={(event) => event.stopPropagation()}
-                    className="rounded-lg p-1.5 text-gray-400 opacity-100 transition-colors hover:bg-white hover:text-gray-700 sm:opacity-0 sm:group-hover:opacity-100"
-                    aria-label={`Open actions for ${mod.title}`}
-                  >
-                    <MoreVertical size={16} />
-                  </button>
-
-                  {openModuleMenuId === moduleKey && (
+                {/* Batch progress bar */}
+                <div className="w-12 shrink-0">
+                  <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteModule(mod)}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        disabled={deletingModuleId === String(mod.id)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Trash2 size={14} />
-                        {deletingModuleId === String(mod.id)
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
+                      className="h-full bg-brand-heading rounded-full transition-all duration-500"
+                      style={{
+                        width: total > 0 ? `${Math.round((completed / total) * 100)}%` : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {/* Accordion body — modules */}
+              {isExpanded && (
+                <div className="bg-white">
+                  {bg.modules.length === 0 ? (
+                    <div className="px-5 py-4 text-xs text-gray-400 italic pl-12">
+                      No modules in this batch yet.
                     </div>
+                  ) : (
+                    bg.modules.map((mod, localIndex) => {
+                      const moduleKey = getModuleKey(mod);
+                      const isActive = moduleKey === activeModuleId;
+                      const isCompleted = !!userProgress[moduleKey];
+                      const globalIndex = batchStartIndex + localIndex;
+
+                      return (
+                        <div
+                          key={mod.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => selectModule(moduleKey)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              selectModule(moduleKey);
+                            }
+                          }}
+                          className={`relative w-full cursor-pointer text-left px-5 py-3.5 transition-all flex items-start gap-4 group pl-12 ${
+                            isActive
+                              ? "bg-blue-50/50 border-r-4 border-brand-heading"
+                              : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <div
+                            className={`mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                              isCompleted
+                                ? "bg-emerald-500 border-emerald-500 text-white"
+                                : isActive
+                                ? "bg-brand-heading border-brand-heading text-white"
+                                : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
+                            }`}
+                          >
+                            {isCompleted ? <CheckCircle2 size={13} /> : globalIndex + 1}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h4
+                              className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
+                                isActive
+                                  ? "text-brand-heading"
+                                  : "text-gray-900 group-hover:text-brand-heading"
+                              }`}
+                            >
+                              {mod.title}
+                            </h4>
+                            {mod.description && (
+                              <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1">
+                                {mod.description}
+                              </p>
+                            )}
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                              <Clock size={10} /> {mod.duration || "—"}
+                            </span>
+                          </div>
+
+                          {/* Admin delete menu */}
+                          {isAdminCoursePage && (
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenModuleMenuId((cur) =>
+                                    cur === moduleKey ? null : moduleKey,
+                                  );
+                                }}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                className="rounded-lg p-1.5 text-gray-400 opacity-100 transition-colors hover:bg-white hover:text-gray-700 sm:opacity-0 sm:group-hover:opacity-100"
+                                aria-label={`Open actions for ${mod.title}`}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+
+                              {openModuleMenuId === moduleKey && (
+                                <div
+                                  className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteModule(mod)}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    disabled={deletingModuleId === String(mod.id)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    <Trash2 size={14} />
+                                    {deletingModuleId === String(mod.id)
+                                      ? "Deleting..."
+                                      : "Delete"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
             </div>
           );
         })}
-
-        {modules.length === 0 && (
-          <div className="p-10 text-center text-gray-400">
-            <Loader2
-              size={32}
-              className="mx-auto mb-4 animate-spin opacity-20"
-            />
-            <p className="text-xs font-bold uppercase tracking-widest">
-              No modules available
-            </p>
-          </div>
-        )}
       </>
     );
   };

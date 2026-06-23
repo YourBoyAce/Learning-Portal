@@ -20,6 +20,12 @@ type Course = {
   course_type?: string;
 };
 
+type Batch = {
+  id: string | number;
+  name: string;
+  schedule_type?: string | null;
+};
+
 type Module = {
   id: string | number;
   title: string;
@@ -30,51 +36,49 @@ type Module = {
 export default function UploadPage() {
   const searchParams = useSearchParams();
   const preselectedCourseId = searchParams.get("courseId") || "";
+  const preselectedBatchId = searchParams.get("batchId") || "";
 
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
+
+  const [selectedCurriculum, setSelectedCurriculum] = useState(preselectedCourseId);
+  const [selectedBatchId, setSelectedBatchId] = useState(preselectedBatchId);
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(
-    null,
-  );
+  const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(null);
   const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState("");
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isBatchesLoading, setIsBatchesLoading] = useState(false);
   const [isModulesLoading, setIsModulesLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [courseTitle, setCourseTitle] = useState("");
-  const [courseDescription, setCourseDescription] = useState("");
-  const [isInitializingCourse, setIsInitializingCourse] = useState(false);
-  const [courseInitMessage, setCourseInitMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [isCoursesLoading, setIsCoursesLoading] = useState(true);
-  const [coursesError, setCoursesError] = useState<string | null>(null);
-  const [selectedCurriculum, setSelectedCurriculum] = useState("");
+
   const [isQueueingVideo, setIsQueueingVideo] = useState(false);
   const [videoQueueMessage, setVideoQueueMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  const fileNameDisplay = useMemo(
-    () => selectedFile?.name || "",
-    [selectedFile],
+  const fileNameDisplay = useMemo(() => selectedFile?.name || "", [selectedFile]);
+
+  // Only show active courses (not upcoming) in curriculum selector
+  const activeCourses = useMemo(
+    () => courses.filter((c) => c.course_type !== "upcoming"),
+    [courses],
   );
 
   const fetchCourses = async () => {
     try {
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-
       if (sessionError || !sessionData.session?.access_token) {
         throw new Error("Please log in again to continue.");
       }
@@ -87,16 +91,11 @@ export default function UploadPage() {
       });
 
       const result = await response.json().catch(() => null);
-
       if (!response.ok) {
-        throw new Error(
-          result?.error || `Request failed (${response.status}).`,
-        );
+        throw new Error(result?.error || `Request failed (${response.status}).`);
       }
 
-      const loadedCourses = Array.isArray(result?.courses)
-        ? result.courses
-        : [];
+      const loadedCourses = Array.isArray(result?.courses) ? result.courses : [];
       setCourses(loadedCourses);
       setError("");
     } catch (err) {
@@ -124,8 +123,65 @@ export default function UploadPage() {
     void init();
   }, []);
 
+  // When course changes, load its batches
   useEffect(() => {
     if (!selectedCurriculum) {
+      setBatches([]);
+      setSelectedBatchId("");
+      setModules([]);
+      setSelectedModuleId("");
+      return;
+    }
+
+    const fetchBatches = async () => {
+      setIsBatchesLoading(true);
+      setSelectedBatchId("");
+      setModules([]);
+      setSelectedModuleId("");
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session?.access_token) throw new Error("Not authenticated.");
+
+        // Fetch batches that belong to this course (via course_id or batch_courses junction)
+        const response = await fetch("/api/admin/batches", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(result?.error || "Failed to fetch batches.");
+
+        const allBatches: any[] = Array.isArray(result?.batches) ? result.batches : [];
+
+        // Filter batches that belong to this course
+        const courseBatches = allBatches.filter((b) => {
+          // direct FK
+          if (String(b.course_id) === String(selectedCurriculum)) return true;
+          // junction table
+          if (Array.isArray(b.batch_courses)) {
+            return b.batch_courses.some(
+              (bc: any) => String(bc.course_id) === String(selectedCurriculum),
+            );
+          }
+          return false;
+        });
+
+        setBatches(courseBatches);
+      } catch (err) {
+        console.error("Failed to fetch batches", err);
+        setBatches([]);
+      } finally {
+        setIsBatchesLoading(false);
+      }
+    };
+
+    fetchBatches();
+  }, [selectedCurriculum]);
+
+  // When batch changes, load its modules
+  useEffect(() => {
+    if (!selectedBatchId) {
       setModules([]);
       setSelectedModuleId("");
       return;
@@ -134,28 +190,59 @@ export default function UploadPage() {
     const fetchModules = async () => {
       setIsModulesLoading(true);
       try {
+        // Try fetching modules by batch_id first
         const { data, error } = await supabase
           .from("coursemodules")
           .select("id, title, created_at")
-          .eq("maincourse_id", selectedCurriculum)
+          .eq("batch_id", selectedBatchId)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          // batch_id column may not exist yet — fall back to course-level modules
+          console.warn("batch_id column not available, falling back to course-level modules:", error.message);
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("coursemodules")
+            .select("id, title, created_at")
+            .eq("maincourse_id", selectedCurriculum)
+            .order("order_index", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
 
-        setModules(data || []);
+          if (fallbackError) throw fallbackError;
+          setModules(fallbackData || []);
+          return;
+        }
+
+        // If no batch-specific modules found, fall back to course-level modules
+        // (for backward compat with modules created before batch_id was introduced)
+        if (!data || data.length === 0) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("coursemodules")
+            .select("id, title, created_at")
+            .eq("maincourse_id", selectedCurriculum)
+            .is("batch_id", null)
+            .order("order_index", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
+
+          if (fallbackError) throw fallbackError;
+          setModules(fallbackData || []);
+        } else {
+          setModules(data);
+        }
       } catch (err) {
         console.error("Failed to fetch modules", err);
         setModules([]);
-        setError("Failed to load modules for this curriculum.");
+        setError("Failed to load modules for this batch.");
       } finally {
         setIsModulesLoading(false);
       }
     };
 
     fetchModules();
-  }, [selectedCurriculum]);
+  }, [selectedBatchId, selectedCurriculum]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -196,12 +283,13 @@ export default function UploadPage() {
 
     if (
       !selectedCurriculum ||
+      !selectedBatchId ||
       !selectedModuleId ||
       !videoTitle.trim() ||
       !selectedFile
     ) {
       setError(
-        "Please select a curriculum, a module, add a video title, and choose a file.",
+        "Please select a course, a batch, a module, add a video title, and choose a file.",
       );
       return;
     }
@@ -216,17 +304,15 @@ export default function UploadPage() {
 
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-
       if (sessionError || !sessionData.session?.access_token) {
         throw new Error("Please log in again to continue.");
       }
 
       const fileSize = selectedFile.size;
-      const chunkSize = 190 * 1024 * 1024; // 190MB chunks (safe margin below 200MB limit)
+      const chunkSize = 190 * 1024 * 1024; // 190MB chunks
       const numChunks = Math.ceil(fileSize / chunkSize);
       const uploadedUIDs: string[] = [];
 
-      // Upload file in chunks
       for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
         const start = chunkIndex * chunkSize;
         const end = Math.min(start + chunkSize, fileSize);
@@ -238,7 +324,6 @@ export default function UploadPage() {
             : "",
         );
 
-        // 1. Get Direct Upload URL from Cloudflare for this chunk
         const directUploadResponse = await fetch(
           "/api/cloudflare/stream/direct-upload",
           {
@@ -253,6 +338,7 @@ export default function UploadPage() {
                   ? `${videoTitle.trim()} (Part ${chunkIndex + 1}/${numChunks})`
                   : videoTitle.trim(),
               courseId: selectedCurriculum,
+              batchId: selectedBatchId,
               moduleId: selectedModuleId,
             }),
           },
@@ -261,15 +347,13 @@ export default function UploadPage() {
         const directUploadResult = await directUploadResponse.json();
         if (!directUploadResponse.ok) {
           throw new Error(
-            directUploadResult.error ||
-            "Failed to initialize Cloudflare upload.",
+            directUploadResult.error || "Failed to initialize Cloudflare upload.",
           );
         }
 
         const { uploadURL, uid } = directUploadResult;
         uploadedUIDs.push(uid);
 
-        // 2. Upload chunk to Cloudflare with retry
         const uploadChunkWithRetry = async (maxRetries = 3) => {
           let lastError: Error | null = null;
 
@@ -281,9 +365,6 @@ export default function UploadPage() {
 
                 xhr.upload.onprogress = (event) => {
                   if (event.lengthComputable) {
-                    const chunkProgress = Math.round(
-                      (event.loaded / (end - start)) * 100,
-                    );
                     const overallProgress = Math.round(
                       ((start + event.loaded) / fileSize) * 100,
                     );
@@ -296,29 +377,22 @@ export default function UploadPage() {
                     resolve();
                   } else {
                     reject(
-                      new Error(
-                        `Upload failed with status ${xhr.status}: ${xhr.statusText}`,
-                      ),
+                      new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`),
                     );
                   }
                 };
 
-                xhr.onerror = () =>
-                  reject(new Error("Network error during upload."));
+                xhr.onerror = () => reject(new Error("Network error during upload."));
                 xhr.onabort = () => reject(new Error("Upload was aborted."));
 
                 const formData = new FormData();
                 formData.append("file", chunk);
                 xhr.send(formData);
               });
-              return; // Success, exit retry loop
+              return;
             } catch (err) {
               lastError = err instanceof Error ? err : new Error(String(err));
-              console.warn(
-                `Upload attempt ${attempt + 1} failed:`,
-                lastError.message,
-              );
-
+              console.warn(`Upload attempt ${attempt + 1} failed:`, lastError.message);
               if (attempt < maxRetries - 1) {
                 const delayMs = Math.pow(2, attempt) * 1000;
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -332,9 +406,10 @@ export default function UploadPage() {
         await uploadChunkWithRetry();
       }
 
-      // 3. Update database with all Cloudflare UIDs
+      // Save to DB with course_id + batch_id + module_id
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
+      payload.append("batchId", selectedBatchId);
       payload.append("moduleId", selectedModuleId);
       payload.append("title", videoTitle.trim());
       payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
@@ -347,9 +422,7 @@ export default function UploadPage() {
           .upload(fileName, moduleThumbnailFile);
 
         if (thumbnailUploadError) {
-          throw new Error(
-            `Failed to upload module thumbnail: ${thumbnailUploadError.message}`,
-          );
+          throw new Error(`Failed to upload module thumbnail: ${thumbnailUploadError.message}`);
         }
 
         const { data: thumbnailUrlData } = supabase.storage
@@ -369,11 +442,8 @@ export default function UploadPage() {
       });
 
       const result = await response.json().catch(() => null);
-
       if (!response.ok) {
-        throw new Error(
-          result?.error || `Request failed (${response.status}).`,
-        );
+        throw new Error(result?.error || `Request failed (${response.status}).`);
       }
 
       setVideoTitle("");
@@ -401,17 +471,22 @@ export default function UploadPage() {
     return `Created ${date.toLocaleDateString()}`;
   };
 
-  const displayedCourses = courses;
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
-            Video Asset Upload
-          </h1>
-          <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
+          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>Video Asset Upload</h1>
+          <p
+            className={
+              TYPOGRAPHY.BODY.fontSize +
+              " " +
+              TYPOGRAPHY.BODY.lineHeight +
+              " " +
+              TYPOGRAPHY.BODY.fontWeight +
+              " text-gray-600"
+            }
+          >
             Upload high-fidelity instructional media to your course modules.
           </p>
         </div>
@@ -420,20 +495,13 @@ export default function UploadPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-              <Image
-                src={ICONS.BOOK}
-                alt="Courses Icon"
-                width={30}
-                height={30}
-              />
+              <Image src={ICONS.BOOK} alt="Courses Icon" width={30} height={30} />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
-                {courses.length}
+                {activeCourses.length}
               </div>
-              <div className="text-xs text-gray-500 font-medium">
-                Total Active Courses
-              </div>
+              <div className="text-xs text-gray-500 font-medium">Total Active Courses</div>
             </div>
           </div>
         </div>
@@ -454,43 +522,93 @@ export default function UploadPage() {
           {/* Left Panel - Upload Form */}
           <div className="lg:col-span-1 space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>
-                Upload New Video
-              </h3>
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Upload New Video</h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
+                {/* Step 1: Select Course */}
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Select Curriculum
+                    Step 1 — Select Course
                   </label>
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedCurriculum ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
                       fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
                     }}
                   >
-                    <option value="" className="text-gray-400">Select curriculum...</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={String(course.id)} className="text-gray-900">
+                    <option value="" className="text-gray-400">
+                      Select course...
+                    </option>
+                    {activeCourses.map((course) => (
+                      <option
+                        key={course.id}
+                        value={String(course.id)}
+                        className="text-gray-900"
+                      >
                         {course.title}
                       </option>
                     ))}
                   </select>
                 </div>
 
+                {/* Step 2: Select Batch */}
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Select Module
+                    Step 2 — Select Batch
+                  </label>
+                  <select
+                    value={selectedBatchId}
+                    onChange={(e) => setSelectedBatchId(e.target.value)}
+                    disabled={!selectedCurriculum || isBatchesLoading}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedBatchId ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
+                  >
+                    <option value="" className="text-gray-400">
+                      {isBatchesLoading
+                        ? "Loading batches..."
+                        : !selectedCurriculum
+                        ? "Select a course first..."
+                        : batches.length === 0
+                        ? "No batches found for this course"
+                        : "Select batch..."}
+                    </option>
+                    {batches.map((batch) => (
+                      <option
+                        key={batch.id}
+                        value={String(batch.id)}
+                        className="text-gray-900"
+                      >
+                        {batch.name}
+                        {batch.schedule_type ? ` (${batch.schedule_type})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Step 3: Select Module */}
+                <div>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    Step 3 — Select Module
                   </label>
                   <select
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
-                    disabled={!selectedCurriculum || isModulesLoading}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedModuleId ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    disabled={!selectedBatchId || isModulesLoading}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedModuleId ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -500,10 +618,18 @@ export default function UploadPage() {
                     <option value="" className="text-gray-400">
                       {isModulesLoading
                         ? "Loading modules..."
+                        : !selectedBatchId
+                        ? "Select a batch first..."
+                        : modules.length === 0
+                        ? "No modules found for this batch"
                         : "Select module..."}
                     </option>
                     {modules.map((module) => (
-                      <option key={module.id} value={String(module.id)} className="text-gray-900">
+                      <option
+                        key={module.id}
+                        value={String(module.id)}
+                        className="text-gray-900"
+                      >
                         {module.title}
                       </option>
                     ))}
@@ -511,9 +637,7 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Video Title
-                  </label>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Video Title</label>
                   <input
                     type="text"
                     placeholder="e.g. Intro to Variables"
@@ -538,11 +662,11 @@ export default function UploadPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       setModuleThumbnailFile(file);
-                      setModuleThumbnailPreview(
-                        file ? URL.createObjectURL(file) : "",
-                      );
+                      setModuleThumbnailPreview(file ? URL.createObjectURL(file) : "");
                     }}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"} w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -565,10 +689,11 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${isDragging
-                    ? "border-brand-primary bg-blue-50"
-                    : "border-dashed border-gray-300 hover:border-gray-400"
-                    }`}
+                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
+                    isDragging
+                      ? "border-brand-primary bg-blue-50"
+                      : "border-dashed border-gray-300 hover:border-gray-400"
+                  }`}
                   onClick={() => document.getElementById("file-input")?.click()}
                 >
                   <input
@@ -587,7 +712,6 @@ export default function UploadPage() {
                       height={32}
                       className="w-8 h-8 text-brand-primary"
                     />
-
                   </div>
 
                   {fileNameDisplay ? (
@@ -598,20 +722,16 @@ export default function UploadPage() {
                       <p className="text-xs text-gray-500">File selected</p>
                     </>
                   ) : (
-                    <>
-                      <p className={`${TYPOGRAPHY.BODY.fontSize} ${TYPOGRAPHY.BODY.fontWeight} ${TYPOGRAPHY.BODY.lineHeight} text-brand-primary`}>Drop asset or click to browse</p>
-                    </>
+                    <p
+                      className={`${TYPOGRAPHY.BODY.fontSize} ${TYPOGRAPHY.BODY.fontWeight} ${TYPOGRAPHY.BODY.lineHeight} text-brand-primary`}
+                    >
+                      Drop asset or click to browse
+                    </p>
                   )}
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={isUploading}
-                  className="w-full"
-                >
-                  {isUploading
-                    ? `Uploading... ${uploadProgress}%`
-                    : "Upload Video Asset"}
+                <Button type="submit" disabled={isUploading} className="w-full">
+                  {isUploading ? `Uploading... ${uploadProgress}%` : "Upload Video Asset"}
                 </Button>
               </form>
             </div>
@@ -621,24 +741,21 @@ export default function UploadPage() {
           <div className="lg:col-span-2 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                  Active Curriculum
-                </h3>
+                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Active Curriculum</h3>
               </div>
 
-              {/* Course Cards Grid — shows 2×2 visible, scrollable for more */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {isCoursesLoading && (
                   <p className="text-sm text-gray-500 col-span-2">Loading courses...</p>
                 )}
 
-                {!isCoursesLoading && courses.length === 0 && (
+                {!isCoursesLoading && activeCourses.length === 0 && (
                   <p className="text-sm text-gray-500 col-span-2">
-                    No courses yet. Initialize your first course to get started.
+                    No active courses yet. Create an active course to get started.
                   </p>
                 )}
 
-                {displayedCourses.map((course) => (
+                {activeCourses.map((course) => (
                   <CourseCard
                     key={course.id}
                     id={course.id}
@@ -647,9 +764,7 @@ export default function UploadPage() {
                     thumbnail={course.thumbnail_url}
                     batchName={course.batch_name}
                     batchScheduleTypes={course.batch_schedule_types}
-                    courseStatus={
-                      course.course_type === "upcoming" ? "upcoming" : "active"
-                    }
+                    courseStatus="active"
                     variant="admin"
                     showProgress={false}
                   />

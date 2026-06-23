@@ -43,10 +43,11 @@ interface CurriculumCourse {
   progress: number;
   thumbnail_url?: string;
   duration?: string;
-  modules?: any[]; // Array of modules
+  modules?: any[];
   certificate_url?: string | null;
   certificate_id?: string | null;
   issued_at?: string | null;
+  batchName?: string | null;
 }
 
 interface Webinar {
@@ -257,6 +258,36 @@ export default function MyLearningDashboard() {
       // --------------------------------------------------
       // FETCH ENROLLMENTS + COURSES + MODULES
       // --------------------------------------------------
+
+      // First, get the user's batch memberships so we can scope modules per batch
+      const userEmail = session.user.email?.trim().toLowerCase() || "";
+      let userBatchIdsByCourseId = new Map<string, string>(); // courseId → batchId
+      const batchNameByCourseId = new Map<string, string>(); // courseId → batchName
+
+      if (userEmail) {
+        const { data: batchMemberRows } = await supabase
+          .from("batch_members")
+          .select("batch_id")
+          .eq("email", userEmail);
+
+        if (batchMemberRows && batchMemberRows.length > 0) {
+          const batchIds = batchMemberRows.map((r: any) => String(r.batch_id));
+          const { data: batchRows } = await supabase
+            .from("batches")
+            .select("id, course_id, name")
+            .in("id", batchIds);
+
+          for (const batch of batchRows ?? []) {
+            if (batch.course_id) {
+              userBatchIdsByCourseId.set(String(batch.course_id), String(batch.id));
+              if (batch.name) {
+                batchNameByCourseId.set(String(batch.course_id), batch.name);
+              }
+            }
+          }
+        }
+      }
+
       const { data: enrollmentsData } = await supabase
         .from("course_enrollments")
         .select(`
@@ -326,7 +357,12 @@ export default function MyLearningDashboard() {
       const mappedCurriculum = validEnrollments.map((e: any) => {
         const course = e.maincourses;
 
-        const modules = (course.coursemodules || []).sort(
+        // Modules belong to the course (via maincourse_id), not the batch.
+        // All course modules are available to all batches of that course.
+        const allCourseModules = (course.coursemodules || []) as any[];
+        const scopedModules = allCourseModules;
+
+        const modules = scopedModules.sort(
           (a: any, b: any) =>
             (a.order_index ?? 0) - (b.order_index ?? 0)
         );
@@ -415,6 +451,8 @@ export default function MyLearningDashboard() {
               : progressPercentage === 100
                 ? "Completed"
                 : `${completedModules}/${totalModules} Modules`,
+
+          batchName: batchNameByCourseId.get(String(course.id)) ?? null,
         };
       });
 
@@ -632,8 +670,8 @@ export default function MyLearningDashboard() {
                 >
                   <CourseCard
                     id={course.id}
-                    title={course.title}
-                    description={course.description}
+                    title={course.batchName || course.title}
+                    description={course.batchName ? course.title : course.description}
                     thumbnail={course.thumbnail_url}
                     category={course.module_label}
                     duration={course.duration}
@@ -650,7 +688,6 @@ export default function MyLearningDashboard() {
                 </CarouselItem>
               ))}
             </CarouselContent>
-
             {activeCourses.length > 1 && (
               <>
                 <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />

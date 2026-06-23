@@ -167,6 +167,10 @@ export async function POST(request: Request) {
     typeof formData.get("moduleId") === "string"
       ? String(formData.get("moduleId")).trim()
       : "";
+  const batchId =
+    typeof formData.get("batchId") === "string"
+      ? String(formData.get("batchId")).trim()
+      : "";
   const thumbnailUrl =
     typeof formData.get("thumbnail_url") === "string"
       ? String(formData.get("thumbnail_url")).trim()
@@ -179,6 +183,7 @@ export async function POST(request: Request) {
         .update({
           video_cf_id: uid,
           ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+          ...(batchId && { batch_id: batchId }),
         })
         .eq("id", moduleId)
         .select("*")
@@ -190,6 +195,7 @@ export async function POST(request: Request) {
           title,
           video_cf_id: uid,
           ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
+          ...(batchId && { batch_id: batchId }),
         })
         .select("*")
         .single();

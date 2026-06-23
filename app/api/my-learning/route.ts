@@ -20,6 +20,8 @@ type CourseRow = {
   id: number | string;
   title: string | null;
   description: string | null;
+  category?: string | null;
+  thumbnail_url?: string | null;
 };
 
 type CalendarEventRow = {
@@ -149,7 +151,7 @@ export async function GET(request: Request) {
   if (courseIds.length > 0) {
     const { data: courseRows, error: courseError } = await authContext.supabaseAdmin
       .from("maincourses")
-      .select("id, title, description")
+      .select("id, title, description, category, thumbnail_url")
       .in("id", courseIds);
 
     if (courseError) {
@@ -170,6 +172,8 @@ export async function GET(request: Request) {
       courseId: batch.course_id,
       courseTitle: course?.title ?? "Unassigned Course",
       courseDescription: course?.description ?? "",
+      courseCategory: course?.category ?? "General",
+      courseThumbnail: course?.thumbnail_url ?? "",
     };
   });
 

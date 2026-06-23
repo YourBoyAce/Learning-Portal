@@ -188,7 +188,7 @@ export async function addMultipleBatchMembers(
 export async function getAllCourses() {
   try {
     const { data, error } = await supabase
-      .from("courses")
+      .from("maincourses")
       .select("*")
       .order("title", { ascending: true });
 
