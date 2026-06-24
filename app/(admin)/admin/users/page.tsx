@@ -75,6 +75,7 @@ export default function AdminUsers() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("user");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formFeedback, setFormFeedback] = useState({ type: "", message: "" });
@@ -179,6 +180,9 @@ export default function AdminUsers() {
     formData.append("email", email);
     formData.append("password", password);
     formData.append("role", role);
+    if (role === "admin") {
+      formData.append("phone", phone);
+    }
 
     const result = await createUser(formData);
 
@@ -192,6 +196,7 @@ export default function AdminUsers() {
       setUsername("");
       setEmail("");
       setPassword("");
+      setPhone("");
       setRole("user");
       fetchUsers();
     } else {
@@ -341,7 +346,12 @@ export default function AdminUsers() {
                   </label>
                   <select
                     value={role}
-                    onChange={(e) => setRole(e.target.value)}
+                    onChange={(e) => {
+                      setRole(e.target.value);
+                      if (e.target.value !== "admin") {
+                        setPhone("");
+                      }
+                    }}
                     className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
@@ -354,6 +364,37 @@ export default function AdminUsers() {
                     ))}
                   </select>
                 </div>
+
+                {role === "admin" && (
+                  <div className="rounded-xl border border-brand-primary/15 bg-brand-primary/5 p-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-brand-primary">
+                        Admin phone number
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Required for admin login verification via SMS. Stored as plain digits only.
+                      </p>
+                    </div>
+                    <div>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                        placeholder="Enter the Number"
+                        className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary`}
+                        style={{
+                          fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                          lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                          fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {formFeedback.message && (
                   <div

@@ -8,6 +8,7 @@ import {ICONS} from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
+import PhoneVerification from "@/app/components/PhoneVerification";
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +22,8 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -51,6 +54,8 @@ export default function ProfilePage() {
           setFullName(profile.full_name || "");
           setBio(profile.bio || "");
           setPortfolioUrl(profile.portfolio_url || "");
+          setPhone(profile.phone || "");
+          setPhoneVerified(Boolean(profile.phone_verified));
 
           if (profile.role) {
             setRole(profile.role);
@@ -183,21 +188,28 @@ export default function ProfilePage() {
                   </span>
 
                   <div className="flex items-center gap-1.5">
-                    <svg
-                      className="w-4 h-4 text-[#0052CC]"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-
-                    <span className="text-[13px] font-bold text-[#0052CC]">
-                      Verified
-                    </span>
+                    {phoneVerified ? (
+                      <>
+                        <svg
+                          className="w-4 h-4 text-[#0052CC]"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <span className="text-[13px] font-bold text-[#0052CC]">
+                          Phone Verified
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[13px] font-bold text-amber-600">
+                        Phone Not Verified
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -241,6 +253,16 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            <PhoneVerification
+              initialPhone={phone}
+              initialVerified={phoneVerified}
+              onVerified={(verifiedPhone) => {
+                setPhone(verifiedPhone);
+                setPhoneVerified(true);
+                dispatchProfileUpdated();
+              }}
+            />
 
             {/* SCHOLARLY BIO */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">

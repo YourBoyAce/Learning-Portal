@@ -90,15 +90,25 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { transporter } from "@/app/lib/mailer";
+import { normalizePhoneNumber } from "@/app/lib/phone-verification";
 
 export async function createUser(formData: FormData) {
   const username = String(formData.get("username") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "").trim();
   const role = String(formData.get("role") || "user").trim().toLowerCase();
+  const phoneInput = String(formData.get("phone") || "").trim();
+  const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
 
   if (!username || !email || !password || !role) {
     return { success: false, error: "Please fill in all fields" };
+  }
+
+  if (role === "admin" && !normalizedPhone) {
+    return {
+      success: false,
+      error: "A valid phone number is required when creating an admin account.",
+    };
   }
 
   const displayName = username;
@@ -126,6 +136,9 @@ export async function createUser(formData: FormData) {
           full_name: displayName,
           role: role,
           created_at: new Date().toISOString(),
+          ...(role === "admin" && normalizedPhone
+            ? { phone: normalizedPhone, phone_verified: true }
+            : {}),
         });
 
       if (profileError) {
