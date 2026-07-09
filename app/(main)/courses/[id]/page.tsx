@@ -29,6 +29,7 @@ import {
   DownloadCloud,
   MoreVertical,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -36,6 +37,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
 import { ICONS } from "@/app/styles/icons";
+import CommunityChatPanel from "./components/CommunityChatPanel";
 
 interface Course {
   id: string;
@@ -188,10 +190,28 @@ export default function CoursePlayerPage() {
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
   const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
 
-  // --- QUIZZES & ARTIFACTS INTEGRATION STATE ---
+  // --- QUIZZES, ARTIFACTS & COMMUNITY INTEGRATION STATE ---
   const [activeTab, setActiveTab] = useState<
-    "overview" | "modules" | "quizzes" | "artifacts"
+    "overview" | "modules" | "quizzes" | "artifacts" | "community"
   >("modules");
+
+  // Persist tab state across reloads
+  useEffect(() => {
+    if (id && typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(`activeTab_${id}`);
+      if (saved && ["overview", "modules", "quizzes", "artifacts", "community"].includes(saved)) {
+        setActiveTab(saved as any);
+      }
+    }
+  }, [id]);
+
+  const handleTabChange = (tab: "overview" | "modules" | "quizzes" | "artifacts" | "community") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(`activeTab_${id}`, tab);
+    }
+  };
+
   const [courseQuizzes, setCourseQuizzes] = useState<any[]>([]);
   const [courseArtifacts, setCourseArtifacts] = useState<any[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
@@ -1565,6 +1585,10 @@ export default function CoursePlayerPage() {
     );
   };
 
+  if (loading) {
+    return null;
+  }
+
   if (!course) {
     return (
       <div className="min-h-screen bg-surface-subtle flex items-center justify-center p-6">
@@ -1721,7 +1745,7 @@ export default function CoursePlayerPage() {
             <div className="lg:hidden">
               <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-6">
                 <button
-                  onClick={() => setActiveTab("overview")}
+                  onClick={() => handleTabChange("overview")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "overview"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1731,7 +1755,7 @@ export default function CoursePlayerPage() {
                   Overview
                 </button>
                 <button
-                  onClick={() => setActiveTab("modules")}
+                  onClick={() => handleTabChange("modules")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1741,7 +1765,7 @@ export default function CoursePlayerPage() {
                   Modules
                 </button>
                 <button
-                  onClick={() => setActiveTab("quizzes")}
+                  onClick={() => handleTabChange("quizzes")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1757,7 +1781,7 @@ export default function CoursePlayerPage() {
                   )}
                 </button>
                 <button
-                  onClick={() => setActiveTab("artifacts")}
+                  onClick={() => handleTabChange("artifacts")}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1772,6 +1796,16 @@ export default function CoursePlayerPage() {
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => handleTabChange("community")}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "community"
+                    ? "border-brand-heading text-brand-heading bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                    }`}
+                >
+                  <MessageSquare size={13} />
+                  Community
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -1781,6 +1815,15 @@ export default function CoursePlayerPage() {
                 {activeTab === "modules" && renderModulesList()}
                 {activeTab === "quizzes" && renderQuizzesList()}
                 {activeTab === "artifacts" && renderArtifactsList()}
+                {activeTab === "community" && userId && (
+                  <div className="flex flex-col" style={{ minHeight: "480px" }}>
+                    <CommunityChatPanel
+                      courseId={String(id)}
+                      userId={userId}
+                      userName={studentName}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1790,10 +1833,10 @@ export default function CoursePlayerPage() {
         </div>
 
         {/* Right: Module Sidebar (Desktop Only) */}
-        <div className="hidden lg:flex lg:col-span-3 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] overflow-y-auto border-l border-gray-100 flex-col">
+        <div className="hidden lg:flex lg:col-span-3 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-160px)] mb-6 self-start overflow-hidden border-l border-gray-100 flex-col rounded-bl-xl rounded-br-xl">
           <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0">
             <button
-              onClick={() => setActiveTab("modules")}
+              onClick={() => handleTabChange("modules")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules" || activeTab === "overview"
                 ? "border-brand-heading text-brand-heading bg-white"
                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1803,7 +1846,7 @@ export default function CoursePlayerPage() {
               Modules
             </button>
             <button
-              onClick={() => setActiveTab("quizzes")}
+              onClick={() => handleTabChange("quizzes")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
                 ? "border-brand-heading text-brand-heading bg-white"
                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1819,7 +1862,7 @@ export default function CoursePlayerPage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("artifacts")}
+              onClick={() => handleTabChange("artifacts")}
               className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
                 ? "border-brand-heading text-brand-heading bg-white"
                 : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
@@ -1834,13 +1877,30 @@ export default function CoursePlayerPage() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => handleTabChange("community")}
+              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "community"
+                ? "border-brand-heading text-brand-heading bg-white"
+                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
+                }`}
+            >
+              <MessageSquare size={13} />
+              Community
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+          <div className={`flex-1 flex flex-col divide-y divide-gray-50 ${activeTab === "community" ? "overflow-hidden" : "overflow-y-auto"}`}>
             {(activeTab === "modules" || activeTab === "overview") &&
               renderModulesList()}
             {activeTab === "quizzes" && renderQuizzesList()}
             {activeTab === "artifacts" && renderArtifactsList()}
+            {activeTab === "community" && userId && (
+              <CommunityChatPanel
+                courseId={String(id)}
+                userId={userId}
+                userName={studentName}
+              />
+            )}
           </div>
         </div>
       </main>
