@@ -22,6 +22,7 @@ import {
   Check,
   RefreshCw,
   X as XIcon,
+  Star,
   FileText,
   FileArchive,
   FileCode,
@@ -188,6 +189,13 @@ export default function CoursePlayerPage() {
   const [showCourseFinishedPopup, setShowCourseFinishedPopup] = useState(false);
   const [studentName, setStudentName] = useState("Learner");
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSaved, setReviewSaved] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [moduleToDelete, setModuleToDelete] = useState<Module | null>(null);
   const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
 
   // --- QUIZZES, ARTIFACTS & COMMUNITY INTEGRATION STATE ---
@@ -737,6 +745,19 @@ export default function CoursePlayerPage() {
         .maybeSingle();
 
       setHasCertificate(!!certData);
+
+      const { data: reviewData, error: reviewDataError } = await supabase
+        .from("course_ratings")
+        .select("rating, review")
+        .eq("user_id", user.id)
+        .eq("course_id", id)
+        .maybeSingle();
+
+      if (!reviewDataError && reviewData) {
+        setReviewSaved(true);
+        setReviewRating(Number(reviewData.rating) || 0);
+        setReviewText(String(reviewData.review || ""));
+      }
     } catch (error) {
       console.error("Error loading course:", error);
     } finally {
@@ -979,6 +1000,7 @@ export default function CoursePlayerPage() {
     };
     generateCertificateInDb();
   }, [progressPercentage, hasCertificate, loading, userId, id],);
+
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
     modules.forEach((mod) => {
@@ -995,6 +1017,66 @@ export default function CoursePlayerPage() {
     if (hrs > 0) return `${hrs}h ${mins}m Total`;
     return `${mins}m Total`;
   }, [modules]);
+
+  const handleSubmitReview = async (event?: { preventDefault?: () => void }) => {
+    event?.preventDefault?.();
+
+    const resolvedCourseId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : null;
+
+    if (reviewRating < 1) {
+      setReviewError("Please select a rating from 1 to 5 stars.");
+      return;
+    }
+
+    if (!reviewText.trim()) {
+      setReviewError("Please share a short description of your experience.");
+      return;
+    }
+
+    if (!userId || !resolvedCourseId) {
+      setReviewError("Please sign in again to save your review.");
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      setReviewError("");
+
+      const { error } = await supabase
+        .from("course_ratings")
+        .upsert(
+          {
+            user_id: userId,
+            course_id: resolvedCourseId,
+            rating: reviewRating,
+            review: reviewText.trim() || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,course_id" },
+        );
+
+      if (error) throw error;
+
+      setReviewSaved(true);
+    } catch (err) {
+      console.error("Error saving course review:", err);
+      setReviewError("We could not save your review right now. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleOpenCertificateModal = () => {
+    if (!reviewSaved || !reviewText.trim() || reviewRating < 1) {
+      setReviewError("Please complete and save your review before downloading your certificate.");
+      setShowCourseFinishedPopup(true);
+      setShowCertificateModal(false);
+      return;
+    }
+
+    setShowCourseFinishedPopup(false);
+    setShowCertificateModal(true);
+  };
 
   const renderModuleOverview = () => {
     return (
@@ -1088,7 +1170,7 @@ export default function CoursePlayerPage() {
               </p>
             </div>
             <Button
-              onClick={() => setShowCertificateModal(true)}
+              onClick={handleOpenCertificateModal}
               className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 self-start sm:self-center shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
             >
               Download Certificate
@@ -1111,17 +1193,18 @@ export default function CoursePlayerPage() {
   const handleDeleteModule = async (mod: Module) => {
     if (!isAdminCoursePage || deletingModuleId) return;
 
-    const confirmed = window.confirm(
-      `Delete "${mod.title}" from this course? This cannot be undone.`,
-    );
-    if (!confirmed) {
-      setOpenModuleMenuId(null);
-      return;
-    }
+    setModuleToDelete(mod);
+    setShowDeleteConfirmModal(true);
+    setOpenModuleMenuId(null);
+  };
+
+  const confirmDeleteModule = async () => {
+    if (!moduleToDelete || !isAdminCoursePage || deletingModuleId) return;
 
     try {
-      setDeletingModuleId(String(mod.id));
+      setDeletingModuleId(String(moduleToDelete.id));
       setModuleDeleteError("");
+      setShowDeleteConfirmModal(false);
 
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
@@ -1131,7 +1214,7 @@ export default function CoursePlayerPage() {
 
       const response = await fetch(
         `/api/admin/coursemodules?moduleId=${encodeURIComponent(
-          String(mod.id),
+          String(moduleToDelete.id),
         )}&courseId=${encodeURIComponent(String(id))}`,
         {
           method: "DELETE",
@@ -1148,12 +1231,11 @@ export default function CoursePlayerPage() {
         );
       }
 
-      const deletedKey = getModuleKey(mod);
+      const deletedKey = getModuleKey(moduleToDelete);
       const nextModules = modules.filter(
         (moduleItem) => getModuleKey(moduleItem) !== deletedKey,
       );
       setModules(nextModules);
-      // Also remove from batchGroups so the accordion reflects the deletion
       setBatchGroups((prev) =>
         prev.map((bg) => ({
           ...bg,
@@ -1162,32 +1244,32 @@ export default function CoursePlayerPage() {
       );
       setUserProgress((prev) => {
         const next = { ...prev };
-        for (const progressId of getModuleProgressIds(mod)) {
+        for (const progressId of getModuleProgressIds(moduleToDelete)) {
           delete next[progressId];
         }
         return next;
       });
       setModuleCompletedAt((prev) => {
         const next = { ...prev };
-        for (const progressId of getModuleProgressIds(mod)) {
+        for (const progressId of getModuleProgressIds(moduleToDelete)) {
           delete next[progressId];
         }
         return next;
       });
       setPlaybackPositions((prev) => {
         const next = { ...prev };
-        for (const progressId of getModuleProgressIds(mod)) {
+        for (const progressId of getModuleProgressIds(moduleToDelete)) {
           delete next[progressId];
         }
         return next;
       });
 
-      if (activeModuleId && getModuleProgressIds(mod).includes(activeModuleId)) {
+      if (activeModuleId && getModuleProgressIds(moduleToDelete).includes(activeModuleId)) {
         setActiveModuleId(nextModules[0] ? getModuleKey(nextModules[0]) : null);
         setAutoPlayModuleId(null);
       }
 
-      setOpenModuleMenuId(null);
+      setModuleToDelete(null);
     } catch (error) {
       setModuleDeleteError(
         error instanceof Error
@@ -2196,14 +2278,6 @@ export default function CoursePlayerPage() {
       {showCourseFinishedPopup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 sm:p-10 text-center relative animate-[fadeInUp_0.4s_ease-out]">
-            {/* Close Button */}
-            <button
-              onClick={() => setShowCourseFinishedPopup(false)}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
-            >
-              <XIcon size={20} />
-            </button>
-
             {/* Trophy / Award Icon */}
             <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
               <Award size={40} className="text-white" />
@@ -2212,25 +2286,142 @@ export default function CoursePlayerPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               🎉 Course Finished!
             </h2>
-            <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto leading-relaxed">
+            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto leading-relaxed">
               Congratulations on completing <span className="font-semibold text-gray-800">{course?.title}</span>! Your certificate of achievement has been generated and is ready to download.
+            </p>
+
+            <div className="w-full rounded-3xl border border-amber-100 bg-amber-50/70 p-5 sm:p-6 text-left mb-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                  <Award size={18} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800">Leave a quick review</h3>
+                  <p className="text-xs text-gray-600">Rate your experience and share any feedback or concerns with us.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mt-3 mb-4">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => {
+                      setReviewRating(star);
+                      setReviewError("");
+                      if (reviewSaved) setReviewSaved(false);
+                    }}
+                    className="transition-transform hover:scale-110 p-1 rounded"
+                    aria-label={`Rate ${star} out of 5`}
+                  >
+                    <Star
+                      size={24}
+                      className={star <= reviewRating ? "text-amber-500 fill-amber-500" : "text-gray-300"}
+                      strokeWidth={1.6}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                Your experience
+              </label>
+              <textarea
+                value={reviewText}
+                onChange={(event) => {
+                  setReviewText(event.target.value);
+                  if (reviewError) setReviewError("");
+                  if (reviewSaved) setReviewSaved(false);
+                }}
+                rows={5}
+                placeholder="Share what you liked, what felt difficult, or any suggestions you have..."
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 min-h-[120px]"
+              />
+
+              {reviewError && (
+                <p className="mt-2 text-sm text-red-600">{reviewError}</p>
+              )}
+              {reviewSaved && (
+                <p className="mt-2 text-sm font-medium text-emerald-600">
+                  Thank you! Your review has been saved.
+                </p>
+              )}
+
+              <Button
+                onClick={() => handleSubmitReview()}
+                disabled={reviewSubmitting || !reviewText.trim() || reviewRating < 1}
+                className="mt-4 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-600 hover:bg-slate-700 text-white font-bold text-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {reviewSubmitting ? "Saving review..." : reviewSaved ? "Update Review" : "Save Review"}
+              </Button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button
+                onClick={handleOpenCertificateModal}
+                disabled={!reviewSaved || !reviewText.trim() || reviewRating < 1}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <Award size={16} /> Download Certificate
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!reviewSaved || !reviewText.trim() || reviewRating < 1) {
+                    setReviewError("Please complete and save your review before continuing.");
+                    return;
+                  }
+                  setShowCourseFinishedPopup(false);
+                }}
+                disabled={!reviewSaved || !reviewText.trim() || reviewRating < 1}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Continue Exploring
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmModal && moduleToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 text-center relative">
+            <button
+              onClick={() => {
+                setShowDeleteConfirmModal(false);
+                setModuleToDelete(null);
+              }}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+            >
+              <XIcon size={20} />
+            </button>
+
+            <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-red-50 flex items-center justify-center">
+              <Trash2 size={28} className="text-red-600" />
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              Delete this module?
+            </h3>
+            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              This action will remove <span className="font-semibold text-gray-800">{moduleToDelete.title}</span> from the course. This cannot be undone.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
                 onClick={() => {
-                  setShowCourseFinishedPopup(false);
-                  setShowCertificateModal(true);
+                  setShowDeleteConfirmModal(false);
+                  setModuleToDelete(null);
                 }}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/10 border border-amber-700/10 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-all cursor-pointer"
               >
-                <Award size={16} /> Download Certificate
+                Cancel
               </Button>
               <Button
-                onClick={() => setShowCourseFinishedPopup(false)}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-all cursor-pointer"
+                onClick={confirmDeleteModule}
+                disabled={deletingModuleId === String(moduleToDelete.id)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Continue Exploring
+                {deletingModuleId === String(moduleToDelete.id) ? "Deleting..." : "Yes, delete"}
               </Button>
             </div>
           </div>

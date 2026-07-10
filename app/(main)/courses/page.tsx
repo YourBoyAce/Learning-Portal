@@ -20,7 +20,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { BookOpen, PlayCircle, CheckCircle2, ExternalLink, X } from "lucide-react";
+import { BookOpen, PlayCircle, CheckCircle2, ExternalLink, X, Star } from "lucide-react";
 import { ICONS } from "@/app/styles/icons";
 
 // --- Types ---
@@ -141,6 +141,11 @@ export default function MyLearningDashboard() {
   const [activeTab, setActiveTab] = useState<"in_progress" | "completed">("in_progress");
   const [selectedCertificateCourse, setSelectedCertificateCourse] = useState<CurriculumCourse | null>(null);
   const [userProfileName, setUserProfileName] = useState<string>("Learner");
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSaved, setReviewSaved] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   // Data States
   const [stats, setStats] = useState<UserStats>({
@@ -151,6 +156,84 @@ export default function MyLearningDashboard() {
   const [courseProgress, setCourseProgress] = useState<Record<string, { progressPercentage: number; completedModules: number; totalModules: number }>>({});
 
   const router = useRouter();
+
+  const handleSubmitReview = async () => {
+    if (!userId || !selectedCertificateCourse) {
+      setReviewError("Please sign in again to save your review.");
+      return;
+    }
+
+    if (reviewRating < 1) {
+      setReviewError("Please select a rating from 1 to 5 stars.");
+      return;
+    }
+
+    if (!reviewText.trim()) {
+      setReviewError("Please share a short description of your experience.");
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      setReviewError("");
+
+      const { error } = await supabase.from("course_ratings").upsert(
+        {
+          user_id: userId,
+          course_id: String(selectedCertificateCourse.id),
+          rating: reviewRating,
+          review: reviewText.trim(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,course_id" },
+      );
+
+      if (error) throw error;
+
+      setReviewSaved(true);
+    } catch (error) {
+      console.error("Error saving course review:", error);
+      setReviewError("We could not save your review right now. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkExistingReview = async () => {
+      if (!userId || !selectedCertificateCourse) {
+        setReviewSaved(false);
+        setReviewRating(0);
+        setReviewText("");
+        setReviewError("");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("course_ratings")
+          .select("rating, review")
+          .eq("user_id", userId)
+          .eq("course_id", String(selectedCertificateCourse.id))
+          .maybeSingle();
+
+        if (!error && data) {
+          setReviewSaved(true);
+          setReviewRating(Number(data.rating) || 0);
+          setReviewText(String(data.review || ""));
+        } else {
+          setReviewSaved(false);
+          setReviewRating(0);
+          setReviewText("");
+        }
+      } catch (error) {
+        console.error("Error checking existing review:", error);
+        setReviewSaved(false);
+      }
+    };
+
+    checkExistingReview();
+  }, [selectedCertificateCourse, userId]);
 
   // Insight States
   const [insights, setInsights] = useState<Insight[]>([]);
@@ -771,7 +854,7 @@ export default function MyLearningDashboard() {
       {selectedCertificateCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
+            <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-10 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
 
               {/* Close Button */}
               <button
@@ -781,32 +864,97 @@ export default function MyLearningDashboard() {
                 <X size={20} />
               </button>
 
-              {/* Responsive Certificate Preview */}
-              <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
-                <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
-                  <Certificate
-                    userName={userProfileName}
-                    courseName={selectedCertificateCourse.title}
-                    completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  />
+              <div className="w-full rounded-3xl border border-amber-100 bg-amber-50/70 p-5 sm:p-6 text-left mb-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
+                    <Star size={18} className="text-amber-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-800">Share your experience</h3>
                 </div>
+                <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                  A review is required before this certificate can be downloaded. If you have already submitted one for this course, it will be reused automatically.
+                </p>
+
+                <div className="flex items-center gap-2 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => {
+                        setReviewRating(star);
+                        setReviewError("");
+                      }}
+                      className="transition-transform hover:scale-110"
+                      aria-label={`Rate ${star} out of 5`}
+                    >
+                      <Star
+                        size={24}
+                        className={star <= reviewRating ? "text-amber-500 fill-amber-500" : "text-gray-300"}
+                        strokeWidth={1.8}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                  Your experience
+                </label>
+                <textarea
+                  value={reviewText}
+                  onChange={(event) => {
+                    setReviewText(event.target.value);
+                    if (reviewError) setReviewError("");
+                  }}
+                  rows={4}
+                  placeholder="Tell us what you liked, what felt difficult, or any suggestions you have..."
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 min-h-[112px]"
+                />
+
+                {reviewError && <p className="mt-2 text-xs text-red-600">{reviewError}</p>}
+                {reviewSaved && (
+                  <p className="mt-2 text-xs font-medium text-emerald-600">
+                    Thank you! Your review has been saved for this course.
+                  </p>
+                )}
+
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={reviewSubmitting || !reviewText.trim() || reviewRating < 1}
+                  className="mt-4 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-heading hover:bg-brand-heading-hover text-white font-bold text-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {reviewSubmitting ? "Saving review..." : reviewSaved ? "Review Saved" : "Save Review"}
+                </Button>
               </div>
 
-              <div className="mb-2">
-                <CertificateDownload
-                  userName={userProfileName}
-                  courseName={selectedCertificateCourse.title}
-                  completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                />
-              </div>
+              {reviewSaved && (
+                <>
+                  <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
+                    <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
+                      <Certificate
+                        userName={userProfileName}
+                        courseName={selectedCertificateCourse.title}
+                        completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                          month: "long",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <CertificateDownload
+                      userName={userProfileName}
+                      courseName={selectedCertificateCourse.title}
+                      completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    />
+                  </div>
+                </>
+              )}
 
             </div>
           </div>
