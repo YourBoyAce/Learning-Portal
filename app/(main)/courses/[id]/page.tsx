@@ -33,6 +33,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import ReviewForm from "@/components/ui/review-form";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 
 // IMPORT OUR NEW VIDEO PLAYER
@@ -2382,96 +2385,57 @@ export default function CoursePlayerPage() {
         </div>
       )}
 
-      {showDeleteConfirmModal && moduleToDelete && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 text-center relative">
-            <button
-              onClick={() => {
-                setShowDeleteConfirmModal(false);
-                setModuleToDelete(null);
-              }}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
-            >
-              <XIcon size={20} />
-            </button>
+      <ConfirmDialog
+        open={showDeleteConfirmModal && Boolean(moduleToDelete)}
+        onClose={() => {
+          setShowDeleteConfirmModal(false);
+          setModuleToDelete(null);
+        }}
+        title="Delete this module?"
+        description={`This action will remove ${moduleToDelete?.title || "this module"} from the course. This cannot be undone.`}
+        icon={<Trash2 size={28} />}
+        confirmText={deletingModuleId === String(moduleToDelete?.id) ? "Deleting..." : "Yes, delete"}
+        cancelText="Cancel"
+        confirmDisabled={deletingModuleId === String(moduleToDelete?.id)}
+        onConfirm={confirmDeleteModule}
+      />
 
-            <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-red-50 flex items-center justify-center">
-              <Trash2 size={28} className="text-red-600" />
-            </div>
+      <Modal
+        open={showCertificateModal && canViewCertificate}
+        onClose={() => setShowCertificateModal(false)}
+        panelClassName="max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide"
+      >
+        <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
 
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              Delete this module?
-            </h3>
-            <p className="text-sm text-gray-500 leading-relaxed mb-6">
-              This action will remove <span className="font-semibold text-gray-800">{moduleToDelete.title}</span> from the course. This cannot be undone.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button
-                onClick={() => {
-                  setShowDeleteConfirmModal(false);
-                  setModuleToDelete(null);
-                }}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-all cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmDeleteModule}
-                disabled={deletingModuleId === String(moduleToDelete.id)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {deletingModuleId === String(moduleToDelete.id) ? "Deleting..." : "Yes, delete"}
-              </Button>
+          {/* Responsive Certificate Preview */}
+          <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
+            <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
+              <Certificate
+                userName={studentName}
+                courseName={course.title}
+                completedDate={new Date().toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              />
             </div>
           </div>
-        </div>
-      )}
 
-      {showCertificateModal && canViewCertificate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
-
-              {/* Close Button */}
-              <button
-                onClick={() => setShowCertificateModal(false)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
-              >
-                <XIcon size={20} />
-              </button>
-
-              {/* Responsive Certificate Preview */}
-              <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
-                <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
-                  <Certificate
-                    userName={studentName}
-                    courseName={course.title}
-                    completedDate={new Date().toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  />
-                </div>
-              </div>
-
-              <div className="mb-2">
-                <CertificateDownload
-                  userName={studentName}
-                  courseName={course.title}
-                  completedDate={new Date().toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                />
-              </div>
-
-            </div>
+          <div className="mb-2">
+            <CertificateDownload
+              userName={studentName}
+              courseName={course.title}
+              completedDate={new Date().toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            />
           </div>
+
         </div>
-      )}
+      </Modal>
 
     </div>
   );
