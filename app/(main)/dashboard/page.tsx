@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import { BookOpen, CheckCircle2, FolderOpen, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, FolderOpen, Users, ShieldAlert, X } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
 import Image from "next/image";
@@ -94,11 +94,22 @@ export default function Dashboard() {
   const router = useRouter();
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
+  const [showPasswordWarning, setShowPasswordWarning] = useState(false);
 
   useEffect(() => {
     setGlobalLoading(loading);
     return () => setGlobalLoading(false);
   }, [loading, setGlobalLoading]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const flag = sessionStorage.getItem("show_password_change_warning");
+      if (flag === "true") {
+        setShowPasswordWarning(true);
+        sessionStorage.removeItem("show_password_change_warning");
+      }
+    }
+  }, []);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -702,6 +713,35 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
+        {showPasswordWarning && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm animate-in slide-in-from-top-4 fade-in duration-300">
+            <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                Your account is using a temporary password
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                For your security, please change your password as soon as possible.
+              </p>
+              <button
+                onClick={() => router.push("/profile")}
+                className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700"
+              >
+                Change Password
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowPasswordWarning(false)}
+              className="shrink-0 rounded p-0.5 text-amber-600 transition hover:bg-amber-100"
+              aria-label="Dismiss warning"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {/* Welcome Banner - Dark Blue */}
         <div className="bg-gradient-to-r from-brand-heading to-brand-primary rounded-2xl p-6 sm:p-12 text-white mb-10 shadow-sm min-h-[200px] sm:min-h-[260px]">
           <h1 className="text-4xl md:text-[44px] font-bold text-white mb-4 tracking-tight leading-tight">

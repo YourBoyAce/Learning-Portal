@@ -1,18 +1,21 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { prepareAdminVerification } from "@/app/actions/admin-2fa";
 import AdminVerificationModal from "@/app/components/AdminVerificationModal";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import Image from "next/image";
-import { Mail, Phone } from "lucide-react";
+import { Mail, Phone, Loader2, ShieldAlert, X } from "lucide-react";
 
 type LoginStep = "credentials" | "chooseMethod";
 type VerificationMethod = "email" | "phone";
 
-export default function LoginPage() {
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const urlEmail = searchParams.get("email");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
@@ -23,6 +26,12 @@ export default function LoginPage() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [autoLoginInProgress, setAutoLoginInProgress] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "info" | "warning" } | null>(
+    null,
+  );
+  const autoLoginAttempted = useRef(false);
 
   const router = useRouter();
 
@@ -73,6 +82,82 @@ export default function LoginPage() {
     checkExistingSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!urlEmail || autoLoginAttempted.current) return;
+    autoLoginAttempted.current = true;
+
+    setEmail(urlEmail);
+
+    const attemptAutoLogin = async () => {
+      setAutoLoginInProgress(true);
+
+      try {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: urlEmail,
+          password: "Welcome123!",
+        });
+
+        if (authError || !data.user) {
+          setAutoLoginInProgress(false);
+          setToast({
+            message: "Welcome back! Please enter your existing password to log in.",
+            type: "info",
+          });
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          await supabase.auth.signOut();
+          setAutoLoginInProgress(false);
+          setError(
+            "Invalid credentials. Please contact an administrator to create your account.",
+          );
+          return;
+        }
+
+        if (profile.role?.toLowerCase() === "admin") {
+          await supabase.auth.signOut();
+          setAutoLoginInProgress(false);
+          setPassword("");
+          setToast({
+            message: "Admin accounts require manual login. Please enter your password.",
+            type: "info",
+          });
+          return;
+        }
+
+        await recordLogin(data.user.id);
+
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("show_password_change_warning", "true");
+        }
+
+        router.refresh();
+        router.push("/dashboard");
+      } catch {
+        setAutoLoginInProgress(false);
+        setToast({
+          message: "Welcome back! Please enter your existing password to log in.",
+          type: "info",
+        });
+      }
+    };
+
+    void attemptAutoLogin();
+  }, [urlEmail]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const resetToCredentials = () => {
     setStep("credentials");
@@ -175,9 +260,49 @@ export default function LoginPage() {
     }
   };
 
+  if (autoLoginInProgress) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center gap-6">
+        <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+        <div className="flex flex-col items-center gap-4 bg-white border border-gray-200 rounded-xl shadow-sm px-10 py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-[#1682F1]" />
+          <p className="text-sm font-medium text-gray-600">
+            Signing you in automatically&hellip;
+          </p>
+          <p className="text-xs text-gray-400">
+            Please wait while we verify your account.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="min-h-screen bg-[#F5F7FA] p-4 py-8 flex flex-col items-center justify-center">
+        {toast && (
+          <div
+            className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md
+              flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border
+              animate-in slide-in-from-top-4 fade-in duration-300
+              ${
+                toast.type === "warning"
+                  ? "bg-amber-50 border-amber-200 text-amber-800"
+                  : "bg-blue-50 border-blue-200 text-blue-800"
+              }`}
+          >
+            <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
+            <p className="text-sm font-medium leading-snug flex-1">{toast.message}</p>
+            <button
+              onClick={() => setToast(null)}
+              className="shrink-0 p-0.5 rounded hover:bg-black/5 transition"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         <div className="text-center mb-4 shrink-0 flex flex-col items-center">
           <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
         </div>
@@ -319,7 +444,10 @@ export default function LoginPage() {
             {step === "credentials" && (
               <Button type="submit" disabled={loading} className="w-full mt-6 justify-center">
                 {loading ? (
-                  "Signing in..."
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in&hellip;
+                  </>
                 ) : (
                   <>
                     Sign In
@@ -380,5 +508,20 @@ export default function LoginPage() {
         />
       )}
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center gap-6">
+          <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#1682F1]" />
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }
