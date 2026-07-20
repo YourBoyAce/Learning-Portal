@@ -32,8 +32,9 @@
 
   /* Font */
 
-  --font-primary: var(--font-roboto, "Roboto"), system-ui, sans-serif;
+  --font-primary: var(--font-bricolage, "Bricolage Grotesque"), system-ui, sans-serif;
 }
+
 .nav-item {
   border-radius: var(--radius-default);
   transition: all 0.2s ease;

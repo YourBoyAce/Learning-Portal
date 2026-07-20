@@ -101,7 +101,7 @@ function LoginPageInner() {
         if (authError || !data.user) {
           setAutoLoginInProgress(false);
           setToast({
-            message: "Welcome back! Please enter your existing password to log in.",
+            message: "Welcome back! Please enter your existing password to access your new content.",
             type: "info",
           });
           return;
@@ -144,7 +144,7 @@ function LoginPageInner() {
       } catch {
         setAutoLoginInProgress(false);
         setToast({
-          message: "Welcome back! Please enter your existing password to log in.",
+          message: "Welcome back! Please enter your existing password to access your new content.",
           type: "info",
         });
       }
@@ -267,7 +267,7 @@ function LoginPageInner() {
         <div className="flex flex-col items-center gap-4 bg-white border border-gray-200 rounded-xl shadow-sm px-10 py-8">
           <Loader2 className="h-8 w-8 animate-spin text-[#1682F1]" />
           <p className="text-sm font-medium text-gray-600">
-            Signing you in automatically&hellip;
+            Setting up your workspace&hellip;
           </p>
           <p className="text-xs text-gray-400">
             Please wait while we verify your account.

@@ -718,10 +718,10 @@ export default function Dashboard() {
             <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-amber-800">
-                Your account is using a temporary password
+                Welcome!
               </p>
               <p className="text-xs text-amber-700 mt-0.5">
-                For your security, please change your password as soon as possible.
+                For security purposes, please change your default password in your profile settings.
               </p>
               <button
                 onClick={() => router.push("/profile")}
@@ -776,7 +776,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
 
         {/* Upcoming Webinars Widget */}
         {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
