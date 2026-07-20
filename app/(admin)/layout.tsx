@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
-import {ICONS} from "@/app/styles/icons";
+import { ICONS } from "@/app/styles/icons";
 import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 
@@ -95,78 +95,86 @@ export default function AdminLayout({
   };
 
   const navItems = [
-  {
-    label: "Dashboard",
-    href: "/admin",
-    active: pathname === "/admin",
-    icon: pathname === "/admin"
-      ? ICONS.DASHBOARDLIGHT
-      : ICONS.DASHBOARD,
-  },
+    {
+      label: "Dashboard",
+      href: "/admin",
+      active: pathname === "/admin",
+      icon: pathname === "/admin"
+        ? ICONS.DASHBOARDLIGHT
+        : ICONS.DASHBOARD,
+    },
 
-  {
-    label: "Manage Courses",
-    href: "/admin/courses",
-    active: pathname.startsWith("/admin/courses"),
-    icon: pathname.startsWith("/admin/courses")
-      ? ICONS.BOOKLIGHT
-      : ICONS.BOOK,
-  },
+    {
+      label: "Manage Courses",
+      href: "/admin/courses",
+      active: pathname.startsWith("/admin/courses"),
+      icon: pathname.startsWith("/admin/courses")
+        ? ICONS.BOOKLIGHT
+        : ICONS.BOOK,
+    },
 
-  {
-    label: "Manage Batches",
-    href: "/admin/batches",
-    active: pathname === "/admin/batches",
-    icon: pathname === "/admin/batches"
-      ? ICONS.BATCHLIGHT
-      : ICONS.BATCH,
-  },
+    {
+      label: "Manage Batches",
+      href: "/admin/batches",
+      active: pathname === "/admin/batches",
+      icon: pathname === "/admin/batches"
+        ? ICONS.BATCHLIGHT
+        : ICONS.BATCH,
+    },
 
-  {
-    label: "Upload Video",
-    href: "/admin/upload",
-    active: pathname === "/admin/upload",
-    icon: pathname === "/admin/upload"
-      ? ICONS.ARROWLIGHT
-      : ICONS.ARROW,
-  },
+    {
+      label: "Upload Video",
+      href: "/admin/upload",
+      active: pathname === "/admin/upload",
+      icon: pathname === "/admin/upload"
+        ? ICONS.ARROWLIGHT
+        : ICONS.ARROW,
+    },
 
-  {
-    label: "Manage Users",
-    href: "/admin/users",
-    active: pathname === "/admin/users",
-    icon: pathname === "/admin/users"
-      ? ICONS.USERSLIGHT
-      : ICONS.USERS,
-  },
+    {
+      label: "Manage Users",
+      href: "/admin/users",
+      active: pathname === "/admin/users",
+      icon: pathname === "/admin/users"
+        ? ICONS.USERSLIGHT
+        : ICONS.USERS,
+    },
 
-  {
-    label: "Manage Webinars",
-    href: "/admin/webinars",
-    active: pathname === "/admin/webinars",
-    icon: pathname === "/admin/webinars"
-      ? ICONS.GLOBELIGHT
-      : ICONS.GLOBE,
-  },
+    {
+      label: "Manage Webinars",
+      href: "/admin/webinars",
+      active: pathname === "/admin/webinars",
+      icon: pathname === "/admin/webinars"
+        ? ICONS.GLOBELIGHT
+        : ICONS.GLOBE,
+    },
 
-  {
-    label: "Quiz Management",
-    href: "/admin/quizzes",
-    active: pathname === "/admin/quizzes",
-    icon: pathname === "/admin/quizzes"
-      ? ICONS.BULBLIGHT
-      : ICONS.BULB,
-  },
+    {
+      label: "Quiz Management",
+      href: "/admin/quizzes",
+      active: pathname === "/admin/quizzes",
+      icon: pathname === "/admin/quizzes"
+        ? ICONS.BULBLIGHT
+        : ICONS.BULB,
+    },
 
-  {
-    label: "Artifacts Management",
-    href: "/admin/artifacts",
-    active: pathname === "/admin/artifacts",
-    icon: pathname === "/admin/artifacts"
-      ? ICONS.MATERIALLIGHT
-      : ICONS.MATERIAL,
-  },
-];
+    {
+      label: "Artifacts Management",
+      href: "/admin/artifacts",
+      active: pathname === "/admin/artifacts",
+      icon: pathname === "/admin/artifacts"
+        ? ICONS.MATERIALLIGHT
+        : ICONS.MATERIAL,
+    },
+    {
+      label: "Communities Management",
+      href: "/admin/communities",
+      active: pathname === "/admin/communities",
+      icon: pathname === "/admin/communities"
+        ? ICONS.COMMUNITIESLIGHT
+        : ICONS.COMMUNITIES,
+    }
+  ];
   return (
     <div className="admin-typography flex h-screen bg-surface-page overflow-hidden">
       {isSidebarOpen && (
@@ -177,9 +185,8 @@ export default function AdminLayout({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:max-w-none lg:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:max-w-none lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="p-5 sm:p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -198,27 +205,26 @@ export default function AdminLayout({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-2">
-  {navItems.map((item) => (
-    <Link
-      key={item.href}
-      href={item.href}
-      className={`nav-item flex items-center gap-3 px-4 py-3 ${
-        item.active
-          ? "nav-item-active"
-          : "nav-item-inactive"
-      }`}
-    >
-      <Image
-        src={item.icon}
-        alt={item.label}
-        width={20}
-        height={20}
-      />
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active
+                  ? "nav-item-active"
+                  : "nav-item-inactive"
+                }`}
+            >
+              <Image
+                src={item.icon}
+                alt={item.label}
+                width={20}
+                height={20}
+              />
 
-      <span>{item.label}</span>
-    </Link>
-  ))}
-</nav>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
 
         <div className="p-4 border-t border-gray-100 space-y-3">
           <Link href="/admin/profile">
@@ -242,7 +248,7 @@ export default function AdminLayout({
             type="button"
             className="w-full justify-center"
             onClick={handleSignOut}
-            
+
           >
             <svg
               className="w-4 h-4"
@@ -283,32 +289,32 @@ export default function AdminLayout({
           />
         </header>
 
-      {showSignOutDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Sign Out
-            </h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to sign out of your account?
-            </p>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row">
-              <Button
-                onClick={() => setShowSignOutDialog(false)}
-                className="w-full justify-center sm:w-1/2"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmSignOut}
-                className="w-full justify-center sm:w-1/2"
-              >
+        {showSignOutDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Sign Out
-              </Button>
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to sign out of your account?
+              </p>
+              <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                <Button
+                  onClick={() => setShowSignOutDialog(false)}
+                  className="w-full justify-center sm:w-1/2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmSignOut}
+                  className="w-full justify-center sm:w-1/2"
+                >
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
         <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>

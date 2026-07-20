@@ -34,4 +34,6 @@ export const ICONS = {
   CLOCK: "/icons/clock.svg",
   CALENDAR: "/icons/calendar.svg",
   COPYPASTE: "/icons/copy-paste.svg",
+  COMMUNITIES: "/icons/communities.svg",
+  COMMUNITIESLIGHT: "/icons/communitiesLight.svg",
 };
