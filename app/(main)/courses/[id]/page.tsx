@@ -41,7 +41,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
 import { ICONS } from "@/app/styles/icons";
-import CommunityChatPanel from "./components/CommunityChatPanel";
+
 
 interface Course {
   id: string;
@@ -1881,16 +1881,6 @@ export default function CoursePlayerPage() {
                     </span>
                   )}
                 </button>
-                <button
-                  onClick={() => handleTabChange("community")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "community"
-                    ? "border-brand-heading text-brand-heading bg-white"
-                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                    }`}
-                >
-                  <MessageSquare size={13} />
-                  Community
-                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -1900,15 +1890,6 @@ export default function CoursePlayerPage() {
                 {activeTab === "modules" && renderModulesList()}
                 {activeTab === "quizzes" && renderQuizzesList()}
                 {activeTab === "artifacts" && renderArtifactsList()}
-                {activeTab === "community" && userId && (
-                  <div className="flex flex-col" style={{ minHeight: "480px" }}>
-                    <CommunityChatPanel
-                      courseId={String(id)}
-                      userId={userId}
-                      userName={studentName}
-                    />
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1962,30 +1943,13 @@ export default function CoursePlayerPage() {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => handleTabChange("community")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "community"
-                ? "border-brand-heading text-brand-heading bg-white"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                }`}
-            >
-              <MessageSquare size={13} />
-              Community
-            </button>
           </div>
 
-          <div className={`flex-1 flex flex-col divide-y divide-gray-50 ${activeTab === "community" ? "overflow-hidden" : "overflow-y-auto"}`}>
+          <div className="flex-1 flex flex-col divide-y divide-gray-50 overflow-y-auto">
             {(activeTab === "modules" || activeTab === "overview") &&
               renderModulesList()}
             {activeTab === "quizzes" && renderQuizzesList()}
             {activeTab === "artifacts" && renderArtifactsList()}
-            {activeTab === "community" && userId && (
-              <CommunityChatPanel
-                courseId={String(id)}
-                userId={userId}
-                userName={studentName}
-              />
-            )}
           </div>
         </div>
       </main>

@@ -3,6 +3,7 @@
 import Image from "next/image";
 
 import { ICONS } from "@/app/styles/icons";
+import { PLACEHOLDER_IMAGE } from "@/lib/utils";
 
 type ScheduleType = "weekday" | "weekend";
 type CourseStatus = "active" | "upcoming";
@@ -27,8 +28,6 @@ type CourseCardProps = {
   onCertificateClick?: () => void;
 };
 
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1498050108023-c5249f4df085";
 
 function ScheduleBadge({ type }: { type: ScheduleType }) {
   const isWeekend = type === "weekend";

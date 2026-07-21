@@ -54,6 +54,8 @@ export default function CommunityChat({
 
     const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
     const [currentAdminName, setCurrentAdminName] = useState<string>("Administrator");
+    const [currentAccessToken, setCurrentAccessToken] = useState<string | null>(null);
+    const [lastReadAt, setLastReadAt] = useState<string | null>(null);
 
     /*************************************************
      *
@@ -158,12 +160,15 @@ export default function CommunityChat({
 
             let adminId = currentAdminId;
             let adminName = currentAdminName;
+            let token = currentAccessToken;
 
-            if (!adminId) {
+            if (!adminId || !token) {
                 const { data: sessionData } = await supabase.auth.getSession();
                 adminId = sessionData.session?.user?.id || null;
-                if (adminId) {
+                token = sessionData.session?.access_token || null;
+                if (adminId && token) {
                     setCurrentAdminId(adminId);
+                    setCurrentAccessToken(token);
                     // Optionally fetch profile here or use metadata
                     const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", adminId).single();
                     adminName = profile?.full_name || "Administrator";
@@ -171,18 +176,35 @@ export default function CommunityChat({
                 }
             }
 
-            if (!adminId) {
+            if (!adminId || !token) {
                 setError({ type: "ERROR", message: "Not authenticated" });
                 setLoadingInitial(false);
                 return;
             }
+
+            const { data: readData } = await supabase
+                .from("community_reads")
+                .select("last_read_at")
+                .eq("user_id", adminId)
+                .eq("course_id", course.id)
+                .maybeSingle();
+
+            if (mounted && readData?.last_read_at) {
+                setLastReadAt(readData.last_read_at);
+            }
+
+            supabase.from("community_reads").upsert({
+                user_id: adminId,
+                course_id: course.id,
+                last_read_at: new Date().toISOString()
+            }).then();
 
             const {
                 messages: initialMessages,
                 error: fetchError,
             } = await fetchInitialMessages(
                 course.id,
-                adminId
+                token
             );
 
             if (!mounted) return;
@@ -220,12 +242,26 @@ export default function CommunityChat({
         ) {
             initialScrollDone.current = true;
 
+            if (lastReadAt) {
+                const unreadIndex = messages.findIndex(m => new Date(m.created_at) > new Date(lastReadAt));
+                if (unreadIndex !== -1) {
+                    const targetMsg = unreadIndex > 0 ? messages[unreadIndex - 1] : messages[0];
+                    const el = document.getElementById(`msg-${targetMsg.id}`);
+                    if (el) {
+                        el.scrollIntoView({ behavior: "instant", block: "start" });
+                        return;
+                    }
+                }
+            }
+
             scrollToBottom(
                 "instant" as ScrollBehavior
             );
         }
     }, [
         loadingInitial,
+        messages,
+        lastReadAt,
         scrollToBottom,
     ]);
 
@@ -449,53 +485,48 @@ export default function CommunityChat({
    *************************************************/
 
     const handleSendMessage = useCallback(
-        async (content: string) => {
-            if (!content.trim() || !currentAdminId) return;
+        (content: string) => {
+            if (!currentAdminId || !currentAdminName || !currentAccessToken) return;
 
-            /*
-              Optimistic message
-            */
+            const trimmed = content.trim();
+            if (!trimmed) return;
 
-            const optimisticId = `optimistic-${Date.now()}`;
-
+            const tempId = `temp-${Date.now()}`;
             const optimisticMessage: ChatMessage = {
-                id: optimisticId,
+                id: tempId,
                 course_id: course.id,
                 user_id: currentAdminId,
-                content,
+                content: trimmed,
                 created_at: new Date().toISOString(),
                 full_name: currentAdminName,
+                role: "admin",
             };
 
-            setMessages((previous) => [
-                ...previous,
-                optimisticMessage,
-            ]);
+            setMessages((prev) => [...prev, optimisticMessage]);
 
-            scrollToBottom();
+            setTimeout(() => {
+                scrollToBottom("smooth");
+            }, 50);
 
             startTransition(async () => {
-                const {
-                    message: confirmedMessage,
-                    error,
-                } = await sendCourseMessage(
-                    currentAdminId,
+                const { message: confirmedMessage, error: sendError } = await sendCourseMessage(
+                    currentAccessToken,
                     course.id,
-                    content
+                    trimmed
                 );
 
-                if (error) {
+                if (sendError) {
                     /*
                       Remove optimistic message
                     */
 
                     setMessages((previous) =>
                         previous.filter(
-                            (m) => m.id !== optimisticId
+                            (m) => m.id !== tempId
                         )
                     );
 
-                    console.error(error);
+                    console.error(sendError);
 
                     return;
                 }
@@ -507,7 +538,7 @@ export default function CommunityChat({
                 if (confirmedMessage) {
                     setMessages((previous) =>
                         previous.map((message) =>
-                            message.id === optimisticId
+                            message.id === tempId
                                 ? confirmedMessage
                                 : message
                         )
@@ -519,6 +550,7 @@ export default function CommunityChat({
             course.id,
             currentAdminId,
             currentAdminName,
+            currentAccessToken,
             scrollToBottom,
         ]
     );
@@ -530,13 +562,12 @@ export default function CommunityChat({
      *************************************************/
 
     const handleDeleteMessage = useCallback(
-        async (messageId: string) => {
-            if (!currentAdminId) return;
-
+        async (msgId: string) => {
+            if (!currentAccessToken) return;
             const { success, error } =
                 await deleteCourseMessage(
-                    currentAdminId,
-                    messageId
+                    currentAccessToken,
+                    msgId
                 );
 
             if (!success) {
@@ -547,11 +578,11 @@ export default function CommunityChat({
 
             setMessages((previous) =>
                 previous.filter(
-                    (message) => message.id !== messageId
+                    (message) => message.id !== msgId
                 )
             );
         },
-        [currentAdminId]
+        [currentAccessToken]
     );
 
     /*************************************************
@@ -561,7 +592,7 @@ export default function CommunityChat({
      *************************************************/
 
     const refreshMessages = useCallback(async () => {
-        if (!currentAdminId) return;
+        if (!currentAccessToken) return;
         setLoadingInitial(true);
 
         const {
@@ -569,7 +600,7 @@ export default function CommunityChat({
             error: fetchError,
         } = await fetchInitialMessages(
             course.id,
-            currentAdminId
+            currentAccessToken
         );
 
         if (fetchError) {

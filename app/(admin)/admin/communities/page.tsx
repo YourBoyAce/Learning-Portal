@@ -16,7 +16,7 @@ export default function CommunitiesPage() {
         useState<CommunityCourse | null>(null);
 
     return (
-        <div className="flex h-[calc(100vh-80px)] bg-white rounded-2xl overflow-hidden border">
+        <div className="flex h-full bg-white rounded-2xl overflow-hidden border">
 
             {/* LEFT SIDEBAR */}
 

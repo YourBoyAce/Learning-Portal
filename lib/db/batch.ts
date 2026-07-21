@@ -14,6 +14,7 @@ export async function createBatch(
   courseId: string,
   scheduleType: "weekday" | "weekend",
   createdBy: string,
+  productId?: string,
 ) {
   try {
     const { data, error } = await supabase
@@ -23,6 +24,7 @@ export async function createBatch(
         course_id: courseId,
         schedule_type: scheduleType,
         created_by: createdBy,
+        ...(productId && { product_id: productId })
       })
       .select()
       .single();
@@ -42,6 +44,7 @@ export async function getAllBatches() {
         `
         *,
         courses:course_id (id, title),
+        products:product_id (id, title),
         batch_members (id)
       `,
       )
@@ -62,6 +65,7 @@ export async function getBatchById(batchId: string) {
         `
         *,
         courses:course_id (id, title),
+        products:product_id (id, title),
         batch_members (id, email, joined_at)
       `,
       )
@@ -80,6 +84,7 @@ export async function updateBatch(
   updates: {
     name?: string;
     schedule_type?: "weekday" | "weekend";
+    product_id?: string | null;
   },
 ) {
   try {

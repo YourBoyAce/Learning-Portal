@@ -159,6 +159,14 @@ export default function MainLayout({
   },
 
   {
+    label: "Communities",
+    href: "/communities",
+    active: pathname === "/communities" || pathname.startsWith("/communities/"),
+    icon: pathname === "/communities" || pathname.startsWith("/communities/")
+      ? ICONS.COMMUNITIESLIGHT
+      : ICONS.COMMUNITIES,
+  },
+  {
     label: "Profile",
     href: "/profile",
     active: pathname === "/profile",

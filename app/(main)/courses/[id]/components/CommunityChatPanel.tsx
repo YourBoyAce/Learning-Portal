@@ -30,8 +30,6 @@ import {
 
 interface CommunityChatPanelProps {
   courseId: string;
-  userId: string;
-  userName: string;
 }
 
 // ─── Timestamp formatter ──────────────────────────────────────────────────────
@@ -80,6 +78,7 @@ function MessageBubble({
 
   return (
     <div
+      id={`msg-${message.id}`}
       className={`flex items-start gap-2.5 group ${isOwn ? "flex-row-reverse" : "flex-row"}`}
     >
       <div className="shrink-0 mt-0.5">
@@ -163,11 +162,10 @@ function MessageBubble({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CommunityChatPanel({
-  courseId,
-  userId,
-  userName,
-}: CommunityChatPanelProps) {
+export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps) {
+  const [userId, setUserId] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
+  const [accessToken, setAccessToken] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -177,6 +175,7 @@ export default function CommunityChatPanel({
   const [sendError, setSendError] = useState<string | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(true);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [lastReadAt, setLastReadAt] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -221,9 +220,56 @@ export default function CommunityChatPanel({
   useEffect(() => {
     let isMounted = true;
     async function loadMessages() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        if (isMounted) {
+            setError({ type: "UNKNOWN", message: "User not authenticated" });
+            setLoadingInitial(false);
+        }
+        return;
+      }
+      
+      const currentUserId = session.user.id;
+      let currentUserName = session.user.email?.split("@")[0] || "User";
+      
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", currentUserId)
+        .single();
+        
+      if (profile?.full_name) {
+          currentUserName = profile.full_name;
+      }
+      
+      if (isMounted) {
+          setUserId(currentUserId);
+          setUserName(currentUserName);
+          setAccessToken(session.access_token);
+      }
+
+      const { data: readData } = await supabase
+        .from("community_reads")
+        .select("last_read_at")
+        .eq("user_id", currentUserId)
+        .eq("course_id", courseId)
+        .maybeSingle();
+
+      if (isMounted && readData?.last_read_at) {
+        setLastReadAt(readData.last_read_at);
+      }
+
+      // Update the read receipt for this course since the user just opened it.
+      // This is done after we grab the old value so we can scroll to the right spot.
+      supabase.from("community_reads").upsert({
+        user_id: currentUserId,
+        course_id: courseId,
+        last_read_at: new Date().toISOString()
+      }).then();
+
       const { messages: initialMessages, isAdmin, error: fetchError } = await fetchInitialMessages(
         courseId,
-        userId,
+        session.access_token,
       );
 
       if (!isMounted) return;
@@ -256,9 +302,22 @@ export default function CommunityChatPanel({
   useEffect(() => {
     if (!loadingInitial && !isInitialScrollDone.current) {
       isInitialScrollDone.current = true;
+      
+      if (lastReadAt) {
+        const unreadIndex = messages.findIndex(m => new Date(m.created_at) > new Date(lastReadAt));
+        if (unreadIndex !== -1) {
+          const targetMsg = unreadIndex > 0 ? messages[unreadIndex - 1] : messages[0];
+          const el = document.getElementById(`msg-${targetMsg.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "instant", block: "start" });
+            return;
+          }
+        }
+      }
+      
       scrollToBottom("instant" as ScrollBehavior);
     }
-  }, [loadingInitial, scrollToBottom]);
+  }, [loadingInitial, messages, lastReadAt, scrollToBottom]);
 
   // ─── Realtime subscription ────────────────────────────────────────────────
 
@@ -403,8 +462,9 @@ export default function CommunityChatPanel({
     setTimeout(() => scrollToBottom(), 50);
 
     startTransition(async () => {
+      if (!accessToken) return;
       const { message: confirmed, error: sendErr } = await sendCourseMessage(
-        userId,
+        accessToken,
         courseId,
         trimmed,
       );
@@ -425,7 +485,8 @@ export default function CommunityChatPanel({
   }, [inputValue, isPending, courseId, userId, userName, scrollToBottom]);
 
   const handleDeleteMessage = useCallback(async (msgId: string) => {
-    const { success, error } = await deleteCourseMessage(userId, msgId);
+    if (!accessToken) return;
+    const { success, error } = await deleteCourseMessage(accessToken, msgId);
     if (success) {
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
     } else {
@@ -549,11 +610,11 @@ export default function CommunityChatPanel({
             <button
               onClick={() => {
                 const oldest = messages[0]?.created_at;
-                if (!oldest) return;
+                if (!oldest || !accessToken) return;
                 setLoadingOlder(true);
                 preserveScrollPositionFor(async () => {
                   const { messages: older, error: olderError } =
-                    await fetchOlderMessages(courseId, userId, oldest);
+                    await fetchOlderMessages(courseId, accessToken, oldest);
                   if (!olderError && older.length > 0) {
                     setMessages((prev) => [...older, ...prev]);
                     setHasMore(older.length === 50);

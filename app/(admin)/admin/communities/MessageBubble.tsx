@@ -53,6 +53,7 @@ export default function MessageBubble({
 
     return (
         <div
+            id={`msg-${message.id}`}
             className={`group flex gap-3 ${isOwn ? "justify-end" : "justify-start"
                 }`}
         >
