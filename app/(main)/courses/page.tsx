@@ -8,6 +8,7 @@ import { getMyLearningData } from "@/app/actions/my-learning";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import { useRouter } from "next/navigation";
 import CourseCard from "@/app/components/course/CourseCard";
+import CourseCardSkeleton from "@/app/components/course/CourseCardSkeleton";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import { Button } from "@/components/ui/button";
@@ -740,38 +741,54 @@ export default function MyLearningDashboard() {
             className="w-full"
           >
             <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-              {activeCourses.map((course) => (
-                <CarouselItem
-                  key={course.id}
-                  className="
-            pl-4
-            sm:pl-6
-            basis-[85vw]
-            sm:basis-1/2
-            lg:basis-1/3
-          "
-                >
-                  <CourseCard
-                    id={course.id}
-                    title={course.batchName || course.title}
-                    description={course.batchName ? course.title : course.description}
-                    thumbnail={course.thumbnail_url}
-                    category={course.module_label}
-                    duration={course.duration}
-                    progressPercentage={
-                      courseProgress[String(course.id)]
-                        ?.progressPercentage || 0
-                    }
-                    showProgress
-                    variant="user"
-                    onClick={() =>
-                      router.push(`/courses/${course.id}`)
-                    }
-                  />
-                </CarouselItem>
-              ))}
+              {loading
+                ? // ── Skeleton placeholders while fetching ──
+                  [0, 1, 2].map((i) => (
+                    <CarouselItem
+                      key={i}
+                      className="
+                pl-4
+                sm:pl-6
+                basis-[85vw]
+                sm:basis-1/2
+                lg:basis-1/3
+              "
+                    >
+                      <CourseCardSkeleton />
+                    </CarouselItem>
+                  ))
+                : activeCourses.map((course) => (
+                    <CarouselItem
+                      key={course.id}
+                      className="
+                pl-4
+                sm:pl-6
+                basis-[85vw]
+                sm:basis-1/2
+                lg:basis-1/3
+              "
+                    >
+                      <CourseCard
+                        id={course.id}
+                        title={course.batchName || course.title}
+                        description={course.batchName ? course.title : course.description}
+                        thumbnail={course.thumbnail_url}
+                        category={course.module_label}
+                        duration={course.duration}
+                        progressPercentage={
+                          courseProgress[String(course.id)]
+                            ?.progressPercentage || 0
+                        }
+                        showProgress
+                        variant="user"
+                        onClick={() =>
+                          router.push(`/courses/${course.id}`)
+                        }
+                      />
+                    </CarouselItem>
+                  ))}
             </CarouselContent>
-            {activeCourses.length > 1 && (
+            {!loading && activeCourses.length > 1 && (
               <>
                 <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
                 <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
@@ -787,21 +804,24 @@ export default function MyLearningDashboard() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {completedCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                id={course.id}
-                title={course.title}
-                description={course.description}
-                thumbnail={course.thumbnail_url}
-                variant="user"
-                progressPercentage={100}
-                showProgress={true}
-                isCompleted={course.progress === 100}
-                onCertificateClick={() => setSelectedCertificateCourse(course)}
-                onClick={() => router.push(`/courses/${course.id}`)}
-              />
-            ))}
+            {loading
+              ? // ── Skeleton placeholders while fetching ──
+                [0, 1].map((i) => <CourseCardSkeleton key={i} />)
+              : completedCourses.map((course) => (
+                  <CourseCard
+                    key={course.id}
+                    id={course.id}
+                    title={course.title}
+                    description={course.description}
+                    thumbnail={course.thumbnail_url}
+                    variant="user"
+                    progressPercentage={100}
+                    showProgress={true}
+                    isCompleted={course.progress === 100}
+                    onCertificateClick={() => setSelectedCertificateCourse(course)}
+                    onClick={() => router.push(`/courses/${course.id}`)}
+                  />
+                ))}
           </div>
         </section>
 

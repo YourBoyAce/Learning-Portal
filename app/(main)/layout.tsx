@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
@@ -17,6 +17,8 @@ export default function MainLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab");
   
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
@@ -150,12 +152,28 @@ export default function MainLayout({
   },
 
   {
-    label: "Quizzes & Artifacts",
-    href: "/practice",
-    active: pathname === "/practice",
-    icon: pathname === "/practice"
+    label: "Quizzes",
+    href: "/practice?tab=quizzes",
+    active: pathname === "/practice" && activeTab !== "artifacts",
+    icon: pathname === "/practice" && activeTab !== "artifacts"
       ? ICONS.BULBLIGHT
       : ICONS.BULB,
+  },
+
+  {
+    label: "Artifacts",
+    href: "/practice?tab=artifacts",
+    active: pathname === "/practice" && activeTab === "artifacts",
+    icon: pathname === "/practice" && activeTab === "artifacts"
+      ? ICONS.MATERIALLIGHT
+      : ICONS.MATERIAL,
+  },
+
+  {
+    label: "Live Webinars",
+    href: "/webinars",
+    active: pathname === "/webinars",
+    icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
   },
 
   {

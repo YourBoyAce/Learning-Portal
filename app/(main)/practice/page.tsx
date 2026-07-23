@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
 import {Button} from "@/components/ui/button";
@@ -79,7 +80,18 @@ export default function StudentPracticeCenter() {
     setGlobalLoading(loading);
     return () => setGlobalLoading(false);
   }, [loading, setGlobalLoading]);
-  const [activeTab, setActiveTab] = useState<"quizzes" | "artifacts">("quizzes");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<"quizzes" | "artifacts">(
+    searchParams.get("tab") === "artifacts" ? "artifacts" : "quizzes"
+  );
+
+  // Keep tab in sync when the URL param changes (e.g. back/forward or sidebar click)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "artifacts" || tab === "quizzes") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   
   // Enrolled Courses & Data State
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<string[]>([]);
@@ -369,65 +381,27 @@ if (artifactsError) {
       default: return <FileText className="w-6 h-6 text-gray-500" />;
     }
   };
-  const quizIcon =
-    activeTab === "quizzes"
-      ? ICONS.BULBLIGHT
-      : ICONS.BULB;
-
-  const materialIcon =
-    activeTab === "artifacts"
-      ? ICONS.MATERIALLIGHT
-      : ICONS.MATERIAL;
-
-
-
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
-          <div>
-            <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2`}>
-              Quizzes & Artifacts
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Access your practice assessments, cheat sheets, boilerplates, and downloadable materials in one integrated space.
-            </p>
-          </div>
-
-          {/* Segmented control tabs */}
-          <div className="grid w-full min-w-0 grid-cols-1 gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm sm:w-auto sm:grid-cols-2 sm:shrink-0">
-            <Button
-              onClick={() => setActiveTab("quizzes")}
-              className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
-                activeTab === "quizzes"
-                  ? "bg-brand-primary text-white"
-                  : "bg-white text-gray-500 hover:bg-brand-primary/10 hover:text-brand-primary"
-              }`}
-            >
-              <Image
-  src={quizIcon}
-  width={24}
-  height={24}
-  alt="Quizzes"
-/>
-              <span className="truncate">Quizzes ({quizzes.length})</span>
-            </Button>
-            <Button
-              onClick={() => setActiveTab("artifacts")}
-              className={`w-full justify-center gap-2 px-3 text-xs sm:min-w-[150px] sm:text-sm ${
-                activeTab === "artifacts"
-                  ? "bg-brand-primary text-white"
-                  : "bg-white text-gray-500 hover:bg-brand-primary/10 hover:text-brand-primary"
-              }`}
-            >
-              <Image src={materialIcon}  width={24}
-  height={24} alt="Materials" />
-              <span className="truncate">Materials ({artifacts.length})</span>
-            </Button>
-          </div>
+        <div className="border-b border-gray-100 pb-6">
+          <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2`}>
+            <Image
+              src={activeTab === "quizzes" ? ICONS.BULB : ICONS.MATERIAL}
+              alt={activeTab === "quizzes" ? "Quizzes" : "Artifacts"}
+              width={28}
+              height={28}
+            />
+            {activeTab === "quizzes" ? "Quizzes" : "Artifacts"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {activeTab === "quizzes"
+              ? "Practice assessments assigned to your enrolled courses."
+              : "Cheat sheets, boilerplates, and downloadable study materials for your courses."}
+          </p>
         </div>
 
         {/* --- TABS BODY --- */}

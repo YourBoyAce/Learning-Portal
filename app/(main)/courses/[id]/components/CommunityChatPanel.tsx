@@ -17,6 +17,7 @@ import {
   type FetchMessagesError,
 } from "@/app/actions/community-chat";
 import UserAvatar from "@/app/components/UserAvatar";
+import CommunityChatSkeleton from "@/app/components/chat/CommunityChatSkeleton";
 import { Button } from "@/components/ui/button";
 import {
   MessageSquare,
@@ -94,6 +95,12 @@ function MessageBubble({
           <span className="text-xs font-bold text-gray-800 truncate max-w-[120px]">
             {isOwn ? "You" : displayName}
           </span>
+          {/* Admin role badge — oval pill with brand-primary color */}
+          {!isOwn && message.role?.toLowerCase() === "admin" && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-primary text-white shrink-0">
+              Admin
+            </span>
+          )}
           <span className="text-[10px] text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {formatTimestamp(message.created_at)}
           </span>
@@ -112,7 +119,7 @@ function MessageBubble({
         <div
           className={`
             px-3 py-2 rounded-2xl text-sm leading-relaxed break-words
-            bg-brand-heading text-white
+            bg-gray-100 text-gray-900 font-medium
             ${isOwn ? "rounded-tr-sm" : "rounded-tl-sm"}
           `}
         >
@@ -507,14 +514,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
     return (
       <div className="flex flex-col flex-1 min-h-0 bg-white">
         <ChatHeader />
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="flex flex-col items-center gap-3 text-gray-400">
-            <Loader2 size={24} className="animate-spin text-brand-heading" />
-            <p className="text-xs font-bold uppercase tracking-widest">
-              Loading Community
-            </p>
-          </div>
-        </div>
+        <CommunityChatSkeleton />
       </div>
     );
   }
