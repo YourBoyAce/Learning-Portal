@@ -671,10 +671,10 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       )}
 
       {/* Input area */}
-      <div className="shrink-0 border-t border-gray-100 bg-white p-2">
-        <div className="flex items-end gap-2">
-          <div className="shrink-0 mb-1">
-            <UserAvatar name={userName} size={28} textSize="text-[10px]" />
+      <div className="shrink-0 border-t border-gray-100 bg-white p-4 pb-8">
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 h-12 flex items-center">
+            <UserAvatar name={userName} size={32} textSize="text-xs" />
           </div>
 
           <div className="flex-1 relative">
@@ -691,23 +691,23 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
               disabled={isPending}
               className="
                 block w-full resize-none rounded-xl border border-gray-200 bg-gray-50
-                px-3 py-2 text-[12px] text-gray-800 placeholder-gray-400
+                px-4 py-3 text-base text-gray-800 placeholder-gray-400
                 leading-relaxed
                 focus:outline-none focus:border-brand-heading focus:bg-white
                 transition-colors
                 disabled:opacity-50 disabled:cursor-not-allowed
-                max-h-24 overflow-y-auto
+                max-h-32 overflow-y-auto
               "
-              style={{ minHeight: "36px" }}
+              style={{ minHeight: "48px" }}
               onInput={(e) => {
                 // Auto-resize textarea
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = "auto";
-                target.style.height = `${Math.min(target.scrollHeight, 96)}px`;
+                target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
               }}
             />
             {inputValue.length > 1800 && (
-              <span className="absolute bottom-1 right-2 text-[9px] text-gray-400 bg-white/80 px-1 rounded">
+              <span className="absolute bottom-2 right-3 text-[10px] text-gray-400 bg-white/80 px-1 rounded">
                 {2000 - inputValue.length}
               </span>
             )}
@@ -717,7 +717,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             onClick={handleSend}
             disabled={!inputValue.trim() || isPending}
             className="
-              shrink-0 rounded-xl px-3 h-9
+              shrink-0 rounded-xl px-4 h-12
               bg-brand-heading hover:bg-brand-heading-hover
               text-white disabled:opacity-40
               transition-all
@@ -725,9 +725,9 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             aria-label="Send message"
           >
             {isPending ? (
-              <Loader2 size={15} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin" />
             ) : (
-              <Send size={15} />
+              <Send size={18} />
             )}
           </Button>
         </div>

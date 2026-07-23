@@ -42,17 +42,17 @@ export default function MessageInput({
     }
 
     return (
-        <div className="border-t bg-white p-4">
-
-            <div className="flex items-end gap-3">
+        <div className="border-t bg-white p-4 pb-8">
+            <div className="flex items-center gap-3">
 
                 {/* Avatar */}
-
-                <UserAvatar
-                    name={currentUserName}
-                    size={38}
-                    textSize="text-xs"
-                />
+                <div className="shrink-0 h-12 flex items-center">
+                    <UserAvatar
+                        name={currentUserName}
+                        size={38}
+                        textSize="text-xs"
+                    />
+                </div>
 
                 {/* Input */}
 
@@ -60,6 +60,7 @@ export default function MessageInput({
 
                     <textarea
                         rows={1}
+                        style={{ minHeight: "48px" }}
                         value={message}
                         onChange={(e) => {
                             setMessage(e.target.value);
@@ -81,7 +82,7 @@ export default function MessageInput({
               bg-gray-50
               px-4
               py-3
-              text-sm
+              text-base
               text-gray-700
               placeholder:text-gray-400
               focus:border-brand-heading
@@ -107,8 +108,8 @@ export default function MessageInput({
                     onClick={handleSend}
                     disabled={sending || !message.trim()}
                     className="
-            h-11
-            w-11
+            h-12
+            w-12
             rounded-full
             bg-brand-heading
             hover:bg-brand-heading-hover
