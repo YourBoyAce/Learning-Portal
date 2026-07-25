@@ -389,7 +389,7 @@ function LoginPageInner() {
                       <Mail className="h-5 w-5" />
                     </div>
                     <p className="text-sm font-semibold text-gray-800">Email</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 break-words">
                       Send a code to {maskedEmail || "your email"}.
                     </p>
                   </button>
@@ -417,7 +417,7 @@ function LoginPageInner() {
                       <Phone className="h-5 w-5" />
                     </div>
                     <p className="text-sm font-semibold text-gray-800">Phone Number</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 break-words">
                       {savedPhone
                         ? "Send a code automatically to your registered admin phone."
                         : "No admin phone on file. Ask an administrator to add one."}

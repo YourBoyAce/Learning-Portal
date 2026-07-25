@@ -9,6 +9,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 import PhoneVerification from "@/app/components/PhoneVerification";
+import { Sparkles } from "lucide-react";
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,6 +25,11 @@ export default function ProfilePage() {
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneVerified, setPhoneVerified] = useState(false);
+
+  // --- Mentor Booking Settings ---
+  const [calLink, setCalLink] = useState("");
+  const [mentorBio, setMentorBio] = useState("");
+  const [mentorExpertise, setMentorExpertise] = useState("");
 
   useEffect(() => {
     async function loadUserProfile() {
@@ -56,6 +62,9 @@ export default function ProfilePage() {
           setPortfolioUrl(profile.portfolio_url || "");
           setPhone(profile.phone || "");
           setPhoneVerified(Boolean(profile.phone_verified));
+          setCalLink(profile.cal_link || "");
+          setMentorBio(profile.mentor_bio || "");
+          setMentorExpertise(Array.isArray(profile.mentor_expertise) ? profile.mentor_expertise.join(", ") : "");
 
           if (profile.role) {
             setRole(profile.role);
@@ -96,6 +105,9 @@ export default function ProfilePage() {
           full_name: fullName.trim(),
           bio: bio.trim(),
           portfolio_url: portfolioUrl.trim(),
+          cal_link: calLink.trim(),
+          mentor_bio: mentorBio.trim(),
+          mentor_expertise: mentorExpertise.split(",").map(t => t.trim()).filter(Boolean),
         })
         .eq("id", userId);
 
@@ -291,6 +303,62 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            {/* MENTOR SETTINGS (ONLY FOR INSTRUCTORS & ADMINS) */}
+            {(role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin") && (
+              <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
+                <div className="flex items-center gap-2 mb-6">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-bold text-brand-primary text-[18px]">
+                    Mentor Booking Setup
+                  </h3>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
+                      CAL.COM SCHEDULING LINK
+                    </label>
+                    <input
+                      type="text"
+                      value={calLink}
+                      onChange={(e) => setCalLink(e.target.value)}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
+                      placeholder="username/30min"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+                      Enter your Cal.com link (exclude "https://cal.com/"). Ensure your calendar is connected on Cal.com.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
+                      PROFESSIONAL BIO
+                    </label>
+                    <textarea
+                      value={mentorBio}
+                      onChange={(e) => setMentorBio(e.target.value)}
+                      rows={3}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors resize-none"
+                      placeholder="Write a brief professional description that will be shown to students..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
+                      EXPERTISE TAGS (COMMA-SEPARATED)
+                    </label>
+                    <input
+                      type="text"
+                      value={mentorExpertise}
+                      onChange={(e) => setMentorExpertise(e.target.value)}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
+                      placeholder="e.g. Next.js, AI Engineering, Databases"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* DIGITAL FOOTPRINT */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">

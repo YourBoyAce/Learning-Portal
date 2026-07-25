@@ -891,3 +891,14 @@ input[type="datetime-local"]::-webkit-inner-spin-button,
 input[type="date"]::-webkit-inner-spin-button {
   display: none;
 }
+
+/* Diagonal stripe pattern for blocked time slots in planner calendar */
+.bg-stripe-pattern {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(148, 163, 184, 0.07),
+    rgba(148, 163, 184, 0.07) 10px,
+    rgba(255, 255, 255, 0.8) 10px,
+    rgba(255, 255, 255, 0.8) 20px
+  );
+}

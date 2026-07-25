@@ -31,6 +31,7 @@ import {
   MoreVertical,
   Trash2,
   MessageSquare,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -41,6 +42,8 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
 import { ICONS } from "@/app/styles/icons";
+import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 
 
 interface Course {
@@ -168,11 +171,13 @@ export default function CoursePlayerPage() {
   const [expandedBatchIds, setExpandedBatchIds] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
+  const { isLoading: isTierLoading, tier, canAccess } = useSecurityGatedData();
+  const isCurrentlyLoading = loading || isTierLoading;
 
   useEffect(() => {
-    setGlobalLoading(loading);
+    setGlobalLoading(isCurrentlyLoading);
     return () => setGlobalLoading(false);
-  }, [loading, setGlobalLoading]);
+  }, [isCurrentlyLoading, setGlobalLoading]);
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
@@ -1528,6 +1533,18 @@ export default function CoursePlayerPage() {
   };
 
   const renderQuizzesList = () => {
+    if (!isTierLoading && !canAccess("Quizzes")) {
+      return (
+        <div className="p-6">
+          <UpgradeRequired
+            title="Quizzes Gated"
+            description="Interactive practice quizzes for this course are exclusively available to Pro and Premium members. Upgrade your plan to test your learning and review your scores."
+            requiredTier="Pro"
+          />
+        </div>
+      );
+    }
+
     return (
       <>
         <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
@@ -1745,7 +1762,26 @@ export default function CoursePlayerPage() {
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
             {/* INTEGRATED VIDEO PLAYER WITH AUTO-COMPLETION */}
             <div className="relative aspect-video bg-black rounded-xl sm:rounded-[2rem] overflow-hidden shadow-2xl group border-4 sm:border-[8px] border-white ring-1 ring-gray-100">
-              {activeModule && userId && videoEmbedUrl ? (
+              {!isTierLoading && !canAccess("Videos") ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-br from-gray-900 via-copy-dark to-slate-900">
+                  <Lock className="h-10 w-10 text-amber-500 mb-3 animate-pulse" />
+                  <h3 className="text-base font-bold text-white mb-1">
+                    Course Videos Gated
+                  </h3>
+                  <p className="text-gray-400 text-xs max-w-xs mb-4">
+                    Course modules are exclusively available to active members. Upgrade your plan to unlock video streaming.
+                  </p>
+                  <Button
+                    asChild
+                    size="sm"
+                    className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs"
+                  >
+                    <a href="http://localhost:3000/plans" target="_blank" rel="noopener noreferrer">
+                      Upgrade to Unlock
+                    </a>
+                  </Button>
+                </div>
+              ) : activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
                   key={`${activeModule.id}-${videoEmbedUrl}`}
                   userId={userId}

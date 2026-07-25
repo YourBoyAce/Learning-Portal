@@ -230,7 +230,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         if (isMounted) {
-            setError({ type: "UNKNOWN", message: "User not authenticated" });
+            setError({ type: "ERROR", message: "User not authenticated" });
             setLoadingInitial(false);
         }
         return;

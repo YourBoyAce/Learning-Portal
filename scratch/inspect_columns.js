@@ -3,15 +3,13 @@ const { createClient } = require('@supabase/supabase-js');
 async function run() {
   const supabase = createClient('https://rqeqcwlchxfboqtghkko.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxZXFjd2xjaHhmYm9xdGdoa2tvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQxMjkwMSwiZXhwIjoyMDkxOTg4OTAxfQ.r_xSaO_xgu9wmZPFGNhmlL2H1U7I2tejbb3pldBt8qI');
   try {
-    const { data: tableCols, error } = await supabase
-      .rpc('get_columns', { table_name: 'coursemodules' }); // standard rpc might not exist, let's try direct select from a system view or fetch a single row
+    // 1. Inspect batches columns
+    const { data: batchSample, error: batchError } = await supabase.from('batches').select('*').limit(1);
+    console.log('Batch columns:', batchSample ? Object.keys(batchSample[0] || {}) : null, batchError);
 
-    // Let's query information_schema if possible, or try checking columns by selecting from pg_attribute
-    const { data, error: queryError } = await supabase.from('coursemodules').select('*').limit(1);
-    console.log('Sample coursemodule:', data);
-
-    const { data: countData, error: countError } = await supabase.from('coursemodules').select('id', { count: 'exact' });
-    console.log('Total modules:', countData?.length, countError);
+    // 2. See if pg_proc exists as a postgrest table/view
+    const { data: pgData, error: pgError } = await supabase.from('pg_proc').select('*').limit(1);
+    console.log('pg_proc query:', pgData, pgError);
   } catch (err) {
     console.error('Error:', err);
   }

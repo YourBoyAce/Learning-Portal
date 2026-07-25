@@ -53,11 +53,14 @@ export default function AdminVerificationModal({
   const [error, setError] = useState("");
   const [queueNotice, setQueueNotice] = useState("");
   const initialAutoSendDone = useRef(false);
+  const initialEmailSendDone = useRef(false);
 
   useEffect(() => {
-    if (method !== "email") {
+    if (method !== "email" || initialEmailSendDone.current) {
       return;
     }
+
+    initialEmailSendDone.current = true;
 
     const sendEmailCode = async () => {
       setLoading(true);
@@ -248,7 +251,7 @@ export default function AdminVerificationModal({
               )}
             </div>
             <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-            <p className="mt-1 text-xs text-gray-500">{subtitle}</p>
+            <p className="mt-1 text-xs text-gray-500 break-words">{subtitle}</p>
           </div>
           <button
             type="button"

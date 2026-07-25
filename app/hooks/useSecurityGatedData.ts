@@ -28,6 +28,30 @@ export function useSecurityGatedData() {
           return;
         }
 
+        // Specifically grant Premium access to demouser@gmail.com and user@example.com for feature testing
+        if (session.user.email === "demouser@gmail.com" || session.user.email === "user@example.com") {
+          if (mounted) {
+            setTier("Premium");
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // Query the profiles table to see if user has instructor or admin role
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (profile?.role?.toLowerCase() === "instructor" || profile?.role?.toLowerCase() === "admin") {
+          if (mounted) {
+            setTier("Premium");
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // Query the phase2 schema for active enrollments
         const { data: enrollment, error } = await supabase
           .schema("phase2")

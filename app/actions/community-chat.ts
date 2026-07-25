@@ -15,7 +15,7 @@ export interface ChatMessage {
   created_at: string;
   // Joined from profiles
   full_name: string | null;
-  role: string | null;
+  role?: string | null;
 }
 
 export type FetchMessagesError = { type: "NOT_ENROLLED" | "ERROR"; message: string };

@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/carousel";
 import { BookOpen, PlayCircle, CheckCircle2, ExternalLink, X, Star } from "lucide-react";
 import { ICONS } from "@/app/styles/icons";
+import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 
 // --- Types ---
 interface Insight {
@@ -128,10 +130,13 @@ export default function MyLearningDashboard() {
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
 
+  const { isLoading: isTierLoading, tier } = useSecurityGatedData();
+  const isCurrentlyLoading = loading || isTierLoading;
+
   useEffect(() => {
-    setGlobalLoading(loading);
+    setGlobalLoading(isCurrentlyLoading);
     return () => setGlobalLoading(false);
-  }, [loading, setGlobalLoading]);
+  }, [isCurrentlyLoading, setGlobalLoading]);
   const [userId, setUserId] = useState<string | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingWebinars, setUpcomingWebinars] = useState<
@@ -655,219 +660,231 @@ export default function MyLearningDashboard() {
   return (
     <div className="min-h-screen bg-surface-subtle p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
-        {/* â”€â”€â”€ TOP SECTION: Header + Weekly Progress â”€â”€â”€ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Heading & Stats */}
-          <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
-            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
-              Continuing Your Journey
-            </h1>
-            <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
-              Welcome back to{" "}
-              <span className="font-bold text-brand-primary">The Automate</span>.
-              You have{" "}
-              <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
-                {stats.liveSessions} upcoming webinars
-              </span>{" "}
-              and{" "}
-              <span className="font-semibold text-brand-success underline decoration-dotted underline-offset-4">
-                {stats.pendingModules} pending module
-                {stats.pendingModules !== 1 ? "s" : ""}
-              </span>{" "}
-              in your core curriculum.
-            </p>
+        {!isTierLoading && tier === null ? (
+          <div className="py-10">
+            <UpgradeRequired
+              title="Academic Curriculum Gated"
+              description="Your access to courses, videos, and chat communities is currently locked. To view your enrolled cohorts and study path, please subscribe to an active learning plan."
+              requiredTier="Starter"
+            />
           </div>
-
-          {/* Right: Weekly Progress Widget */}
-          <div className="lg:col-span-1">
-            <section className="bg-gradient-to-br from-brand-heading to-brand-primary text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-blue-100 mb-2">
-                    Weekly Progress
-                  </h3>
-                  <p className="text-[13px] text-blue-50 leading-relaxed max-w-[140px]">
-                    {weeklyProgressPct >= 100
-                      ? "Weekly goal reached!"
-                      : "Complete more modules to reach your goal."}
-                  </p>
-                </div>
-
-                {/* Custom SVG Circular Progress */}
-                <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
-                  <svg className="transform -rotate-90 w-full h-full">
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r={circleRadius}
-                      stroke="rgba(255,255,255,0.2)"
-                      strokeWidth="6"
-                      fill="none"
-                    />
-                    <circle
-                      cx="48"
-                      cy="48"
-                      r={circleRadius}
-                      stroke="#ffffff"
-                      strokeWidth="6"
-                      fill="none"
-                      strokeDasharray={circleCircumference}
-                      strokeDashoffset={circleOffset}
-                      strokeLinecap="round"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xl font-bold tracking-tighter">
-                      {weeklyProgressPct}%
-                    </span>
-                  </div>
-                </div>
+        ) : (
+          <>
+            {/* ─── TOP SECTION: Header + Weekly Progress ─── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left: Heading & Stats */}
+              <div className="lg:col-span-2 flex flex-col justify-center min-h-48">
+                <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
+                  Continuing Your Journey
+                </h1>
+                <p className="text-gray-600 text-[17px] leading-relaxed max-w-2xl">
+                  Welcome back to{" "}
+                  <span className="font-bold text-brand-primary">The Automate</span>.
+                  You have{" "}
+                  <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
+                    {stats.liveSessions} upcoming webinars
+                  </span>{" "}
+                  and{" "}
+                  <span className="font-semibold text-brand-success underline decoration-dotted underline-offset-4">
+                    {stats.pendingModules} pending module
+                    {stats.pendingModules !== 1 ? "s" : ""}
+                  </span>{" "}
+                  in your core curriculum.
+                </p>
               </div>
 
-              {/* Decorative background */}
-              <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl" />
-            </section>
-          </div>
-        </div>
-        {/* Course Carousel */}
-        <div className="relative">
-          <Carousel
-            opts={{
-              align: "start",
-              loop: false,
-              dragFree: true,
-            }}
-            className="w-full"
-          >
-            <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-              {loading
-                ? // ── Skeleton placeholders while fetching ──
-                  [0, 1, 2].map((i) => (
-                    <CarouselItem
-                      key={i}
-                      className="
-                pl-4
-                sm:pl-6
-                basis-[85vw]
-                sm:basis-1/2
-                lg:basis-1/3
-              "
-                    >
-                      <CourseCardSkeleton />
-                    </CarouselItem>
-                  ))
-                : activeCourses.map((course) => (
-                    <CarouselItem
-                      key={course.id}
-                      className="
-                pl-4
-                sm:pl-6
-                basis-[85vw]
-                sm:basis-1/2
-                lg:basis-1/3
-              "
-                    >
-                      <CourseCard
-                        id={course.id}
-                        title={course.batchName || course.title}
-                        description={course.batchName ? course.title : course.description}
-                        thumbnail={course.thumbnail_url}
-                        category={course.module_label}
-                        duration={course.duration}
-                        progressPercentage={
-                          courseProgress[String(course.id)]
-                            ?.progressPercentage || 0
-                        }
-                        showProgress
-                        variant="user"
-                        onClick={() =>
-                          router.push(`/courses/${course.id}`)
-                        }
-                      />
-                    </CarouselItem>
-                  ))}
-            </CarouselContent>
-            {!loading && activeCourses.length > 1 && (
-              <>
-                <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-              </>
-            )}
-          </Carousel>
-        </div>
+              {/* Right: Weekly Progress Widget */}
+              <div className="lg:col-span-1">
+                <section className="bg-gradient-to-br from-brand-heading to-brand-primary text-white p-6 rounded-2xl shadow-md relative overflow-hidden h-full flex flex-col justify-center">
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-blue-100 mb-2">
+                        Weekly Progress
+                      </h3>
+                      <p className="text-[13px] text-blue-50 leading-relaxed max-w-[140px]">
+                        {weeklyProgressPct >= 100
+                          ? "Weekly goal reached!"
+                          : "Complete more modules to reach your goal."}
+                      </p>
+                    </div>
 
-        {/*Completed courses */}
-        <section className="mt-12 text-gray-900">
-          <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-            Completed Courses
-          </h2>
+                    {/* Custom SVG Circular Progress */}
+                    <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
+                      <svg className="transform -rotate-90 w-full h-full">
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r={circleRadius}
+                          stroke="rgba(255,255,255,0.2)"
+                          strokeWidth="6"
+                          fill="none"
+                        />
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r={circleRadius}
+                          stroke="#ffffff"
+                          strokeWidth="6"
+                          fill="none"
+                          strokeDasharray={circleCircumference}
+                          strokeDashoffset={circleOffset}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xl font-bold tracking-tighter">
+                          {weeklyProgressPct}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {loading
-              ? // ── Skeleton placeholders while fetching ──
-                [0, 1].map((i) => <CourseCardSkeleton key={i} />)
-              : completedCourses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    id={course.id}
-                    title={course.title}
-                    description={course.description}
-                    thumbnail={course.thumbnail_url}
-                    variant="user"
-                    progressPercentage={100}
-                    showProgress={true}
-                    isCompleted={course.progress === 100}
-                    onCertificateClick={() => setSelectedCertificateCourse(course)}
-                    onClick={() => router.push(`/courses/${course.id}`)}
-                  />
-                ))}
-          </div>
-        </section>
-
-        {/* â”€â”€â”€ THE AUTOMATE INSIGHT â”€â”€â”€ */}
-        <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 opacity-40 top-6 text-brand-primary/10">
-            <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
-          </div>
-
-          <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-              <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
+                  {/* Decorative background */}
+                  <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl" />
+                </section>
+              </div>
             </div>
-            <h3 className="font-bold text-brand-heading text-base">
-              The Automate Insight
-            </h3>
-          </div>
+            {/* Course Carousel */}
+            <div className="relative">
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: false,
+                  dragFree: true,
+                }}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                  {loading
+                    ? // ── Skeleton placeholders while fetching ──
+                      [0, 1, 2].map((i) => (
+                        <CarouselItem
+                          key={i}
+                          className="
+                    pl-4
+                    sm:pl-6
+                    basis-[85vw]
+                    sm:basis-1/2
+                    lg:basis-1/3
+                  "
+                        >
+                          <CourseCardSkeleton />
+                        </CarouselItem>
+                      ))
+                    : activeCourses.map((course) => (
+                        <CarouselItem
+                          key={course.id}
+                          className="
+                    pl-4
+                    sm:pl-6
+                    basis-[85vw]
+                    sm:basis-1/2
+                    lg:basis-1/3
+                  "
+                        >
+                          <CourseCard
+                            id={course.id}
+                            title={course.batchName || course.title}
+                            description={course.batchName ? course.title : course.description}
+                            thumbnail={course.thumbnail_url}
+                            category={course.module_label}
+                            duration={course.duration}
+                            progressPercentage={
+                              courseProgress[String(course.id)]
+                                ?.progressPercentage || 0
+                            }
+                            showProgress
+                            variant="user"
+                            onClick={() =>
+                              router.push(`/courses/${course.id}`)
+                            }
+                          />
+                        </CarouselItem>
+                      ))}
+                </CarouselContent>
+                {!loading && activeCourses.length > 1 && (
+                  <>
+                    <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                    <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                  </>
+                )}
+              </Carousel>
+            </div>
 
-          <div className="mb-6 relative z-10">
-            {insights.length > 0 ? (
-              <>
-                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
-                  &quot;{currentInsight.content}&quot;
-                </p>
-                {currentInsight.author && (
-                  <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
-                    &mdash; {currentInsight.author}
+            {/*Completed courses */}
+            <section className="mt-12 text-gray-900">
+              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                Completed Courses
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                {loading
+                  ? // ── Skeleton placeholders while fetching ──
+                    [0, 1].map((i) => <CourseCardSkeleton key={i} />)
+                  : completedCourses.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        id={course.id}
+                        title={course.title}
+                        description={course.description}
+                        thumbnail={course.thumbnail_url}
+                        variant="user"
+                        progressPercentage={100}
+                        showProgress={true}
+                        isCompleted={course.progress === 100}
+                        onCertificateClick={() => setSelectedCertificateCourse(course)}
+                        onClick={() => router.push(`/courses/${course.id}`)}
+                      />
+                    ))}
+              </div>
+            </section>
+
+            {/* ─── THE AUTOMATE INSIGHT ─── */}
+            <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
+              <div className="absolute right-6 opacity-40 top-6 text-brand-primary/10">
+                <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
+              </div>
+
+              <div className="flex items-center gap-3 mb-4 relative z-10">
+                <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
+                  <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
+                </div>
+                <h3 className="font-bold text-brand-heading text-base">
+                  The Automate Insight
+                </h3>
+              </div>
+
+              <div className="mb-6 relative z-10">
+                {insights.length > 0 ? (
+                  <>
+                    <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
+                      &quot;{currentInsight.content}&quot;
+                    </p>
+                    {currentInsight.author && (
+                      <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
+                        &mdash; {currentInsight.author}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Cultivating new insights...
                   </p>
                 )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">
-                Cultivating new insights...
-              </p>
-            )}
-          </div>
+              </div>
 
-          <div className="relative z-10 flex justify-end">
-            <Button
-              onClick={handleMarkInsightAsRead}
-              disabled={insights.length === 0}
-              className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
-            > Mark as Read
-            </Button>
-          </div>
-        </section>
+              <div className="relative z-10 flex justify-end">
+                <Button
+                  onClick={handleMarkInsightAsRead}
+                  disabled={insights.length === 0}
+                  className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+                > Mark as Read
+                </Button>
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       {/* ─── CERTIFICATE MODAL ─── */}

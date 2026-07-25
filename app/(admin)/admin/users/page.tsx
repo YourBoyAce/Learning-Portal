@@ -51,6 +51,7 @@ type ProfileRow = {
 
 const ROLES = [
   { value: "user", label: "User" },
+  { value: "instructor", label: "Instructor" },
   { value: "admin", label: "Admin" },
 ];
 
@@ -415,7 +416,9 @@ export default function AdminUsers() {
                   disabled={isSubmitting}
                   className="w-full"
                 >
-                  {isSubmitting ? `Creating ${role === "admin" ? "Admin" : "Scholar"}...` : `Create ${role === "admin" ? "Admin" : "Scholar"}`}
+                  {isSubmitting
+                    ? `Creating ${role === "admin" ? "Admin" : role === "instructor" ? "Instructor" : "Scholar"}...`
+                    : `Create ${role === "admin" ? "Admin" : role === "instructor" ? "Instructor" : "Scholar"}`}
                 </Button>
               </form>
             </div>
@@ -577,9 +580,11 @@ export default function AdminUsers() {
                         {/* Role */}
                         <td className="py-4 px-4">
                           <span
-                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border ${user.role?.toLowerCase() === "admin"
+                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border capitalize ${user.role?.toLowerCase() === "admin"
                               ? "bg-red-500/10 text-red-600 border-red-500/20"
-                              : "bg-brand-success/10 text-[#174778] border-brand-success/20"
+                              : user.role?.toLowerCase() === "instructor"
+                                ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+                                : "bg-brand-success/10 text-[#174778] border-brand-success/20"
                               }`}
                           >
                             {user.role || "User"}
@@ -658,7 +663,11 @@ export default function AdminUsers() {
                                   onClick={() => handleDeleteClick(user)}
                                   className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
                                 >
-                                  {user.role === "admin" ? "Remove Admin" : "Remove Scholar"}
+                                  {user.role === "admin"
+                                    ? "Remove Admin"
+                                    : user.role === "instructor"
+                                      ? "Remove Instructor"
+                                      : "Remove Scholar"}
                                 </button>
                               </div>
                             </div>
@@ -682,7 +691,7 @@ export default function AdminUsers() {
                 <Trash2 className="w-6 h-6 text-red-600" />
               </div>
               <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
-                Remove {deletingUser.role === "admin" ? "Admin" : "Scholar"}
+                Remove {deletingUser.role === "admin" ? "Admin" : deletingUser.role === "instructor" ? "Instructor" : "Scholar"}
               </h3>
               <p className="text-sm text-gray-500 text-center">
                 Are you sure you want to permanently remove{" "}

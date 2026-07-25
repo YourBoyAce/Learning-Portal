@@ -731,6 +731,8 @@ export default function ProfilePage() {
               </div>
             </div>
 
+
+
             {/* DIGITAL FOOTPRINT & MASTER SAVE */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
               <h3 className="font-bold text-brand-primary text-[18px] mb-6">

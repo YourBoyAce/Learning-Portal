@@ -10,6 +10,7 @@ import { PLACEHOLDER_IMAGE } from "@/lib/utils";
 interface SidebarCourse extends CommunityCourse {
     heroImage?: string;
     lastMessage?: string;
+    lastActivityRaw?: string | null;
     lastActivity?: string;
 }
 

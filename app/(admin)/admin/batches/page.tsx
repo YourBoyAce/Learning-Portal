@@ -81,9 +81,11 @@ function findProfileByEmail(users: Profile[], email: string): Profile | undefine
   return users.find((u) => u.email?.trim().toLowerCase() === email.toLowerCase());
 }
 
-function buildUserSelectOptions(profileUsers: Profile[], memberEmails: string[] = []): BatchOption[] {
+function buildScholarSelectOptions(profileUsers: Profile[], memberEmails: string[] = []): BatchOption[] {
   const map = new Map<string, BatchOption>();
-  for (const u of profileUsers.filter((u) => !isAdminProfile(u))) {
+  for (const u of profileUsers) {
+    const role = u.role?.toLowerCase();
+    if (role === "admin" || role === "instructor") continue;
     if (!u.email) continue;
     const v = u.email.trim().toLowerCase();
     map.set(v, { value: v, label: getProfileDisplayName(u) });
@@ -91,23 +93,46 @@ function buildUserSelectOptions(profileUsers: Profile[], memberEmails: string[] 
   for (const email of memberEmails) {
     if (map.has(email)) continue;
     const matched = findProfileByEmail(profileUsers, email);
-    if (matched && isAdminProfile(matched)) continue;
+    if (matched) {
+      const role = matched.role?.toLowerCase();
+      if (role === "admin" || role === "instructor") continue;
+    }
     map.set(email, { value: email, label: matched ? getProfileDisplayName(matched) : email });
   }
   return Array.from(map.values());
 }
 
-function buildSelectedUsers(memberEmails: string[], userOptions: BatchOption[], profileUsers: Profile[] = []): BatchOption[] {
-  const optMap = new Map(userOptions.map((o) => [o.value, o]));
-  const adminEmails = new Set(
-    profileUsers.filter(isAdminProfile).map((u) => u.email?.trim().toLowerCase() ?? "").filter(Boolean),
-  );
-  return memberEmails
-    .filter((e) => !adminEmails.has(e))
-    .map((e) => {
-      const matched = findProfileByEmail(profileUsers, e);
-      return optMap.get(e) ?? { value: e, label: matched ? getProfileDisplayName(matched) : e };
-    });
+function buildMentorSelectOptions(profileUsers: Profile[], mentorEmails: string[] = []): BatchOption[] {
+  const map = new Map<string, BatchOption>();
+  for (const u of profileUsers) {
+    const role = u.role?.toLowerCase();
+    if (role !== "admin" && role !== "instructor") continue;
+    if (!u.email) continue;
+    const v = u.email.trim().toLowerCase();
+    map.set(v, { value: v, label: `${getProfileDisplayName(u)} (${role === "admin" ? "Admin" : "Instructor"})` });
+  }
+  for (const email of mentorEmails) {
+    if (map.has(email)) continue;
+    const matched = findProfileByEmail(profileUsers, email);
+    map.set(email, { value: email, label: matched ? `${getProfileDisplayName(matched)} (${matched.role === "admin" ? "Admin" : "Instructor"})` : email });
+  }
+  return Array.from(map.values());
+}
+
+function buildSelectedScholars(memberEmails: string[], scholarOptions: BatchOption[], profileUsers: Profile[] = []): BatchOption[] {
+  const optMap = new Map(scholarOptions.map((o) => [o.value, o]));
+  return memberEmails.map((e) => {
+    const matched = findProfileByEmail(profileUsers, e);
+    return optMap.get(e) ?? { value: e, label: matched ? getProfileDisplayName(matched) : e };
+  });
+}
+
+function buildSelectedMentors(mentorEmails: string[], mentorOptions: BatchOption[], profileUsers: Profile[] = []): BatchOption[] {
+  const optMap = new Map(mentorOptions.map((o) => [o.value, o]));
+  return mentorEmails.map((e) => {
+    const matched = findProfileByEmail(profileUsers, e);
+    return optMap.get(e) ?? { value: e, label: matched ? `${getProfileDisplayName(matched)} (${matched.role === "admin" ? "Admin" : "Instructor"})` : e };
+  });
 }
 
 /** Derive batch name: "<CourseTitle> <MonthYear> <Schedule> Batch"
@@ -145,7 +170,9 @@ export default function AdminBatches() {
   const [scheduleType, setScheduleType] = useState<"weekday" | "weekend">("weekday");
   const [startDate, setStartDate] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<readonly BatchOption[]>([]);
+  const [selectedMentors, setSelectedMentors] = useState<readonly BatchOption[]>([]);
   const [userSelectOptions, setUserSelectOptions] = useState<BatchOption[]>([]);
+  const [mentorSelectOptions, setMentorSelectOptions] = useState<BatchOption[]>([]);
 
   // Loading flags
   const [isSaving, setIsSaving] = useState(false);
@@ -248,7 +275,8 @@ export default function AdminBatches() {
 
       setUsers(nextUsers);
       setCourses(nextCourses);
-      setUserSelectOptions(buildUserSelectOptions(nextUsers));
+      setUserSelectOptions(buildScholarSelectOptions(nextUsers));
+      setMentorSelectOptions(buildMentorSelectOptions(nextUsers));
     } catch (e) {
       console.error("Failed to fetch assignment options:", e);
     } finally {
@@ -274,6 +302,7 @@ export default function AdminBatches() {
     setScheduleType("weekday");
     setStartDate("");
     setSelectedUsers([]);
+    setSelectedMentors([]);
     setModalMessage(null);
     setIsLoadingAssignments(false);
   }
@@ -315,7 +344,8 @@ export default function AdminBatches() {
       const latestCourses: Course[] = Array.isArray(result?.courses) ? result.courses : courses;
       setUsers(latestUsers);
       setCourses(latestCourses);
-      setUserSelectOptions(buildUserSelectOptions(latestUsers));
+      setUserSelectOptions(buildScholarSelectOptions(latestUsers));
+      setMentorSelectOptions(buildMentorSelectOptions(latestUsers));
 
       const memberEmails: string[] = Array.isArray(result?.assignment?.memberEmails)
         ? result.assignment.memberEmails.map((e: unknown) =>
@@ -323,9 +353,19 @@ export default function AdminBatches() {
           ).filter(Boolean)
         : (batch.batch_members ?? []).map((m) => m.email?.trim().toLowerCase() ?? "").filter(Boolean);
 
-      const opts = buildUserSelectOptions(latestUsers, memberEmails);
-      setUserSelectOptions(opts);
-      setSelectedUsers(buildSelectedUsers(memberEmails, opts, latestUsers));
+      const mentorEmails: string[] = Array.isArray(result?.assignment?.mentorEmails)
+        ? result.assignment.mentorEmails.map((e: unknown) =>
+            typeof e === "string" ? e.trim().toLowerCase() : "",
+          ).filter(Boolean)
+        : [];
+
+      const scholarOpts = buildScholarSelectOptions(latestUsers, memberEmails);
+      const mentorOpts = buildMentorSelectOptions(latestUsers, mentorEmails);
+
+      setUserSelectOptions(scholarOpts);
+      setMentorSelectOptions(mentorOpts);
+      setSelectedUsers(buildSelectedScholars(memberEmails, scholarOpts, latestUsers));
+      setSelectedMentors(buildSelectedMentors(mentorEmails, mentorOpts, latestUsers));
     } catch (e) {
       console.error("Failed to fetch batch assignments:", e);
       setModalMessage({ type: "error", text: "Failed to load assignments. Showing saved data." });
@@ -368,6 +408,7 @@ export default function AdminBatches() {
         start_date: startDate || null,
         schedule_type: scheduleType,
         assigned_scholars: selectedUsers.map((u) => u.value),
+        assigned_mentors: selectedMentors.map((u) => u.value),
         assigned_courses: [selectedCourseId],
       };
 
@@ -533,17 +574,46 @@ export default function AdminBatches() {
                 <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
                   {filteredBatches.map((batch) => (
                     <CarouselItem key={batch.id} className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3">
-                      <CourseCard
-                        id={batch.id}
-                        title={batch.name}
-                        description={batch.description || batch.course_title || ""}
-                        thumbnail={batch.course_thumbnail_url ?? undefined}
-                        batchScheduleTypes={[batch.schedule_type === "weekend" ? "weekend" : "weekday"]}
-                        variant="admin"
-                        onClick={() => router.push(`/admin/batches/${batch.id}`)}
-                        onEdit={() => handleEdit(batch)}
-                        onDelete={() => handleDeleteClick(batch)}
-                      />
+                      <div className="flex flex-col h-full justify-between">
+                        <CourseCard
+                          id={batch.id}
+                          title={batch.name}
+                          description={batch.description || batch.course_title || ""}
+                          thumbnail={batch.course_thumbnail_url ?? undefined}
+                          batchScheduleTypes={[batch.schedule_type === "weekend" ? "weekend" : "weekday"]}
+                          variant="admin"
+                          onClick={() => router.push(`/admin/batches/${batch.id}`)}
+                          onEdit={() => handleEdit(batch)}
+                          onDelete={() => handleDeleteClick(batch)}
+                        />
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-2 mt-3 text-left">
+                          <div className="flex items-center gap-1.5 font-extrabold text-[11px] text-gray-500 uppercase tracking-wider">
+                            <Users size={12} className="text-purple-500" />
+                            <span>Assigned Mentors</span>
+                          </div>
+                          {(() => {
+                            const memberEmails = (batch.batch_members ?? []).map((m) => m.email?.trim().toLowerCase());
+                            const assignedMentorsForBatch = users.filter(
+                              (u) => u.email && memberEmails.includes(u.email.trim().toLowerCase()) &&
+                                     (u.role?.toLowerCase() === "instructor" || u.role?.toLowerCase() === "admin")
+                            );
+
+                            if (assignedMentorsForBatch.length === 0) {
+                              return <div className="text-gray-400 text-[10px] italic">No mentors assigned</div>;
+                            }
+
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {assignedMentorsForBatch.map((mentor) => (
+                                  <span key={mentor.id} className="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-full text-[9px] font-bold">
+                                    {mentor.full_name || mentor.email}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </CarouselItem>
                   ))}
                 </CarouselContent>
@@ -607,6 +677,30 @@ export default function AdminBatches() {
                   value={selectedUsers}
                   onChange={(v) => setSelectedUsers((v ?? []) as readonly BatchOption[])}
                   placeholder="Select members..."
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+                  styles={{
+                    menuPortal: (b) => ({ ...b, zIndex: 9999 }),
+                    option: (b) => ({ ...b, color: "#000" }),
+                    input: (b) => ({ ...b, color: "#000" }),
+                    multiValueLabel: (b) => ({ ...b, color: "#000" }),
+                    control: (b) => ({ ...b, minHeight: "46px", borderColor: "#e5e7eb", boxShadow: "none" }),
+                  }}
+                />
+              </div>
+
+              {/* 2b. Assign Mentors */}
+              <div>
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Users size={14} className="text-purple-500" /> Assign Mentors / Instructors
+                </label>
+                <Select
+                  isMulti
+                  isLoading={isLoadingAssignments || isLoadingAssignmentOptions}
+                  isDisabled={isLoadingAssignments || isLoadingAssignmentOptions}
+                  options={mentorSelectOptions}
+                  value={selectedMentors}
+                  onChange={(v) => setSelectedMentors((v ?? []) as readonly BatchOption[])}
+                  placeholder="Select mentors..."
                   menuPortalTarget={typeof window !== "undefined" ? document.body : null}
                   styles={{
                     menuPortal: (b) => ({ ...b, zIndex: 9999 }),

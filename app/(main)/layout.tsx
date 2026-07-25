@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabase";
@@ -10,7 +10,8 @@ import Image from "next/image";
 import {ICONS} from "@/app/styles/icons";
 import {Button} from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
-export default function MainLayout({
+
+function MainLayoutContent({
   children,
 }: {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ export default function MainLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -50,11 +52,12 @@ export default function MainLayout({
       
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, role")
         .eq("id", user.id)
         .single();
 
       setFullName(profile?.full_name?.trim() || null);
+      setRole(profile?.role || null);
       
       setLoading(false);
     };
@@ -132,67 +135,100 @@ export default function MainLayout({
     router.replace("/login");
   };
 
+  const isMentor = role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
+
   const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    active: pathname === "/dashboard",
-    icon: pathname === "/dashboard"
-      ? ICONS.DASHBOARDLIGHT
-      : ICONS.DASHBOARD,
-  },
+    {
+      label: "Dashboard",
+      href: "/dashboard",
+      active: pathname === "/dashboard",
+      icon: pathname === "/dashboard"
+        ? ICONS.DASHBOARDLIGHT
+        : ICONS.DASHBOARD,
+    },
+  ];
 
-  {
-    label: "My Learning",
-    href: "/courses",
-    active: pathname === "/courses",
-    icon: pathname === "/courses"
-      ? ICONS.BOOKLIGHT
-      : ICONS.BOOK,
-  },
+  // Add student-only tabs if user is not a mentor
+  if (!isMentor) {
+    navItems.push(
+      {
+        label: "My Learning",
+        href: "/courses",
+        active: pathname === "/courses",
+        icon: pathname === "/courses"
+          ? ICONS.BOOKLIGHT
+          : ICONS.BOOK,
+      },
+      {
+        label: "Quizzes",
+        href: "/practice?tab=quizzes",
+        active: pathname === "/practice" && activeTab !== "artifacts",
+        icon: pathname === "/practice" && activeTab !== "artifacts"
+          ? ICONS.BULBLIGHT
+          : ICONS.BULB,
+      },
+      {
+        label: "Artifacts",
+        href: "/practice?tab=artifacts",
+        active: pathname === "/practice" && activeTab === "artifacts",
+        icon: pathname === "/practice" && activeTab === "artifacts"
+          ? ICONS.MATERIALLIGHT
+          : ICONS.MATERIAL,
+      },
+      {
+        label: "Live Webinars",
+        href: "/webinars",
+        active: pathname === "/webinars",
+        icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
+      }
+    );
+  }
 
-  {
-    label: "Quizzes",
-    href: "/practice?tab=quizzes",
-    active: pathname === "/practice" && activeTab !== "artifacts",
-    icon: pathname === "/practice" && activeTab !== "artifacts"
-      ? ICONS.BULBLIGHT
-      : ICONS.BULB,
-  },
-
-  {
-    label: "Artifacts",
-    href: "/practice?tab=artifacts",
-    active: pathname === "/practice" && activeTab === "artifacts",
-    icon: pathname === "/practice" && activeTab === "artifacts"
-      ? ICONS.MATERIALLIGHT
-      : ICONS.MATERIAL,
-  },
-
-  {
-    label: "Live Webinars",
-    href: "/webinars",
-    active: pathname === "/webinars",
-    icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
-  },
-
-  {
+  // Communities is visible to everyone
+  navItems.push({
     label: "Communities",
     href: "/communities",
     active: pathname === "/communities" || pathname.startsWith("/communities/"),
     icon: pathname === "/communities" || pathname.startsWith("/communities/")
       ? ICONS.COMMUNITIESLIGHT
       : ICONS.COMMUNITIES,
-  },
-  {
+  });
+
+  // Mentor Planner is visible to everyone
+  navItems.push({
+    label: "Mentor Planner",
+    href: "/mentor-planner",
+    active: pathname === "/mentor-planner",
+    icon: pathname === "/mentor-planner"
+      ? ICONS.USERSLIGHT
+      : ICONS.USERS,
+  });
+
+  // If user is admin or instructor, append the Mentor Dashboard page
+  if (isMentor) {
+    navItems.push({
+      label: "Mentor Dashboard",
+      href: "/mentor",
+      active: pathname === "/mentor" || pathname.startsWith("/mentor/"),
+      icon: ICONS.CALENDAR,
+    });
+    navItems.push({
+      label: "Invites",
+      href: "/invites",
+      active: pathname === "/invites",
+      icon: pathname === "/invites" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+    });
+  }
+
+  // Profile page always goes last
+  navItems.push({
     label: "Profile",
     href: "/profile",
     active: pathname === "/profile",
     icon: pathname === "/profile"
       ? ICONS.PROFILELIGHT
       : ICONS.PROFILE,
-  },
-];
+  });
 
   return (
     <div className="flex flex-col h-screen bg-surface-subtle">
@@ -321,5 +357,17 @@ export default function MainLayout({
         </div>
       )}
     </div>
+  );
+}
+
+export default function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <MainLayoutContent>{children}</MainLayoutContent>
+    </Suspense>
   );
 }

@@ -8,6 +8,8 @@ import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
+import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import {
   FileText,
   FileArchive,
@@ -76,10 +78,13 @@ export default function StudentPracticeCenter() {
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
 
+  const { isLoading: isTierLoading, tier, canAccess } = useSecurityGatedData();
+  const isCurrentlyLoading = loading || isTierLoading;
+
   useEffect(() => {
-    setGlobalLoading(loading);
+    setGlobalLoading(isCurrentlyLoading);
     return () => setGlobalLoading(false);
-  }, [loading, setGlobalLoading]);
+  }, [isCurrentlyLoading, setGlobalLoading]);
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"quizzes" | "artifacts">(
     searchParams.get("tab") === "artifacts" ? "artifacts" : "quizzes"
@@ -408,8 +413,17 @@ if (artifactsError) {
 
         {/* Tab 1: Quizzes list */}
         {activeTab === "quizzes" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {quizzes.map((quiz) => {
+          !isTierLoading && !canAccess("Quizzes") ? (
+            <div className="py-6">
+              <UpgradeRequired
+                title="Practice Quizzes Gated"
+                description="Interactive practice quizzes are exclusively available to Pro and Premium members. Upgrade your plan to test your learning and review your scores."
+                requiredTier="Pro"
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {quizzes.map((quiz) => {
               const quizCourseId = String(quiz.courseId || "general");
               const courseScoreData = bestScores[quizCourseId] || {};
               const score = courseScoreData[quiz.id];
@@ -484,6 +498,7 @@ if (artifactsError) {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* Tab 2: Artifacts list */}

@@ -11,6 +11,7 @@ export interface ChatMessage {
     content: string;
     created_at: string;
     full_name: string | null;
+    role?: string | null;
 }
 
 interface MessageBubbleProps {

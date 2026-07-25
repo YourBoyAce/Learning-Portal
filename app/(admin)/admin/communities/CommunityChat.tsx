@@ -485,7 +485,7 @@ export default function CommunityChat({
    *************************************************/
 
     const handleSendMessage = useCallback(
-        (content: string) => {
+        async (content: string) => {
             if (!currentAdminId || !currentAdminName || !currentAccessToken) return;
 
             const trimmed = content.trim();

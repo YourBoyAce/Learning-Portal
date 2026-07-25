@@ -279,14 +279,12 @@ export async function GET(request: Request) {
       (authUsersResult.data?.users ?? []).map((u) => [u.id, u.email ?? null]),
     );
 
-    users = ((profileRows ?? []) as ProfileRow[])
-      .filter((row) => !isAdminRole(row.role))
-      .map((row) => ({
-        id: row.id,
-        full_name: row.full_name ?? null,
-        email: row.email ?? authEmailById.get(row.id) ?? null,
-        role: row.role ?? null,
-      }));
+    users = ((profileRows ?? []) as ProfileRow[]).map((row) => ({
+      id: row.id,
+      full_name: row.full_name ?? null,
+      email: row.email ?? authEmailById.get(row.id) ?? null,
+      role: row.role ?? null,
+    }));
   }
 
   if (includeCourses) {
@@ -321,9 +319,35 @@ export async function GET(request: Request) {
 
   try {
     const assignment = await getBatchAssignments(authContext.supabaseAdmin, batchId);
-    assignment.memberEmails = await filterAssignableMemberEmails(
+    
+    // Fetch profiles of all batch member emails
+    const { data: memberProfiles } = await authContext.supabaseAdmin
+      .from("profiles")
+      .select("email, role")
+      .in("email", assignment.memberEmails);
+
+    const mentorEmails: string[] = [];
+    const scholarEmails: string[] = [];
+
+    const mentorSet = new Set(
+      (memberProfiles ?? [])
+        .filter((p) => p.role?.toLowerCase() === "instructor" || p.role?.toLowerCase() === "admin")
+        .map((p) => p.email?.trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    for (const email of assignment.memberEmails) {
+      if (mentorSet.has(email.toLowerCase())) {
+        mentorEmails.push(email);
+      } else {
+        scholarEmails.push(email);
+      }
+    }
+
+    // Still filter the student scholars to avoid showing admins
+    const filteredScholarEmails = await filterAssignableMemberEmails(
       authContext.supabaseAdmin,
-      assignment.memberEmails,
+      scholarEmails,
     );
 
     return NextResponse.json({
@@ -331,7 +355,11 @@ export async function GET(request: Request) {
       batches: data ?? [],
       users,
       courses,
-      assignment,
+      assignment: {
+        memberEmails: filteredScholarEmails,
+        mentorEmails: mentorEmails,
+        courseIds: assignment.courseIds,
+      },
     });
   } catch (assignmentError) {
     return NextResponse.json(
@@ -372,6 +400,15 @@ export async function POST(request: Request) {
     authContext.supabaseAdmin,
     assignedMembers,
   );
+  
+  const assignedMentors = Array.isArray(body?.assigned_mentors)
+    ? body.assigned_mentors
+        .map((value: unknown) =>
+          typeof value === "string" ? value.trim().toLowerCase() : "",
+        )
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
+
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
@@ -404,9 +441,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // 3. Link the scholars to the batch
-  if (assignedMembers.length > 0) {
-    const junctionData = assignedMembers.map((memberEmail: string) => ({
+  // 3. Link the scholars & mentors to the batch
+  const allMembers = [...assignedMembers, ...assignedMentors];
+  if (allMembers.length > 0) {
+    const junctionData = allMembers.map((memberEmail: string) => ({
       batch_id: batch.id,
       email: memberEmail,
     }));
@@ -538,6 +576,15 @@ export async function PUT(request: Request) {
     authContext.supabaseAdmin,
     assignedMembers,
   );
+
+  const assignedMentors = Array.isArray(body?.assigned_mentors)
+    ? body.assigned_mentors
+        .map((value: unknown) =>
+          typeof value === "string" ? value.trim().toLowerCase() : "",
+        )
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
+
   const assignedCourses = Array.isArray(body?.assigned_courses)
     ? body.assigned_courses
         .map((value: unknown) => normalizeCourseId(value))
@@ -617,8 +664,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: clearMembersError.message }, { status: 500 });
   }
 
-  if (assignedMembers.length > 0) {
-    const memberRows = assignedMembers.map((memberEmail: string) => ({
+  const allMembers = [...assignedMembers, ...assignedMentors];
+  if (allMembers.length > 0) {
+    const memberRows = allMembers.map((memberEmail: string) => ({
       batch_id: id,
       email: memberEmail,
     }));
