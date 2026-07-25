@@ -194,6 +194,14 @@ function MainLayoutContent({
       : ICONS.COMMUNITIES,
   });
 
+  // Inbox is visible to everyone
+  navItems.push({
+    label: "Inbox",
+    href: "/inbox",
+    active: pathname === "/inbox",
+    icon: pathname === "/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+  });
+
   // Mentor Planner is visible to everyone
   navItems.push({
     label: "Mentor Planner",

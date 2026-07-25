@@ -78,11 +78,49 @@ export async function POST(request: Request) {
   }
 
   if (action === "accept") {
-    // Update status:pending to status:accepted in the tag
+    // Parse student name, email from event.description
+    let studentName = "Student";
+    let studentEmail = "";
+
+    const desc = event.description || "";
+    const requestedByMatch = desc.match(/Requested by:\s*(.*?)\s*\((.*?)\)/);
+    if (requestedByMatch) {
+      studentName = requestedByMatch[1].trim();
+      studentEmail = requestedByMatch[2].trim();
+    }
+
+    // Fetch mentor profile to check if cal_event_type_id is set
+    const { data: mentorProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("cal_event_type_id")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    let meetLink = null;
+    if (mentorProfile?.cal_event_type_id) {
+      const startDateTimeStr = `${event.event_date}T${event.event_time}`;
+      const { createCalcomBooking } = await import("@/app/lib/calcom");
+      const bookingResult = await createCalcomBooking({
+        eventTypeId: mentorProfile.cal_event_type_id,
+        startDateTimeStr,
+        attendee: {
+          name: studentName,
+          email: studentEmail,
+        }
+      });
+      if (bookingResult.success && bookingResult.meetingUrl) {
+        meetLink = bookingResult.meetingUrl;
+      }
+    }
+
+    // Update status:pending to status:accepted in the tag and store meet_link
     const newTag = (event.tag || "").replace("status:pending", "status:accepted");
     const { data: updatedEvent, error: updateError } = await supabaseAdmin
       .from("calendar_events")
-      .update({ tag: newTag })
+      .update({ 
+        tag: newTag,
+        meet_link: meetLink
+      })
       .eq("id", eventId)
       .select()
       .single();

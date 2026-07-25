@@ -373,6 +373,7 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [calEventTypeId, setCalEventTypeId] = useState("");
 
   // --- New Password State ---
   const [newPassword, setNewPassword] = useState("");
@@ -412,6 +413,7 @@ export default function ProfilePage() {
           setFullName(profile.full_name || "");
           setBio(profile.bio || "");
           setPortfolioUrl(profile.portfolio_url || "");
+          setCalEventTypeId(profile.cal_event_type_id ? String(profile.cal_event_type_id) : "");
 
           if (profile.role) {
             setRole(profile.role);
@@ -445,18 +447,45 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     try {
+      const parsedCalId = calEventTypeId.trim() ? parseInt(calEventTypeId.trim(), 10) : null;
+      if (calEventTypeId.trim() && isNaN(Number(calEventTypeId.trim()))) {
+        alert("Please enter a valid numeric Event Type ID.");
+        setIsSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: fullName.trim(),
           bio: bio.trim(),
           portfolio_url: portfolioUrl.trim(),
+          cal_event_type_id: parsedCalId,
         })
         .eq("id", userId);
 
       if (error) throw error;
 
       dispatchProfileUpdated();
+
+      // Trigger meet generation if Event Type ID was successfully updated
+      if (parsedCalId) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            await fetch("/api/mentor-planner/generate-meet", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            });
+          }
+        } catch (generateErr) {
+          console.error("Error generating meeting links on save:", generateErr);
+        }
+      }
+
       alert("Profile updated successfully.");
     } catch (err: unknown) {
       console.error(err);
@@ -704,6 +733,42 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </div>
+
+            {/* CAL.COM SETUP (INSTRUCTOR/ADMIN ONLY) */}
+            {(role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin") && (
+              <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
+                <div className="flex items-center gap-2 mb-6">
+                  <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <h3 className="font-bold text-brand-primary text-[18px]">
+                    Cal.com Integration Settings
+                  </h3>
+                </div>
+
+                <p className="text-[13px] text-gray-500 mb-6 leading-relaxed">
+                  Provide your Cal.com Event Type ID to enable automatic Google Meet link generation for accepted student bookings.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
+                      CAL.COM EVENT TYPE ID
+                    </label>
+                    <input
+                      type="text"
+                      value={calEventTypeId}
+                      onChange={(e) => setCalEventTypeId(e.target.value)}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
+                      placeholder="e.g. 123456"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
+                      You can find this ID in the URL of your Cal.com event type page (e.g. cal.com/event-types/<b>123456</b>).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* SCHOLARLY BIO */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">

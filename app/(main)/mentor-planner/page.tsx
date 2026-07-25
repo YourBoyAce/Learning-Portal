@@ -24,7 +24,8 @@ import {
   Grid,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Video
 } from "lucide-react";
 
 // Types
@@ -47,6 +48,7 @@ interface CalendarEvent {
   end_time: string;   // HH:MM:SS (inferred or customized)
   event_type: "video" | "course" | "session" | "webinar";
   tag: string; // Used to store specific labels like "Blocked" or "Connect"
+  meet_link?: string | null;
 }
 
 export default function MentorConnectPage() {
@@ -247,7 +249,7 @@ export default function MentorConnectPage() {
     try {
       const { data, error } = await supabase
         .from("calendar_events")
-        .select("id, title, description, event_date, event_time, event_type, tag")
+        .select("id, title, description, event_date, event_time, event_type, tag, meet_link")
         .eq("user_id", userId);
 
       if (error) {
@@ -282,6 +284,7 @@ export default function MentorConnectPage() {
             end_time: endTimeStr,
             event_type: e.event_type,
             tag: e.tag || "",
+            meet_link: e.meet_link,
           };
         });
         setEvents(formattedEvents);
@@ -1227,6 +1230,42 @@ export default function MentorConnectPage() {
                     <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
                       {selectedEvent.description}
                     </p>
+                  </div>
+                )}
+
+                {/* Meet Link generation/join details */}
+                {selectedEvent.tag.includes("status:accepted") && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Meeting Link</p>
+                    {selectedEvent.meet_link ? (
+                      <Button
+                        onClick={() => window.open(selectedEvent.meet_link!, "_blank")}
+                        className="w-full py-2.5 rounded-xl text-xs font-bold bg-brand-primary text-white flex items-center justify-center gap-1.5"
+                      >
+                        <Video size={14} /> Join Meeting
+                      </Button>
+                    ) : (
+                      currentUserRole?.toLowerCase() === "instructor" || currentUserRole?.toLowerCase() === "admin" ? (
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2 text-[11px] text-amber-805 leading-relaxed">
+                          <div className="flex gap-1.5 items-start">
+                            <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                            <p className="font-bold">Meet link not yet generated</p>
+                          </div>
+                          <p>Complete Cal.com setup in your Profile to generate Meet links for accepted bookings.</p>
+                          <Button
+                            onClick={() => window.location.href = "/profile"}
+                            className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] py-1.5 h-auto rounded-lg font-bold"
+                          >
+                            Go to Profile Settings
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex gap-2 items-center text-[11px] text-slate-500 font-semibold">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                          <span>Waiting for mentor to generate Google Meet link.</span>
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
 

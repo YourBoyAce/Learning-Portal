@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   event_time TIME NOT NULL,
   event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('video', 'course', 'session', 'webinar')),
   tag VARCHAR(100),
+  meet_link TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
