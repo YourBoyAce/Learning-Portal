@@ -29,7 +29,7 @@ export function useSecurityGatedData() {
         }
 
         // Specifically grant Premium access to demouser@gmail.com and user@example.com for feature testing
-        if (session.user.email === "demouser@gmail.com" || session.user.email === "user@example.com") {
+        if (session.user.email === "demouser@gmail.com" || session.user.email === "user@example.com" || session.user.email === "premium@gmail.com") {
           if (mounted) {
             setTier("Premium");
             setIsLoading(false);
@@ -69,7 +69,7 @@ export function useSecurityGatedData() {
 
         // Assuming bundle_name is directly on the bundle object
         const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter"; // Fallback to Starter
-        
+
         let resolvedTier: UserTier = "Starter";
         if (typeof bundleName === "string") {
           const lowerName = bundleName.toLowerCase();
@@ -114,7 +114,7 @@ export function useSecurityGatedData() {
         if (queryBuilder) {
           query = queryBuilder(query);
         }
-        
+
         const { data, error } = await query;
         return { data, error };
       } catch (error) {

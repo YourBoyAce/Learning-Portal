@@ -15,19 +15,25 @@ CREATE TABLE IF NOT EXISTS products (
 -- Add indexes for products
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC);
 
--- 2. Alter batches to include product_id
+-- 2. Alter batches to include product_id (nullable FK)
 ALTER TABLE batches
 ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id) ON DELETE SET NULL;
 
 -- Add index for the new foreign key
 CREATE INDEX IF NOT EXISTS idx_batches_product_id ON batches(product_id);
 
--- 3. Enable RLS on products
+-- 3. Add product_id to maincourses (nullable — backward compatible)
+--    Existing rows keep NULL and continue working exactly as before.
+ALTER TABLE maincourses
+ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_maincourses_product_id ON maincourses(product_id);
+
+-- 4. Enable RLS on products
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS Policies for products
+-- 5. RLS Policies for products
 
--- Products: Everyone can read, only admins can write
 CREATE POLICY "Anyone can view products" ON products
   FOR SELECT USING (true);
 
