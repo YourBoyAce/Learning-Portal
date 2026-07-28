@@ -26,6 +26,8 @@ import {
   Loader2,
   Upload,
   Users,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CueCard from "@/app/components/course/CueCard";
@@ -175,6 +177,11 @@ export default function AdminCourses() {
   // Product delete confirmation modal state
   const [showProductDeleteConfirm, setShowProductDeleteConfirm] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // Product inline-edit state
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductTitle, setEditingProductTitle] = useState("");
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // ── Member/Mentor assignment state ──────────────────────────────────────────
   const [profileUsers, setProfileUsers] = useState<Profile[]>([]);
@@ -520,6 +527,13 @@ export default function AdminCourses() {
           ? (selectedProduct?.title ?? "")
           : newProductTitle.trim();
 
+      let finalCourseThumbnailUrl = thumbnailUrl;
+      if (!isEditing && thumbnailUrl === undefined) {
+        finalCourseThumbnailUrl = productMode === "new" ? newProductThumbnailUrl : (selectedProduct?.thumbnail_url || null);
+      } else if (isEditing && thumbnailUrl === null) {
+        finalCourseThumbnailUrl = productMode === "new" ? newProductThumbnailUrl : (selectedProduct?.thumbnail_url || null);
+      }
+
       const body = {
         ...(isEditing && editingCourseId ? { id: editingCourseId } : {}),
         course_type: "active",
@@ -542,7 +556,7 @@ export default function AdminCourses() {
         schedule: batchSchedule,
         start_date: startDateField || null,
         description: courseDescription.trim(),
-        ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
+        ...(finalCourseThumbnailUrl !== undefined && { thumbnail_url: finalCourseThumbnailUrl }),
         modules: modules
           .filter((m) => m.title.trim())
           .map((m) => ({
@@ -646,9 +660,58 @@ export default function AdminCourses() {
     }
   };
 
+  const handleSaveProductEdit = async (productId: string | number) => {
+    if (!editingProductTitle.trim()) {
+      setEditingProductId(null);
+      return;
+    }
+    try {
+      setIsSavingProduct(true);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
+
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: productId,
+          title: editingProductTitle.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const result = await res.json().catch(() => null);
+        throw new Error(result?.error || "Failed to update product.");
+      }
+
+      setProducts(
+        products.map((p) =>
+          p.id === productId ? { ...p, title: editingProductTitle.trim() } : p
+        )
+      );
+      setEditingProductId(null);
+    } catch (error) {
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to update product.",
+      });
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
   const handleDeleteClick = (course: Course) => {
-    setDeletingCourse(course);
     setModalMessage(null);
+    setDeletingCourse(course);
     setShowDeleteConfirm(true);
   };
 
@@ -1212,15 +1275,20 @@ export default function AdminCourses() {
                                 <div className="max-h-52 overflow-y-auto py-1">
                                   {products.map((product) => {
                                     const isSelected = selectedProductId === String(product.id);
+                                    const isEditing = editingProductId === String(product.id);
                                     return (
                                       <div
                                         key={product.id}
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          if (isEditing) {
+                                            e.stopPropagation();
+                                            return;
+                                          }
                                           setSelectedProductId(String(product.id));
                                           setProductDropdownOpen(false);
                                         }}
-                                        className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
-                                          isSelected
+                                        className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${
+                                          isSelected && !isEditing
                                             ? "bg-brand-primary/5"
                                             : "hover:bg-gray-50"
                                         }`}
@@ -1235,30 +1303,93 @@ export default function AdminCourses() {
                                                 : "bg-transparent group-hover:bg-gray-300"
                                             }`}
                                           />
-                                          <span
-                                            className={`text-[14px] truncate transition-colors ${
-                                              isSelected
-                                                ? "font-semibold text-brand-primary"
-                                                : "font-medium text-gray-700 group-hover:text-gray-900"
-                                            }`}
-                                          >
-                                            {product.title}
-                                          </span>
+                                          {isEditing ? (
+                                            <input
+                                              type="text"
+                                              value={editingProductTitle}
+                                              onChange={(e) => setEditingProductTitle(e.target.value)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  void handleSaveProductEdit(product.id);
+                                                } else if (e.key === "Escape") {
+                                                  e.stopPropagation();
+                                                  setEditingProductId(null);
+                                                }
+                                              }}
+                                              className="w-full text-[14px] px-2 py-1 border border-brand-primary rounded focus:outline-none bg-white text-gray-900"
+                                              autoFocus
+                                            />
+                                          ) : (
+                                            <span
+                                              className={`text-[14px] truncate transition-colors ${
+                                                isSelected
+                                                  ? "font-semibold text-brand-primary"
+                                                  : "font-medium text-gray-700 group-hover:text-gray-900"
+                                              }`}
+                                            >
+                                              {product.title}
+                                            </span>
+                                          )}
                                         </div>
-                                        {/* Delete button inside dropdown */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProductDropdownOpen(false);
-                                            void handleDeleteProduct(product);
-                                          }}
-                                          disabled={isDeletingProduct}
-                                          className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                          title={`Delete ${product.title}`}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        {/* Actions inside dropdown */}
+                                        <div className="flex items-center">
+                                          {isEditing ? (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  void handleSaveProductEdit(product.id);
+                                                }}
+                                                disabled={isSavingProduct}
+                                                className="rounded-md p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
+                                              >
+                                                {isSavingProduct ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditingProductId(null);
+                                                }}
+                                                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                              >
+                                                <X className="h-3.5 w-3.5" />
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setEditingProductId(String(product.id));
+                                                  setEditingProductTitle(product.title);
+                                                }}
+                                                className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-50 hover:text-blue-500 mr-1"
+                                                title={`Edit ${product.title}`}
+                                              >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setProductDropdownOpen(false);
+                                                  void handleDeleteProduct(product);
+                                                }}
+                                                disabled={isDeletingProduct}
+                                                className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                title={`Delete ${product.title}`}
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -1527,49 +1658,73 @@ export default function AdminCourses() {
                   </div>
 
                   {/* Thumbnail */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Course Thumbnail
-                    </label>
-                    {thumbnailPreview ? (
-                      <div className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group">
-                        <Image
-                          src={thumbnailPreview}
-                          alt="Thumbnail preview"
-                          fill
-                          className="object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setThumbnailFile(null);
-                              setThumbnailPreview("");
-                            }}
-                            className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
+                  {(() => {
+                    const defaultThumbnailPreview =
+                      productMode === "existing"
+                        ? products.find((p) => String(p.id) === selectedProductId)?.thumbnail_url
+                        : newProductThumbnailPreview;
+                        
+                    const displayThumbnail = thumbnailPreview || defaultThumbnailPreview;
+
+                    return (
+                      <div>
+                        <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                          Course Thumbnail
+                        </label>
+                        {displayThumbnail ? (
+                          <label className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group block cursor-pointer">
+                            <Image
+                              src={displayThumbnail}
+                              alt="Course Thumbnail"
+                              fill
+                              className="object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                              <span className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors shadow-sm">
+                                {thumbnailPreview ? "Change Override" : "Upload Custom"}
+                              </span>
+                              {thumbnailPreview && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setThumbnailFile(null);
+                                    setThumbnailPreview("");
+                                  }}
+                                  className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors shadow-sm"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleThumbnailChange}
+                              className="hidden"
+                            />
+                          </label>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
+                            <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
+                            <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
+                              Click to upload thumbnail
+                            </span>
+                            <span className="text-[10px] text-gray-300 mt-1">
+                              PNG, JPG up to 5MB
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleThumbnailChange}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
                       </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
-                        <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
-                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
-                          Click to upload thumbnail
-                        </span>
-                        <span className="text-[10px] text-gray-300 mt-1">
-                          PNG, JPG up to 5MB
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Start Date */}
                   <div>
