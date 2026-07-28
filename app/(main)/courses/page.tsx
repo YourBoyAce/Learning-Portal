@@ -50,7 +50,6 @@ interface CurriculumCourse {
   certificate_url?: string | null;
   certificate_id?: string | null;
   issued_at?: string | null;
-  batchName?: string | null;
 }
 
 interface Webinar {
@@ -65,8 +64,6 @@ interface Webinar {
 }
 
 interface Enrollment {
-  batchId: number | string;
-  batchName: string;
   startDate: string | null;
   courseId: number | string | null;
   courseTitle: string;
@@ -348,34 +345,8 @@ export default function MyLearningDashboard() {
       // FETCH ENROLLMENTS + COURSES + MODULES
       // --------------------------------------------------
 
-      // First, get the user's batch memberships so we can scope modules per batch
+      // Get the user's course memberships (direct, no batch hop)
       const userEmail = session.user.email?.trim().toLowerCase() || "";
-      let userBatchIdsByCourseId = new Map<string, string>(); // courseId → batchId
-      const batchNameByCourseId = new Map<string, string>(); // courseId → batchName
-
-      if (userEmail) {
-        const { data: batchMemberRows } = await supabase
-          .from("batch_members")
-          .select("batch_id")
-          .eq("email", userEmail);
-
-        if (batchMemberRows && batchMemberRows.length > 0) {
-          const batchIds = batchMemberRows.map((r: any) => String(r.batch_id));
-          const { data: batchRows } = await supabase
-            .from("batches")
-            .select("id, course_id, name")
-            .in("id", batchIds);
-
-          for (const batch of batchRows ?? []) {
-            if (batch.course_id) {
-              userBatchIdsByCourseId.set(String(batch.course_id), String(batch.id));
-              if (batch.name) {
-                batchNameByCourseId.set(String(batch.course_id), batch.name);
-              }
-            }
-          }
-        }
-      }
 
       const { data: enrollmentsData } = await supabase
         .from("course_enrollments")
@@ -541,7 +512,6 @@ export default function MyLearningDashboard() {
                 ? "Completed"
                 : `${completedModules}/${totalModules} Modules`,
 
-          batchName: batchNameByCourseId.get(String(course.id)) ?? null,
         };
       });
 
@@ -785,8 +755,8 @@ export default function MyLearningDashboard() {
                         >
                           <CourseCard
                             id={course.id}
-                            title={course.batchName || course.title}
-                            description={course.batchName ? course.title : course.description}
+                            title={course.title}
+                            description={course.description || ""}
                             thumbnail={course.thumbnail_url}
                             category={course.module_label}
                             duration={course.duration}

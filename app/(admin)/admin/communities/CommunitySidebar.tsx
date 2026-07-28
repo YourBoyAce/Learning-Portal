@@ -24,11 +24,13 @@ export default function CommunitySidebar({
     onSelectCourse,
 }: Props) {
     const [courses, setCourses] = useState<SidebarCourse[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadCourses() {
+            setIsLoading(true);
             try {
                 const { data: sessionData } = await supabase.auth.getSession();
                 if (!sessionData.session?.access_token) return;
@@ -106,8 +108,10 @@ export default function CommunitySidebar({
                         }
                     }
                 }
-            } catch (error) {
-                console.error("Failed to fetch courses:", error);
+            } catch (err) {
+                console.error("Failed to load admin community courses:", err);
+            } finally {
+                setIsLoading(false);
             }
         }
 
@@ -220,8 +224,19 @@ export default function CommunitySidebar({
             {/* Course List */}
 
             <div className="flex-1 overflow-y-auto">
-
-                {filtered.map((course) => {
+                {isLoading ? (
+                    // Skeleton Loaders
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={`skel-${i}`} className="flex w-full items-center gap-4 border-b px-5 py-4">
+                            <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gray-100 shrink-0 animate-pulse" />
+                            <div className="flex flex-1 flex-col items-start overflow-hidden gap-2">
+                                <div className="h-4 w-3/4 rounded bg-gray-100 animate-pulse" />
+                                <div className="h-3 w-1/2 rounded bg-gray-100 animate-pulse" />
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    filtered.map((course) => {
 
                     const active = selectedCourse?.id === course.id;
 
@@ -328,10 +343,8 @@ export default function CommunitySidebar({
 
                         </button>
                     );
-                })}
-
+                }))}
             </div>
-
         </div>
     );
 }

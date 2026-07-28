@@ -32,15 +32,17 @@ export default function UserCommunitySidebar({
     onSelectCourse,
 }: Props) {
     const [courses, setCourses] = useState<SidebarCourse[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadCourses() {
+            setIsLoading(true);
             try {
                 const { data: sessionData } = await supabase.auth.getSession();
                 if (!sessionData.session?.user?.id) return;
-                
+
                 const currentUserId = sessionData.session.user.id;
                 setUserId(currentUserId);
 
@@ -52,7 +54,7 @@ export default function UserCommunitySidebar({
                         .from("community_reads")
                         .select("course_id, last_read_at")
                         .eq("user_id", currentUserId);
-                        
+
                     const readMap = new Map(readData?.map(r => [r.course_id, r.last_read_at]) || []);
 
                     const formatted: SidebarCourse[] = await Promise.all(userCourses.map(async (course: any) => {
@@ -65,7 +67,7 @@ export default function UserCommunitySidebar({
                             .maybeSingle();
 
                         const lastReadAt = readMap.get(course.id.toString()) || '1970-01-01T00:00:00.000Z';
-                        
+
                         const { count } = await supabase
                             .from("course_messages")
                             .select("*", { count: "exact", head: true })
@@ -106,13 +108,13 @@ export default function UserCommunitySidebar({
                     }
                 }
             } catch (err) {
-                console.error("Failed to load community courses:", err);
+            } finally {
+                setIsLoading(false);
             }
         }
 
         loadCourses();
     }, []);
-
     // ─── Realtime Subscriptions ──────────────────────────────────────────────
     useEffect(() => {
         if (!userId || courses.length === 0) return;
@@ -127,13 +129,13 @@ export default function UserCommunitySidebar({
                 },
                 (payload) => {
                     const newMsg = payload.new;
-                    
+
                     setCourses(prevCourses => {
                         const courseIndex = prevCourses.findIndex(c => c.id === newMsg.course_id);
                         if (courseIndex === -1) return prevCourses;
 
                         const course = { ...prevCourses[courseIndex] };
-                        
+
                         course.lastMessage = newMsg.content;
                         course.lastActivityRaw = newMsg.created_at;
                         course.lastActivity = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(newMsg.created_at));
@@ -190,66 +192,73 @@ export default function UserCommunitySidebar({
 
             {/* Course List */}
             <div className="flex-1 overflow-y-auto">
-                {filtered.map((course) => {
-                    const active = selectedCourse?.id === course.id;
-
-                    return (
-                        <button
-                            key={course.id}
-                            onClick={() => {
-                                onSelectCourse(course);
-                                if (userId) {
-                                    setCourses(prev => prev.map(c => 
-                                        c.id === course.id ? { ...c, unread: 0 } : c
-                                    ));
-                                }
-                            }}
-                            className={`flex w-full items-center gap-4 border-b px-5 py-4 transition-all ${
-                                active ? "bg-blue-500 text-white" : "hover:bg-gray-50"
-                            }`}
-                        >
-                            {/* Course Image */}
-                            <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gray-100 shrink-0">
-                                <Image
-                                    src={course.heroImage || PLACEHOLDER_IMAGE}
-                                    fill
-                                    alt={course.title}
-                                    className="object-cover"
-                                />
+                {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={`skel-user-${i}`} className="flex w-full items-center gap-4 border-b px-5 py-4">
+                            <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gray-100 shrink-0 animate-pulse" />
+                            <div className="flex flex-1 flex-col items-start overflow-hidden gap-2">
+                                <div className="h-4 w-3/4 rounded bg-gray-100 animate-pulse" />
+                                <div className="h-3 w-1/2 rounded bg-gray-100 animate-pulse" />
                             </div>
+                        </div>
+                    ))
+                ) : (
+                    filtered.map((course) => {
+                        const active = selectedCourse?.id === course.id;
 
-                            {/* Course Details */}
-                            <div className="flex flex-1 flex-col items-start overflow-hidden">
-                                <span className={`truncate font-semibold ${
-                                    active ? "text-white" : "text-brand-heading"
-                                }`}>
-                                    {course.title}
-                                </span>
+                        return (
+                            <button
+                                key={course.id}
+                                onClick={() => {
+                                    onSelectCourse(course);
+                                    if (userId) {
+                                        setCourses(prev => prev.map(c =>
+                                            c.id === course.id ? { ...c, unread: 0 } : c
+                                        ));
+                                    }
+                                }}
+                                className={`flex w-full items-center gap-4 border-b px-5 py-4 transition-all ${active ? "bg-blue-500 text-white" : "hover:bg-gray-50"
+                                    }`}
+                            >
+                                {/* Course Image */}
+                                <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gray-100 shrink-0">
+                                    <Image
+                                        src={course.heroImage || PLACEHOLDER_IMAGE}
+                                        fill
+                                        alt={course.title}
+                                        className="object-cover"
+                                    />
+                                </div>
 
-                                <span className={`mt-1 truncate text-xs ${
-                                    active ? "text-white/80" : "text-gray-500"
-                                }`}>
-                                    {course.lastMessage}
-                                </span>
-                            </div>
+                                {/* Course Details */}
+                                <div className="flex flex-1 flex-col items-start overflow-hidden">
+                                    <span className={`truncate font-semibold ${active ? "text-white" : "text-brand-heading"
+                                        }`}>
+                                        {course.title}
+                                    </span>
 
-                            {/* Right side: Time and Unread Badge */}
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                                <span className={`text-[10px] font-medium ${
-                                    active ? "text-white/80" : "text-gray-400"
-                                }`}>
-                                    {course.lastActivity}
-                                </span>
-                                
-                                {course.unread && course.unread > 0 ? (
-                                    <div className="flex h-5 items-center justify-center rounded-full bg-brand-alt px-2 text-[10px] font-bold text-white min-w-[20px]">
-                                        {course.unread > 4 ? "4+" : course.unread}
-                                    </div>
-                                ) : null}
-                            </div>
-                        </button>
-                    );
-                })}
+                                    <span className={`mt-1 truncate text-xs ${active ? "text-white/80" : "text-gray-500"
+                                        }`}>
+                                        {course.lastMessage}
+                                    </span>
+                                </div>
+
+                                {/* Right side: Time and Unread Badge */}
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                    <span className={`text-[10px] font-medium ${active ? "text-white/80" : "text-gray-400"
+                                        }`}>
+                                        {course.lastActivity}
+                                    </span>
+
+                                    {course.unread && course.unread > 0 ? (
+                                        <div className="flex h-5 items-center justify-center rounded-full bg-brand-alt px-2 text-[10px] font-bold text-white min-w-[20px]">
+                                            {course.unread > 4 ? "4+" : course.unread}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </button>
+                        );
+                    }))}
             </div>
         </div>
     );

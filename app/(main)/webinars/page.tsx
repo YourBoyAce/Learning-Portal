@@ -75,35 +75,16 @@ export default function LiveWebinarsPage() {
 
         const userEmail = session.user.email?.trim().toLowerCase() || "";
 
-        // 2. Fetch the batches the user belongs to
-        let userBatchIds: string[] = [];
-        if (userEmail) {
-          const { data: batchMemberRows } = await supabase
-            .from("batch_members")
-            .select("batch_id")
-            .eq("email", userEmail);
-
-          userBatchIds = (batchMemberRows || []).map((r: any) =>
-            String(r.batch_id)
-          );
-        }
-
-        // 3. Fetch all webinars (with batch name via join)
+        // 2. Fetch all webinars
         const { data: webinarRows, error } = await supabase
           .from("webinars")
-          .select("*, batches(name)")
+          .select("*")
           .order("created_at", { ascending: false });
 
         if (error) throw error;
 
-        // 4. Filter: show webinars that are either global (no batch) or
-        //    assigned to one of the user's batches
-        const filtered = (webinarRows || []).filter((w: any) => {
-          if (!w.batch_id) return true; // global webinar — visible to all
-          return userBatchIds.includes(String(w.batch_id));
-        });
-
-        const mapped: Webinar[] = filtered.map((w: any) => ({
+        // 3. Map to Webinar interface (no batch filtering for now)
+        const mapped: Webinar[] = (webinarRows || []).map((w: any) => ({
           id: w.id,
           title: w.title,
           subtitle: w.subtitle || "",
@@ -113,8 +94,8 @@ export default function LiveWebinarsPage() {
           status: w.status || "streaming",
           link_text: w.link_text || "",
           attendees_count: w.attendees_count || 0,
-          batch_id: w.batch_id,
-          batchName: w.batches?.name || null,
+          batch_id: null,
+          batchName: undefined,
         }));
 
         setWebinars(mapped);

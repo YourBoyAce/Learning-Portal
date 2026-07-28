@@ -15,6 +15,7 @@ import { supabase } from "@/app/lib/supabase";
 import CommunityHeader from "./CommunityHeader";
 import MessageBubble, { ChatMessage } from "./MessageBubble";
 import MessageInput from "./MessageInput";
+import CommunityChatSkeleton from "@/app/components/chat/CommunityChatSkeleton";
 
 import { CommunityCourse } from "./page";
 
@@ -634,11 +635,12 @@ export default function CommunityChat({
 
     if (loadingInitial) {
         return (
-            <div className="flex h-full flex-1 items-center justify-center bg-white">
-                <Loader2
-                    size={32}
-                    className="animate-spin text-brand-heading"
+            <div className="flex h-full flex-1 flex-col bg-white">
+                <CommunityHeader
+                    courseTitle={course.title}
+                    messageCount={0}
                 />
+                <CommunityChatSkeleton />
             </div>
         );
     }

@@ -131,6 +131,7 @@ export default function Dashboard() {
 
   //for progress
   const [completedVideoIds, setCompletedVideoIds] = useState<string[]>([]);
+  const [allocationPage, setAllocationPage] = useState(0);
 
 
   const loadDashboardData = async () => {
@@ -203,29 +204,6 @@ export default function Dashboard() {
 
     setProfile((fetchedProfile ?? null) as Profile | null);
 
-    // Build a map of courseId → batchId for this user's batch memberships
-    const userBatchIdsByCourseId = new Map<string, string>();
-    const userEmailForBatch = user.email?.trim().toLowerCase() || "";
-    if (userEmailForBatch) {
-      const { data: batchMemberRows } = await supabase
-        .from("batch_members")
-        .select("batch_id")
-        .eq("email", userEmailForBatch);
-
-      if (batchMemberRows && batchMemberRows.length > 0) {
-        const batchIds = batchMemberRows.map((r: any) => String(r.batch_id));
-        const { data: batchRows } = await supabase
-          .from("batches")
-          .select("id, course_id")
-          .in("id", batchIds);
-
-        for (const batch of batchRows ?? []) {
-          if (batch.course_id) {
-            userBatchIdsByCourseId.set(String(batch.course_id), String(batch.id));
-          }
-        }
-      }
-    }
 
     // Helper: modules belong to the course, not the batch.
     // All modules from the parent course are available to all batches.
@@ -778,7 +756,7 @@ export default function Dashboard() {
         </div>
 
         {/* Upcoming Webinars Widget */}
-        {/* --- Side-by-Side Layout: Webinars & Batch Allocations --- */}
+        {/* --- Side-by-Side Layout: Webinars & Course Allocations --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
 
           {/* 1. Upcoming Webinars Widget */}
@@ -866,7 +844,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 2. Enrollment Summary / Batch Allocations Widget */}
+          {/* 2. Enrollment Summary / Course Allocations Widget */}
           <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-7 shadow-sm flex flex-col h-full">
 
             <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
@@ -875,7 +853,7 @@ export default function Dashboard() {
                   <Image src={ICONS.USERS} alt="Users" width={20} height={20} />
                 </div>
                 <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                  Batch Allocations
+                  Course Allocations
                 </h2>
               </div>
               <span className="text-[10px] font-bold px-3 py-1.5 bg-surface-accent text-brand-primary rounded-md uppercase tracking-widest border border-brand-primary/10">
@@ -1180,7 +1158,7 @@ export default function Dashboard() {
                       Active Studies
                     </h2>
                     <span className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em]">
-                      {activeEnrollments.length} Batches in Progress
+                      {activeEnrollments.length} Courses in Progress
                     </span>
                   </div>
 
@@ -1195,16 +1173,16 @@ export default function Dashboard() {
                           className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard
-                            id={String(enrollment.courseId ?? enrollment.batchId)}
-                            title={enrollment.batchName}
-                            description={enrollment.courseTitle}
+                            id={String(enrollment.courseId)}
+                            title={enrollment.courseTitle}
+                            description={enrollment.courseDescription || ""}
                             thumbnail={(enrollment as any).courseThumbnail || undefined}
                             progressPercentage={
                               courseProgress[String(enrollment.courseId)]?.progressPercentage || 0
                             }
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(enrollment.courseId ?? enrollment.batchId)}
+                            onClick={() => handleOpenCourse(enrollment.courseId!)}
                           />
                         </CarouselItem>
                       ))}
@@ -1246,14 +1224,16 @@ export default function Dashboard() {
                           className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard
-                            id={String(enrollment.courseId ?? enrollment.batchId)}
-                            title={enrollment.batchName}
-                            description={enrollment.courseTitle}
+                            id={String(enrollment.courseId)}
+                            title={enrollment.courseTitle}
+                            description={enrollment.courseDescription || ""}
                             thumbnail={(enrollment as any).courseThumbnail || undefined}
-                            progressPercentage={100}
+                            progressPercentage={
+                              courseProgress[String(enrollment.courseId)]?.progressPercentage || 0
+                            }
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(enrollment.courseId ?? enrollment.batchId)}
+                            onClick={() => handleOpenCourse(enrollment.courseId!)}
                           />
                         </CarouselItem>
                       ))}

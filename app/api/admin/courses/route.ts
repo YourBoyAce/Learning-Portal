@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeId(value: unknown): string | number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -16,6 +17,55 @@ function normalizeId(value: unknown): string | number | null {
       : trimmed;
   }
   return null;
+}
+
+function isAdminRole(role: string | null | undefined): boolean {
+  return role?.toLowerCase() === "admin";
+}
+
+type ProfileRow = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  role: string | null;
+};
+
+type CourseEnrollmentRow = {
+  user_id: string;
+};
+
+async function filterAssignableMemberEmails(
+  supabaseAdmin: SupabaseClient,
+  emails: string[],
+): Promise<string[]> {
+  if (emails.length === 0) return emails;
+
+  const { data: profileRows, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, role");
+
+  if (error) throw new Error(error.message);
+
+  const authUsersResult =
+    await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const authEmailById = new Map(
+    (authUsersResult.data?.users ?? []).map((user) => [
+      user.id,
+      user.email?.trim().toLowerCase() ?? "",
+    ]),
+  );
+
+  const adminEmails = new Set<string>();
+  for (const row of (profileRows ?? []) as Pick<ProfileRow, "id" | "email" | "role">[]) {
+    if (!isAdminRole(row.role)) continue;
+    const email =
+      row.email?.trim().toLowerCase() ||
+      authEmailById.get(row.id) ||
+      "";
+    if (email) adminEmails.add(email);
+  }
+
+  return emails.filter((email) => !adminEmails.has(email.toLowerCase()));
 }
 
 type AuthContext =
@@ -91,114 +141,15 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
   };
 }
 
-async function attachBatchNamesToCourses(
-  supabaseAdmin: SupabaseClient,
-  courses: Array<{ id: string | number }>,
-) {
-  if (courses.length === 0) return courses;
-
-  const courseIds = courses.map((course) => course.id);
-  const infoByCourseId = new Map<
-    string,
-    {
-      names: string[];
-      scheduleTypes: Set<"weekday" | "weekend">;
-      startDate: string | null;
-    }
-  >();
-
-  const addBatchToCourse = (
-    courseId: unknown,
-    batch: {
-      name?: string | null;
-      schedule_type?: unknown;
-      start_date?: string | null;
-    },
-  ) => {
-    if (courseId == null || typeof batch.name !== "string" || !batch.name.trim()) {
-      return;
-    }
-
-    const key = String(courseId);
-    const info = infoByCourseId.get(key) ?? {
-      names: [],
-      scheduleTypes: new Set<"weekday" | "weekend">(),
-      startDate: null,
-    };
-
-    if (!info.names.includes(batch.name)) {
-      info.names.push(batch.name);
-    }
-
-    info.scheduleTypes.add(
-      batch.schedule_type === "weekend" ? "weekend" : "weekday",
-    );
-
-    if (batch.start_date && !info.startDate) {
-      info.startDate = batch.start_date;
-    }
-
-    infoByCourseId.set(key, info);
-  };
-
-  const { data: directBatches } = await supabaseAdmin
-    .from("batches")
-    .select("name, course_id, schedule_type, start_date")
-    .in("course_id", courseIds);
-
-  for (const batch of directBatches ?? []) {
-    addBatchToCourse(batch.course_id, batch);
-  }
-
-  const { data: batchCourses } = await supabaseAdmin
-    .from("batch_courses")
-    .select("course_id, batch_id")
-    .in("course_id", courseIds);
-
-  const junctionBatchIds = [
-    ...new Set(
-      (batchCourses ?? [])
-        .map((row) => row.batch_id)
-        .filter((id): id is string | number => id != null),
-    ),
-  ];
-
-  if (junctionBatchIds.length > 0) {
-    const { data: junctionBatches } = await supabaseAdmin
-      .from("batches")
-      .select("id, name, schedule_type, start_date")
-      .in("id", junctionBatchIds);
-
-    const batchById = new Map(
-      (junctionBatches ?? []).map((batch) => [String(batch.id), batch]),
-    );
-
-    for (const row of batchCourses ?? []) {
-      const batch = batchById.get(String(row.batch_id));
-      if (batch) {
-        addBatchToCourse(row.course_id, batch);
-      }
-    }
-  }
-
-  return courses.map((course) => {
-    const info = infoByCourseId.get(String(course.id));
-    return {
-      ...course,
-      batch_name: info?.names.join(", ") || null,
-      batch_schedule_types: info
-        ? Array.from(info.scheduleTypes)
-        : [],
-      batch_start_date: info?.startDate ?? null,
-    };
-  });
-}
-
 export async function GET(request: Request) {
   const authContext = await authenticateAdmin(request);
   if ("error" in authContext) {
     return authContext.error;
   }
+
+  const { searchParams } = new URL(request.url);
+  const includeMembers = searchParams.get("includeMembers") === "true";
+  const courseIdParam = searchParams.get("courseId");
 
   // Fetch active maincourses
   const { data: maincoursesData, error: maincoursesError } = await authContext.supabaseAdmin
@@ -220,7 +171,6 @@ export async function GET(request: Request) {
   }
 
   // Products that already have a linked maincourse are "active" — don't show them in upcoming.
-  // Determine which product_ids already have a maincourse
   const linkedProductIds = new Set(
     ((maincoursesData ?? []) as any[])
       .map((c) => c.product_id)
@@ -234,23 +184,124 @@ export async function GET(request: Request) {
     .map((p) => ({
       ...p,
       course_type: "upcoming",
-      _source: "product", // sentinel so frontend can distinguish
+      _source: "product",
     }));
-
-  // Enrich maincourses with batch names
-  const coursesWithBatches = await attachBatchNamesToCourses(
-    authContext.supabaseAdmin,
-    maincoursesData ?? [],
-  );
 
   // Return merged: active maincourses + upcoming products
   const courses = [
-    ...((coursesWithBatches as any[]).map((c) => ({ ...c, _source: "maincourse" }))),
+    ...((maincoursesData ?? []) as any[]).map((c) => ({ ...c, _source: "maincourse" })),
     ...upcomingProducts,
   ];
 
+  // ── Fetch mentors for active courses ──
+  const { data: allMembers } = await authContext.supabaseAdmin
+    .from("course_members")
+    .select("maincourse_id, email");
+
+  if (allMembers && allMembers.length > 0) {
+    const memberEmails = [...new Set(allMembers.map((m: any) => m.email).filter(Boolean))];
+    
+    if (memberEmails.length > 0) {
+      const { data: mentorProfiles } = await authContext.supabaseAdmin
+        .from("profiles")
+        .select("email, full_name, role")
+        .in("email", memberEmails)
+        .in("role", ["instructor", "admin", "mentor"]);
+        
+      if (mentorProfiles) {
+        const mentorMap = new Map(mentorProfiles.map((p: any) => [p.email?.toLowerCase(), p.full_name || p.email]));
+        const mentorsByCourse = new Map<string | number, { full_name: string }[]>();
+        
+        for (const m of allMembers) {
+          if (!m.email || !m.maincourse_id) continue;
+          const name = mentorMap.get(m.email.toLowerCase());
+          if (name) {
+            const courseMentors = mentorsByCourse.get(m.maincourse_id) || [];
+            if (!courseMentors.find((c: any) => c.full_name === name)) {
+              courseMentors.push({ full_name: name });
+            }
+            mentorsByCourse.set(m.maincourse_id, courseMentors);
+          }
+        }
+        
+        for (const c of courses) {
+          if (c._source === "maincourse") {
+            c.assigned_mentors = mentorsByCourse.get(c.id) || [];
+          }
+        }
+      }
+    }
+  }
+
+  // If includeMembers requested, also return profiles + course member assignments
+  if (!includeMembers) {
+    return NextResponse.json(
+      { success: true, courses },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  // Fetch all profiles for the multi-select options
+  const { data: profileRows, error: usersError } = await authContext.supabaseAdmin
+    .from("profiles")
+    .select("id, email, full_name, role")
+    .order("created_at", { ascending: false });
+
+  if (usersError) {
+    return NextResponse.json({ error: usersError.message }, { status: 500 });
+  }
+
+  // Get auth emails for profiles that lack an email in the profiles table
+  const authUsersResult =
+    await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const authEmailById = new Map(
+    (authUsersResult.data?.users ?? []).map((u) => [u.id, u.email ?? null]),
+  );
+
+  const users = ((profileRows ?? []) as ProfileRow[]).map((row) => ({
+    id: row.id,
+    full_name: row.full_name ?? null,
+    email: row.email ?? authEmailById.get(row.id) ?? null,
+    role: row.role ?? null,
+  }));
+
+  // If a specific courseId was requested, fetch its member assignments
+  let assignment: { scholarEmails: string[]; mentorEmails: string[] } | undefined;
+
+  if (courseIdParam) {
+    const courseId = normalizeId(courseIdParam);
+    if (courseId !== null) {
+      const { data: memberRows } = await authContext.supabaseAdmin
+        .from("course_members")
+        .select("email")
+        .eq("maincourse_id", courseId);
+
+      const scholarEmails: string[] = [];
+      const mentorEmails: string[] = [];
+
+      // Create a fast lookup map for emails to role
+      const roleByEmail = new Map(
+        users.map((u) => [u.email?.trim().toLowerCase(), u.role?.toLowerCase()]),
+      );
+
+      for (const row of (memberRows ?? []) as { email: string }[]) {
+        const email = row.email?.trim().toLowerCase();
+        if (!email) continue;
+        
+        const role = roleByEmail.get(email);
+        if (role === "instructor" || role === "admin" || role === "mentor") {
+          mentorEmails.push(email);
+        } else {
+          scholarEmails.push(email);
+        }
+      }
+
+      assignment = { scholarEmails, mentorEmails };
+    }
+  }
+
   return NextResponse.json(
-    { success: true, courses },
+    { success: true, courses, users, ...(assignment && { assignment }) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -472,7 +523,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  // ── WORKFLOW 2: Active → product + maincourse + modules ───────────────────
+  // ── WORKFLOW 2: Active → product + maincourse + modules + members ─────────
   const description = typeof body?.description === "string" ? body.description.trim() : "";
   if (!description) {
     return NextResponse.json({ error: "Description is required for active courses." }, { status: 400 });
@@ -486,10 +537,8 @@ export async function POST(request: Request) {
   const newProductThumbnail = typeof body?.new_product_thumbnail === "string" ? body.new_product_thumbnail.trim() : null;
 
   if (existingProductId) {
-    // Reuse the chosen product
     productId = existingProductId;
   } else if (newProductTitle) {
-    // Create a new product first
     const { data: createdProduct, error: productInsertError } = await authContext.supabaseAdmin
       .from("products")
       .insert({
@@ -505,7 +554,6 @@ export async function POST(request: Request) {
     }
     productId = createdProduct.id;
   }
-  // productId can remain null if no product selected — backward compatible
 
   // Step 2: Build internal maincourse title from product + month + schedule
   let internalTitle: string;
@@ -516,7 +564,6 @@ export async function POST(request: Request) {
   if (productTitle && month) {
     internalTitle = `${productTitle} - ${month} ${scheduleLabel}`;
   } else if (typeof body?.title === "string" && body.title.trim()) {
-    // Fallback: explicit title provided (edit case / legacy)
     internalTitle = body.title.trim();
   } else {
     return NextResponse.json({ error: "Product and month are required to generate the course title." }, { status: 400 });
@@ -565,30 +612,80 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 5: Automatically create the corresponding batch
-  // Batch name follows the existing format: "<ProductTitle> <Month> <ScheduleLabel> Batch"
-  const batchScheduleType: "weekday" | "weekend" =
-    body?.schedule === "weekend" ? "weekend" : "weekday";
-  const batchScheduleLabel = batchScheduleType === "weekend" ? "Weekend" : "Weekday";
-  const batchName = productTitle && month
-    ? `${productTitle} ${month} ${batchScheduleLabel} Batch`
-    : internalTitle;
+  // Step 5: Assign scholars and mentors via course_members table
+  let assignedScholars = Array.isArray(body?.assigned_scholars)
+    ? body.assigned_scholars
+        .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
+  assignedScholars = await filterAssignableMemberEmails(
+    authContext.supabaseAdmin,
+    assignedScholars,
+  );
 
-  const startDate = typeof body?.start_date === "string" ? body.start_date.trim() : null;
+  const assignedMentors = Array.isArray(body?.assigned_mentors)
+    ? body.assigned_mentors
+        .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
 
-  const { error: batchInsertError } = await authContext.supabaseAdmin
-    .from("batches")
-    .insert({
-      name: batchName,
-      description,
-      start_date: startDate || null,
-      schedule_type: batchScheduleType,
-      course_id: newCourse.id,
-    });
+  const memberRows = [
+    ...assignedScholars.map((email: string) => ({
+      maincourse_id: newCourse.id,
+      email,
+    })),
+    ...assignedMentors.map((email: string) => ({
+      maincourse_id: newCourse.id,
+      email,
+    })),
+  ];
 
-  if (batchInsertError) {
-    // Batch creation failure is non-fatal — course + modules are already saved
-    console.error("Auto-batch creation failed:", batchInsertError.message);
+  if (memberRows.length > 0) {
+    const { error: memberError } = await authContext.supabaseAdmin
+      .from("course_members")
+      .insert(memberRows);
+
+    if (memberError) {
+      console.error("course_members insert error:", memberError.message);
+    }
+  }
+
+  // Step 6: Auto-enroll scholars into course_enrollments
+  if (assignedScholars.length > 0) {
+    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUsers = authUsersResult.data?.users ?? [];
+
+    const userIdsToEnroll: string[] = [];
+    for (const email of assignedScholars) {
+      const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (authUser) userIdsToEnroll.push(authUser.id);
+    }
+
+    if (userIdsToEnroll.length > 0) {
+      const { data: existing } = await authContext.supabaseAdmin
+        .from("course_enrollments")
+        .select("user_id")
+        .eq("course_id", newCourse.id)
+        .in("user_id", userIdsToEnroll);
+
+      const existingUserIds = new Set(
+        ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
+      );
+
+      const newEnrollments = userIdsToEnroll
+        .filter((id) => !existingUserIds.has(id))
+        .map((id) => ({ user_id: id, course_id: newCourse.id }));
+
+      if (newEnrollments.length > 0) {
+        const { error: enrollError } = await authContext.supabaseAdmin
+          .from("course_enrollments")
+          .insert(newEnrollments);
+
+        if (enrollError) {
+          console.error("Enrollment error:", enrollError.message);
+        }
+      }
+    }
   }
 
   return NextResponse.json({ success: true });
@@ -661,7 +758,7 @@ export async function PUT(request: Request) {
     course_type: "active",
     ...(titleUpdate && { title: titleUpdate }),
     ...(resolvedThumbnailUrl !== undefined && { thumbnail_url: resolvedThumbnailUrl }),
-    ...(body?.product_id !== undefined && { product_id: body.product_id }),
+    ...(body?.product_id !== undefined && body?.product_id !== "" && { product_id: Number(body.product_id) }),
   };
 
   const { error: updateError } = await authContext.supabaseAdmin
@@ -760,6 +857,104 @@ export async function PUT(request: Request) {
     }
   }
 
+  // ── Step: Assign scholars and mentors via course_members ──────────────────
+  let assignedScholars = Array.isArray(body?.assigned_scholars)
+    ? body.assigned_scholars
+        .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
+  assignedScholars = await filterAssignableMemberEmails(
+    authContext.supabaseAdmin,
+    assignedScholars,
+  );
+
+  const assignedMentors = Array.isArray(body?.assigned_mentors)
+    ? body.assigned_mentors
+        .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
+        .filter((email: string) => EMAIL_RE.test(email))
+    : [];
+
+  // Only update course_members if the fields were explicitly sent
+  if (body?.assigned_scholars !== undefined || body?.assigned_mentors !== undefined) {
+    // Clear existing course_members for this course
+    const { error: clearMembersError } = await authContext.supabaseAdmin
+      .from("course_members")
+      .delete()
+      .eq("maincourse_id", id);
+
+    if (clearMembersError) {
+      return NextResponse.json({ error: clearMembersError.message }, { status: 500 });
+    }
+
+    const memberRows = [
+      ...assignedScholars.map((email: string) => ({
+        maincourse_id: id,
+        email,
+      })),
+      ...assignedMentors.map((email: string) => ({
+        maincourse_id: id,
+        email,
+      })),
+    ];
+
+    if (memberRows.length > 0) {
+      const { error: memberError } = await authContext.supabaseAdmin
+        .from("course_members")
+        .insert(memberRows);
+
+      if (memberError) {
+        console.error("course_members insert error:", memberError.message);
+      }
+    }
+
+    // Re-sync course_enrollments for scholars
+    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUsers = authUsersResult.data?.users ?? [];
+
+    const userIdsToEnroll: string[] = [];
+    for (const email of assignedScholars) {
+      const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (authUser) userIdsToEnroll.push(authUser.id);
+    }
+
+    // Fetch existing enrollments for this course
+    const { data: existing } = await authContext.supabaseAdmin
+      .from("course_enrollments")
+      .select("user_id")
+      .eq("course_id", id);
+
+    const existingUserIds = new Set(
+      ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
+    );
+
+    const userIdsToEnrollSet = new Set(userIdsToEnroll);
+
+    // Determine which to delete and which to add
+    const toDelete = [...existingUserIds].filter((uid) => !userIdsToEnrollSet.has(uid));
+    const toAdd = userIdsToEnroll.filter((uid) => !existingUserIds.has(uid));
+
+    if (toDelete.length > 0) {
+      const { error: deleteError } = await authContext.supabaseAdmin
+        .from("course_enrollments")
+        .delete()
+        .eq("course_id", id)
+        .in("user_id", toDelete);
+      if (deleteError) {
+        console.error("Enrollment delete error:", deleteError.message);
+      }
+    }
+
+    if (toAdd.length > 0) {
+      const newEnrollments = toAdd.map((uid) => ({ user_id: uid, course_id: id }));
+      const { error: enrollError } = await authContext.supabaseAdmin
+        .from("course_enrollments")
+        .insert(newEnrollments);
+      if (enrollError) {
+        console.error("Enrollment insert error:", enrollError.message);
+      }
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
@@ -793,12 +988,14 @@ export async function DELETE(request: Request) {
   }
 
   // ── Active → delete maincourse and all related data ───────────────────────
+  await authContext.supabaseAdmin.from("course_members").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("batches").update({ course_id: null }).eq("course_id", id);
   await authContext.supabaseAdmin.from("coursemodules").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("user_video_progress").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("course_enrollments").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("course_ratings").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("certificates").delete().eq("course_id", id);
+  await authContext.supabaseAdmin.schema("phase2").from("orders").delete().eq("course_id", id);
 
   const { error: deleteError } = await authContext.supabaseAdmin
     .from("maincourses")

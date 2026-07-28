@@ -82,23 +82,14 @@ async function checkEnrollment(
   const userEmail = userData.user.email?.trim().toLowerCase();
   if (!userEmail) return false;
 
-  const { data: batchMemberRows, error: memberError } = await supabaseAdmin
-    .from("batch_members")
-    .select("batch_id")
-    .eq("email", userEmail);
+  const { data: memberRows, error: memberError } = await supabaseAdmin
+    .from("course_members")
+    .select("maincourse_id")
+    .eq("email", userEmail)
+    .eq("maincourse_id", courseId);
 
-  if (memberError || !batchMemberRows?.length) return false;
-
-  const batchIds = batchMemberRows.map((r: any) => r.batch_id);
-
-  const { data: courseBatches, error: batchError } = await supabaseAdmin
-    .from("batches")
-    .select("id")
-    .in("id", batchIds)
-    .eq("course_id", courseId);
-
-  if (batchError) return false;
-  return (courseBatches ?? []).length > 0;
+  if (memberError) return false;
+  return (memberRows ?? []).length > 0;
 }
 
 async function hydrateMessagesWithProfiles(
@@ -421,25 +412,15 @@ export async function getUserCommunities(accessToken: string): Promise<{
     const userEmail = userData.user.email?.trim().toLowerCase();
     if (!userEmail) return { courses: [], error: "User email not found" };
 
-    // Get batches
+    // Get courses from course_members
     const { data: memberRows, error: memberError } = await supabaseAdmin
-      .from("batch_members")
-      .select("batch_id")
+      .from("course_members")
+      .select("maincourse_id")
       .eq("email", userEmail);
 
     if (memberError || !memberRows?.length) return { courses: [], error: null };
     
-    const batchIds = memberRows.map((r: any) => r.batch_id);
-
-    // Get courses from batches
-    const { data: batchRows, error: batchError } = await supabaseAdmin
-      .from("batches")
-      .select("course_id")
-      .in("id", batchIds);
-      
-    if (batchError || !batchRows?.length) return { courses: [], error: null };
-    
-    const courseIds = Array.from(new Set(batchRows.map(b => b.course_id).filter(id => id !== null)));
+    const courseIds = Array.from(new Set(memberRows.map((r: any) => r.maincourse_id).filter((id: any) => id !== null)));
     if (courseIds.length === 0) return { courses: [], error: null };
 
     // Get course details

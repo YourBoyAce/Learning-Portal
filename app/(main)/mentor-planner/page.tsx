@@ -186,31 +186,31 @@ export default function MentorConnectPage() {
   // Fetch mentors for Student View based on their assigned batch
   async function loadMentors(studentEmail: string) {
     try {
-      // 1. Get all batches where the student is a member
-      const { data: userBatchMembers, error: batchError } = await supabase
-        .from("batch_members")
-        .select("batch_id")
+      // 1. Get all courses where the student is a member
+      const { data: userCourseMembers, error: courseError } = await supabase
+        .from("course_members")
+        .select("maincourse_id")
         .eq("email", studentEmail);
 
-      if (batchError) throw batchError;
+      if (courseError) throw courseError;
 
-      if (!userBatchMembers || userBatchMembers.length === 0) {
+      if (!userCourseMembers || userCourseMembers.length === 0) {
         setMentors([]);
         return;
       }
 
-      const batchIds = userBatchMembers.map((bm: any) => bm.batch_id).filter(Boolean);
+      const courseIds = userCourseMembers.map((cm: any) => cm.maincourse_id).filter(Boolean);
 
-      // 2. Find all emails inside batch_members for those batch IDs
-      const { data: siblingBatchMembers, error: siblingError } = await supabase
-        .from("batch_members")
+      // 2. Find all emails inside course_members for those course IDs
+      const { data: siblingCourseMembers, error: siblingError } = await supabase
+        .from("course_members")
         .select("email")
-        .in("batch_id", batchIds);
+        .in("maincourse_id", courseIds);
 
       if (siblingError) throw siblingError;
 
-      const mentorEmails = (siblingBatchMembers ?? [])
-        .map((bm: any) => bm.email?.trim().toLowerCase())
+      const mentorEmails = (siblingCourseMembers ?? [])
+        .map((cm: any) => cm.email?.trim().toLowerCase())
         .filter(Boolean);
 
       if (mentorEmails.length === 0) {

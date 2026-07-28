@@ -205,7 +205,7 @@ export default function InvitesPage() {
               RSVP Invites
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Respond to study connect requests submitted by scholars in your assigned batches.
+              Respond to study connect requests submitted by scholars in your assigned courses.
             </p>
           </div>
 

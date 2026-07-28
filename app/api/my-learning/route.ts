@@ -109,19 +109,19 @@ export async function GET(request: Request) {
   }
 
   const { data: memberRows, error: memberError } = await authContext.supabaseAdmin
-    .from("batch_members")
-    .select("batch_id")
+    .from("course_members")
+    .select("maincourse_id")
     .eq("email", userEmail);
 
   if (memberError) {
     return NextResponse.json({ error: memberError.message }, { status: 500 });
   }
 
-  const batchIds = ((memberRows ?? []) as BatchMemberRow[])
-    .map((row) => row.batch_id)
+  const courseIds = ((memberRows ?? []) as any[])
+    .map((row) => row.maincourse_id)
     .filter((value) => value !== null && value !== undefined);
 
-  if (batchIds.length === 0) {
+  if (courseIds.length === 0) {
     return NextResponse.json({
       success: true,
       enrollments: [],
@@ -129,51 +129,26 @@ export async function GET(request: Request) {
     });
   }
 
-  const { data: batchRows, error: batchError } = await authContext.supabaseAdmin
-    .from("batches")
-    .select("id, name, course_id, start_date")
-    .in("id", batchIds)
-    .order("start_date", { ascending: true });
+  const { data: courseRows, error: courseError } = await authContext.supabaseAdmin
+    .from("maincourses")
+    .select("id, title, description, category, thumbnail_url, created_at")
+    .in("id", courseIds)
+    .order("created_at", { ascending: false });
 
-  if (batchError) {
-    return NextResponse.json({ error: batchError.message }, { status: 500 });
+  if (courseError) {
+    return NextResponse.json({ error: courseError.message }, { status: 500 });
   }
 
-  const courseIds = Array.from(
-    new Set(
-      ((batchRows ?? []) as BatchRow[])
-        .map((batch) => batch.course_id)
-        .filter((courseId): courseId is string | number => courseId !== null),
-    ),
-  );
-
-  let courseById = new Map<string, CourseRow>();
-  if (courseIds.length > 0) {
-    const { data: courseRows, error: courseError } = await authContext.supabaseAdmin
-      .from("maincourses")
-      .select("id, title, description, category, thumbnail_url")
-      .in("id", courseIds);
-
-    if (courseError) {
-      return NextResponse.json({ error: courseError.message }, { status: 500 });
-    }
-
-    courseById = new Map(
-      ((courseRows ?? []) as CourseRow[]).map((course) => [String(course.id), course]),
-    );
-  }
-
-  const enrollments = ((batchRows ?? []) as BatchRow[]).map((batch) => {
-    const course = batch.course_id ? courseById.get(String(batch.course_id)) : null;
+  const enrollments = ((courseRows ?? []) as any[]).map((course) => {
     return {
-      batchId: batch.id,
-      batchName: batch.name ?? "Untitled Batch",
-      startDate: batch.start_date,
-      courseId: batch.course_id,
-      courseTitle: course?.title ?? "Unassigned Course",
-      courseDescription: course?.description ?? "",
-      courseCategory: course?.category ?? "General",
-      courseThumbnail: course?.thumbnail_url ?? "",
+      batchId: null,
+      batchName: null,
+      startDate: course.created_at, // fallback
+      courseId: course.id,
+      courseTitle: course.title ?? "Unassigned Course",
+      courseDescription: course.description ?? "",
+      courseCategory: course.category ?? "General",
+      courseThumbnail: course.thumbnail_url ?? "",
     };
   });
 

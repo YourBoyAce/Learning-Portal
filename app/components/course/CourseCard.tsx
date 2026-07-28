@@ -26,6 +26,7 @@ type CourseCardProps = {
   onDelete?: () => void;
   isCompleted?: boolean;
   onCertificateClick?: () => void;
+  assignedMentors?: { full_name: string }[];
 };
 
 
@@ -77,6 +78,7 @@ export default function CourseCard({
   onDelete,
   isCompleted = false,
   onCertificateClick,
+  assignedMentors,
 }: CourseCardProps) {
   const isAdmin = variant === "admin";
 
@@ -135,6 +137,26 @@ export default function CourseCard({
             {batchName || "No batch assigned"}
           </p>
           {showScheduleInFooter && scheduleBadges}
+        </div>
+      )}
+
+      {courseStatus === "active" && (
+        <div className="mb-4">
+          <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Assigned Mentors</p>
+          {assignedMentors && assignedMentors.length > 0 ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {assignedMentors.map((mentor, i) => (
+                <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-md px-2 py-1">
+                  <div className="w-4 h-4 rounded-full bg-brand-primary/10 flex items-center justify-center text-[8px] font-bold text-brand-primary">
+                    {mentor.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-medium text-gray-700 truncate max-w-[100px]">{mentor.full_name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic">No mentors assigned</p>
+          )}
         </div>
       )}
 

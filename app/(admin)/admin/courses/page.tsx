@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
+import Select from "react-select";
 import { CourseCard } from "@/app/components/course";
+import CourseCardSkeleton from "@/app/components/course/CourseCardSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -22,6 +25,7 @@ import {
   X,
   Loader2,
   Upload,
+  Users,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CueCard from "@/app/components/course/CueCard";
@@ -35,6 +39,64 @@ interface Course {
   course_type?: string;
   product_id?: number | string | null;
   _source?: "maincourse" | "product"; // sentinel from API
+  assigned_mentors?: { full_name: string }[];
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface Profile {
+  id: string;
+  email: string | null;
+  full_name?: string | null;
+  role?: string | null;
+}
+
+function getProfileDisplayName(user: Pick<Profile, "full_name" | "email">): string {
+  const name = user.full_name?.trim();
+  if (name) return name;
+  const email = user.email?.trim();
+  if (email) return email.split("@")[0] ?? email;
+  return "Unknown user";
+}
+
+function buildScholarSelectOptions(profileUsers: Profile[], memberEmails: string[] = []): SelectOption[] {
+  const map = new Map<string, SelectOption>();
+  for (const u of profileUsers) {
+    const role = u.role?.toLowerCase();
+    if (role === "admin" || role === "instructor" || role === "mentor") continue;
+    if (!u.email) continue;
+    const v = u.email.trim().toLowerCase();
+    map.set(v, { value: v, label: getProfileDisplayName(u) });
+  }
+  for (const email of memberEmails) {
+    if (map.has(email)) continue;
+    map.set(email, { value: email, label: email });
+  }
+  return Array.from(map.values());
+}
+
+function buildMentorSelectOptions(profileUsers: Profile[], mentorEmails: string[] = []): SelectOption[] {
+  const map = new Map<string, SelectOption>();
+  for (const u of profileUsers) {
+    const role = u.role?.toLowerCase();
+    if (role !== "instructor" && role !== "mentor") continue;
+    if (!u.email) continue;
+    const v = u.email.trim().toLowerCase();
+    map.set(v, { value: v, label: getProfileDisplayName(u) });
+  }
+  for (const email of mentorEmails) {
+    if (map.has(email)) continue;
+    map.set(email, { value: email, label: email });
+  }
+  return Array.from(map.values());
+}
+
+function buildSelectedOptions(emails: string[], options: SelectOption[]): SelectOption[] {
+  const optMap = new Map(options.map((o) => [o.value, o]));
+  return emails.map((e) => optMap.get(e) ?? { value: e, label: e });
 }
 
 export default function AdminCourses() {
@@ -64,23 +126,38 @@ export default function AdminCourses() {
   } | null>(null);
 
   // ── Product-layer state (Active workflow) ──────────────────────────────────
-  interface Product { id: number | string; title: string; description?: string; thumbnail_url?: string | null; }
+  interface Product {
+    id: number | string;
+    title: string;
+    description?: string;
+    thumbnail_url?: string | null;
+  }
   const [products, setProducts] = useState<Product[]>([]);
-  const [productMode, setProductMode] = useState<"existing" | "new">("existing");
+  const [productMode, setProductMode] = useState<"existing" | "new">(
+    "existing",
+  );
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [newProductTitle, setNewProductTitle] = useState("");
   const [newProductDescription, setNewProductDescription] = useState("");
-  const [newProductThumbnailFile, setNewProductThumbnailFile] = useState<File | null>(null);
-  const [newProductThumbnailPreview, setNewProductThumbnailPreview] = useState<string>("");
+  const [newProductThumbnailFile, setNewProductThumbnailFile] =
+    useState<File | null>(null);
+  const [newProductThumbnailPreview, setNewProductThumbnailPreview] =
+    useState<string>("");
   const [batchMonth, setBatchMonth] = useState(""); // e.g. "June"
-  const [batchYear, setBatchYear] = useState(() => String(new Date().getFullYear()));
-  const [batchSchedule, setBatchSchedule] = useState<"weekday" | "weekend">("weekday");
+  const [batchYear, setBatchYear] = useState(() =>
+    String(new Date().getFullYear()),
+  );
+  const [batchSchedule, setBatchSchedule] = useState<"weekday" | "weekend">(
+    "weekday",
+  );
   const [startDateField, setStartDateField] = useState("");
   // Generated internal title preview
   const generatedTitle = (() => {
-    const productTitle = productMode === "existing"
-      ? (products.find((p) => String(p.id) === selectedProductId)?.title ?? "")
-      : newProductTitle.trim();
+    const productTitle =
+      productMode === "existing"
+        ? (products.find((p) => String(p.id) === selectedProductId)?.title ??
+          "")
+        : newProductTitle.trim();
     if (!productTitle || !batchMonth) return "";
     const scheduleLabel = batchSchedule === "weekend" ? "Weekend" : "Weekday";
     return `${productTitle} - ${batchMonth} ${scheduleLabel}`;
@@ -90,13 +167,24 @@ export default function AdminCourses() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchCourses();
-  }, []);
+  // Custom product dropdown state
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
 
-  const fetchCourses = async () => {
+  // Product delete confirmation modal state
+  const [showProductDeleteConfirm, setShowProductDeleteConfirm] = useState(false);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // ── Member/Mentor assignment state ──────────────────────────────────────────
+  const [profileUsers, setProfileUsers] = useState<Profile[]>([]);
+  const [scholarSelectOptions, setScholarSelectOptions] = useState<SelectOption[]>([]);
+  const [mentorSelectOptions, setMentorSelectOptions] = useState<SelectOption[]>([]);
+  const [selectedScholars, setSelectedScholars] = useState<readonly SelectOption[]>([]);
+  const [selectedMentors, setSelectedMentors] = useState<readonly SelectOption[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+  const fetchCourses = useCallback(async () => {
     try {
       setLoading(true);
       const { data: sessionData, error: sessionError } =
@@ -123,7 +211,9 @@ export default function AdminCourses() {
 
       // Also fetch products for the active-course modal dropdown
       const productsRes = await fetch("/api/admin/products", {
-        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
       });
       const productsResult = await productsRes.json().catch(() => null);
       if (productsRes.ok && Array.isArray(productsResult?.products)) {
@@ -134,7 +224,11 @@ export default function AdminCourses() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchCourses();
+  }, [fetchCourses]);
 
   const resetActiveFields = () => {
     setProductMode("existing");
@@ -147,6 +241,8 @@ export default function AdminCourses() {
     setBatchYear(String(new Date().getFullYear()));
     setBatchSchedule("weekday");
     setStartDateField("");
+    setSelectedScholars([]);
+    setSelectedMentors([]);
   };
 
   const handleCreateNew = () => {
@@ -161,9 +257,31 @@ export default function AdminCourses() {
     setModalMessage(null);
     resetActiveFields();
     setShowModal(true);
+
+    // Fetch profile users for the member/mentor dropdowns
+    void (async () => {
+      try {
+        setIsLoadingMembers(true);
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session?.access_token) return;
+        const res = await fetch("/api/admin/courses?includeMembers=true", {
+          headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+        });
+        const result = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(result?.users)) {
+          setProfileUsers(result.users);
+          setScholarSelectOptions(buildScholarSelectOptions(result.users));
+          setMentorSelectOptions(buildMentorSelectOptions(result.users));
+        }
+      } catch (e) {
+        console.error("Failed to fetch profiles:", e);
+      } finally {
+        setIsLoadingMembers(false);
+      }
+    })();
   };
 
-  const handleEdit = async (course: Course) => {
+  const handleEdit = useCallback(async (course: Course) => {
     setIsEditing(true);
     setEditingCourseId(course.id);
     setCourseTitle(course.title);
@@ -187,11 +305,16 @@ export default function AdminCourses() {
       setSelectedProductId(String(course.product_id));
       setProductMode("existing");
     }
-    // Parse month and schedule from internal title (e.g. "Playwright - June Weekday")
-    const titleMatch = course.title.match(/- (\w+) (Weekday|Weekend)$/i);
+    // Parse month, year, and schedule from internal title (e.g. "Playwright - June 2026 Weekday")
+    const titleMatch = course.title.match(/- (\w+)(?: (\d{4}))? (Weekday|Weekend)$/i);
     if (titleMatch) {
       setBatchMonth(titleMatch[1]);
-      setBatchSchedule(titleMatch[2].toLowerCase() === "weekend" ? "weekend" : "weekday");
+      if (titleMatch[2]) {
+        setBatchYear(titleMatch[2]);
+      }
+      setBatchSchedule(
+        titleMatch[3].toLowerCase() === "weekend" ? "weekend" : "weekday",
+      );
     }
 
     setShowModal(true);
@@ -206,29 +329,78 @@ export default function AdminCourses() {
         .order("created_at", { ascending: true })
         .order("id", { ascending: true });
       if (!error && data && data.length > 0) {
-        setModules(data.map((m) => ({ id: m.id, title: m.title, description: m.description || "" })));
+        setModules(
+          data.map((m) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description || "",
+          })),
+        );
       }
     } catch (err) {
       console.error("Failed to fetch modules:", err);
     }
-  };
 
-  const handleAddModule = () => setModules([...modules, { title: "", description: "" }]);
+    // Fetch member/mentor assignments for this course
+    try {
+      setIsLoadingMembers(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) return;
 
-  const handleModuleChange = (index: number, field: "title" | "description", value: string) => {
+      const res = await fetch(
+        `/api/admin/courses?includeMembers=true&courseId=${encodeURIComponent(String(course.id))}`,
+        { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } },
+      );
+      const result = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(result?.users)) {
+        const latestUsers = result.users as Profile[];
+        setProfileUsers(latestUsers);
+
+        const scholarEmails: string[] = result?.assignment?.scholarEmails ?? [];
+        const mentorEmails: string[] = result?.assignment?.mentorEmails ?? [];
+
+        const scholarOpts = buildScholarSelectOptions(latestUsers, scholarEmails);
+        const mentorOpts = buildMentorSelectOptions(latestUsers, mentorEmails);
+
+        setScholarSelectOptions(scholarOpts);
+        setMentorSelectOptions(mentorOpts);
+        setSelectedScholars(buildSelectedOptions(scholarEmails, scholarOpts));
+        setSelectedMentors(buildSelectedOptions(mentorEmails, mentorOpts));
+      }
+    } catch (e) {
+      console.error("Failed to fetch member assignments:", e);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  }, []);
+
+  const handleAddModule = () =>
+    setModules([...modules, { title: "", description: "" }]);
+
+  const handleModuleChange = (
+    index: number,
+    field: "title" | "description",
+    value: string,
+  ) => {
     const next = [...modules];
     next[index] = { ...next[index], [field]: value };
     setModules(next);
   };
 
-  const handleRemoveModule = (index: number) => setModules(modules.filter((_, i) => i !== index));
+  const handleRemoveModule = (index: number) =>
+    setModules(modules.filter((_, i) => i !== index));
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setThumbnailFile(file); setThumbnailPreview(URL.createObjectURL(file)); }
+    if (file) {
+      setThumbnailFile(file);
+      setThumbnailPreview(URL.createObjectURL(file));
+    }
   };
 
-  const handleNewProductThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewProductThumbnailChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
       setNewProductThumbnailFile(file);
@@ -239,9 +411,13 @@ export default function AdminCourses() {
   const uploadThumbnail = async (file: File): Promise<string | null> => {
     const fileExt = file.name.split(".").pop();
     const fileName = `course-thumbnails/${Date.now()}.${fileExt}`;
-    const { error } = await supabase.storage.from("course-thumbnails").upload(fileName, file);
+    const { error } = await supabase.storage
+      .from("course-thumbnails")
+      .upload(fileName, file);
     if (error) return null;
-    const { data: urlData } = supabase.storage.from("course-thumbnails").getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage
+      .from("course-thumbnails")
+      .getPublicUrl(fileName);
     return urlData.publicUrl ?? null;
   };
 
@@ -250,7 +426,8 @@ export default function AdminCourses() {
       setIsSaving(true);
       setModalMessage(null);
 
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
       if (sessionError || !sessionData.session?.access_token) {
         throw new Error("Please log in again to continue.");
       }
@@ -268,7 +445,10 @@ export default function AdminCourses() {
       // ── WORKFLOW 1: Upcoming → save/update product only ──────────────────
       if (courseType === "upcoming") {
         if (!courseTitle.trim()) {
-          setModalMessage({ type: "error", text: "Please add a product title." });
+          setModalMessage({
+            type: "error",
+            text: "Please add a product title.",
+          });
           setIsSaving(false);
           return;
         }
@@ -282,20 +462,27 @@ export default function AdminCourses() {
 
         const res = await fetch("/api/admin/products", {
           method: isEditing ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
           body: JSON.stringify(payload),
         });
         const result = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(result?.error || `Request failed (${res.status}).`);
+        if (!res.ok)
+          throw new Error(result?.error || `Request failed (${res.status}).`);
 
         await fetchCourses();
         setShowModal(false);
-        setCourseTitle(""); setCourseDescription(""); setThumbnailFile(null); setThumbnailPreview("");
+        setCourseTitle("");
+        setCourseDescription("");
+        setThumbnailFile(null);
+        setThumbnailPreview("");
         return;
       }
 
       // ── WORKFLOW 2: Active → product + maincourse + modules ──────────────
-      if (!batchMonth) {
+      if (!isEditing && !batchMonth) {
         setModalMessage({ type: "error", text: "Please select a month." });
         setIsSaving(false);
         return;
@@ -305,13 +492,16 @@ export default function AdminCourses() {
         setIsSaving(false);
         return;
       }
-      if (productMode === "existing" && !selectedProductId) {
+      if (!isEditing && productMode === "existing" && !selectedProductId) {
         setModalMessage({ type: "error", text: "Please select a product." });
         setIsSaving(false);
         return;
       }
       if (productMode === "new" && !newProductTitle.trim()) {
-        setModalMessage({ type: "error", text: "Please enter the new product title." });
+        setModalMessage({
+          type: "error",
+          text: "Please enter the new product title.",
+        });
         setIsSaving(false);
         return;
       }
@@ -322,52 +512,137 @@ export default function AdminCourses() {
         newProductThumbnailUrl = await uploadThumbnail(newProductThumbnailFile);
       }
 
-      const selectedProduct = products.find((p) => String(p.id) === selectedProductId);
-      const productTitle = productMode === "existing" ? (selectedProduct?.title ?? "") : newProductTitle.trim();
+      const selectedProduct = products.find(
+        (p) => String(p.id) === selectedProductId,
+      );
+      const productTitle =
+        productMode === "existing"
+          ? (selectedProduct?.title ?? "")
+          : newProductTitle.trim();
 
       const body = {
         ...(isEditing && editingCourseId ? { id: editingCourseId } : {}),
         course_type: "active",
         // Product resolution
-        ...(productMode === "existing" ? { product_id: selectedProductId, product_title: productTitle } : {}),
-        ...(productMode === "new" ? {
-          new_product_title: newProductTitle.trim(),
-          new_product_description: newProductDescription.trim(),
-          ...(newProductThumbnailUrl && { new_product_thumbnail: newProductThumbnailUrl }),
-          product_title: newProductTitle.trim(),
-        } : {}),
+        ...(productMode === "existing"
+          ? { product_id: selectedProductId, product_title: productTitle }
+          : {}),
+        ...(productMode === "new"
+          ? {
+              new_product_title: newProductTitle.trim(),
+              new_product_description: newProductDescription.trim(),
+              ...(newProductThumbnailUrl && {
+                new_product_thumbnail: newProductThumbnailUrl,
+              }),
+              product_title: newProductTitle.trim(),
+            }
+          : {}),
         // Batch fields
-        month: `${batchMonth} ${batchYear}`,
+        month: batchMonth ? `${batchMonth} ${batchYear}` : "",
         schedule: batchSchedule,
         start_date: startDateField || null,
         description: courseDescription.trim(),
         ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
-        modules: modules.filter((m) => m.title.trim()).map((m) => ({
-          ...(m.id && { id: m.id }),
-          title: m.title.trim(),
-          description: m.description.trim(),
-        })),
+        modules: modules
+          .filter((m) => m.title.trim())
+          .map((m) => ({
+            ...(m.id && { id: m.id }),
+            title: m.title.trim(),
+            description: m.description.trim(),
+          })),
+        // Members & Mentors
+        assigned_scholars: selectedScholars.map((u) => u.value),
+        assigned_mentors: selectedMentors.map((u) => u.value),
       };
 
       const res = await fetch("/api/admin/courses", {
         method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
         body: JSON.stringify(body),
       });
       const result = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(result?.error || `Request failed (${res.status}).`);
+      if (!res.ok)
+        throw new Error(result?.error || `Request failed (${res.status}).`);
 
       await fetchCourses();
       setShowModal(false);
-      setCourseTitle(""); setCourseDescription(""); setModules([]); setThumbnailFile(null); setThumbnailPreview("");
+      setCourseTitle("");
+      setCourseDescription("");
+      setModules([]);
+      setThumbnailFile(null);
+      setThumbnailPreview("");
       resetActiveFields();
     } catch (error) {
       setModalMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to save. Please try again.",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to save. Please try again.",
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    // Show styled confirmation modal instead of window.confirm
+    setDeletingProduct(product);
+    setShowProductDeleteConfirm(true);
+  };
+
+  const handleConfirmDeleteProduct = async () => {
+    if (!deletingProduct) return;
+
+    try {
+      setIsDeletingProduct(true);
+      setModalMessage(null);
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Please log in again to continue.");
+      }
+
+      const response = await fetch(
+        `/api/admin/products?id=${encodeURIComponent(String(deletingProduct.id))}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        },
+      );
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to delete product.");
+      }
+
+      if (selectedProductId === String(deletingProduct.id)) {
+        setSelectedProductId("");
+      }
+
+      await fetchCourses();
+      setModalMessage({
+        type: "success",
+        text: `Removed "${deletingProduct.title}" from products.`,
+      });
+      setShowProductDeleteConfirm(false);
+      setDeletingProduct(null);
+    } catch (error) {
+      setModalMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete product. Please try again.",
+      });
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
@@ -398,7 +673,7 @@ export default function AdminCourses() {
     } else if (action === "delete") {
       handleDeleteClick(course);
     }
-  }, [searchParams, courses, loading, router]);
+  }, [searchParams, courses, loading, router, handleEdit]);
 
   const handleConfirmDelete = async () => {
     if (!deletingCourse) return;
@@ -412,7 +687,9 @@ export default function AdminCourses() {
         throw new Error("Please log in again to continue.");
       }
 
-      const isProduct = deletingCourse._source === "product" || deletingCourse.course_type === "upcoming";
+      const isProduct =
+        deletingCourse._source === "product" ||
+        deletingCourse.course_type === "upcoming";
       const url = isProduct
         ? `/api/admin/courses?id=${deletingCourse.id}&source=product`
         : `/api/admin/courses?id=${deletingCourse.id}&source=maincourse`;
@@ -423,7 +700,10 @@ export default function AdminCourses() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
-        body: JSON.stringify({ id: deletingCourse.id, source: isProduct ? "product" : "maincourse" }),
+        body: JSON.stringify({
+          id: deletingCourse.id,
+          source: isProduct ? "product" : "maincourse",
+        }),
       });
 
       const result = await response.json().catch(() => null);
@@ -438,7 +718,10 @@ export default function AdminCourses() {
     } catch (error) {
       setModalMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to delete. Please try again.",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete. Please try again.",
       });
     } finally {
       setIsDeleting(false);
@@ -466,7 +749,6 @@ export default function AdminCourses() {
       value: courses.length.toString(),
       icon: ICONS.GLOBE,
     },
-
   ];
 
   return (
@@ -475,10 +757,17 @@ export default function AdminCourses() {
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
-              Manage Courses
-            </h1>
-            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
+            <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>Manage Courses</h1>
+            <p
+              className={
+                TYPOGRAPHY.BODY.fontSize +
+                " " +
+                TYPOGRAPHY.BODY.lineHeight +
+                " " +
+                TYPOGRAPHY.BODY.fontWeight +
+                " text-gray-600"
+              }
+            >
               Create, edit, and publish your course catalog.
             </p>
           </div>
@@ -549,11 +838,25 @@ export default function AdminCourses() {
 
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <Loader2 className="w-10 h-10 text-brand-primary animate-spin mb-4" />
-            <p className="text-sm font-medium text-gray-500">
-              Loading your catalog...
-            </p>
+          <div className="space-y-16">
+            <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {[0, 1, 2].map((i) => (
+                  <CourseCardSkeleton key={i} variant="admin" />
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Upcoming Courses</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {[0, 1].map((i) => (
+                  <CourseCardSkeleton key={i} variant="admin" />
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -587,13 +890,13 @@ export default function AdminCourses() {
         )}
 
         {/* Derive our split lists right in the JSX */}
-        {(() => {
+        {!loading && filteredCourses.length > 0 && (() => {
           // Split the courses based on course_type
           const activeCourses = filteredCourses.filter(
-            (c) => c.course_type !== "upcoming"
+            (c) => c.course_type !== "upcoming",
           );
           const upcomingCourses = filteredCourses.filter(
-            (c) => c.course_type === "upcoming"
+            (c) => c.course_type === "upcoming",
           );
 
           return (
@@ -609,7 +912,8 @@ export default function AdminCourses() {
                       No active courses found
                     </p>
                     <p className="text-sm text-gray-500 mb-6 max-w-md">
-                      Get started by creating your first active course to populate this section.
+                      Get started by creating your first active course to
+                      populate this section.
                     </p>
                   </div>
                 ) : (
@@ -639,6 +943,7 @@ export default function AdminCourses() {
                             }
                             onEdit={() => handleEdit(course)}
                             onDelete={() => handleDeleteClick(course)}
+                            assignedMentors={course.assigned_mentors}
                           />
                         </CarouselItem>
                       ))}
@@ -713,7 +1018,6 @@ export default function AdminCourses() {
         })()}
       </div>
 
-
       {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -733,16 +1037,25 @@ export default function AdminCourses() {
 
             {/* Modal Body - Scrollable */}
             <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
-
               {/* Course type radio — only shown when creating */}
               {!isEditing && (
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input type="radio" checked={courseType === "active"} onChange={() => setCourseType("active")} className="accent-brand-primary" />
+                    <input
+                      type="radio"
+                      checked={courseType === "active"}
+                      onChange={() => setCourseType("active")}
+                      className="accent-brand-primary"
+                    />
                     Active Course
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input type="radio" checked={courseType === "upcoming"} onChange={() => setCourseType("upcoming")} className="accent-brand-primary" />
+                    <input
+                      type="radio"
+                      checked={courseType === "upcoming"}
+                      onChange={() => setCourseType("upcoming")}
+                      className="accent-brand-primary"
+                    />
                     Upcoming Product
                   </label>
                 </div>
@@ -752,7 +1065,9 @@ export default function AdminCourses() {
               {courseType === "upcoming" && (
                 <>
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Product Title</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Product Title
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. Playwright"
@@ -762,7 +1077,9 @@ export default function AdminCourses() {
                     />
                   </div>
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Description</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Description
+                    </label>
                     <textarea
                       value={courseDescription}
                       onChange={(e) => setCourseDescription(e.target.value)}
@@ -772,20 +1089,45 @@ export default function AdminCourses() {
                     />
                   </div>
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Thumbnail</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Thumbnail
+                    </label>
                     {thumbnailPreview ? (
                       <div className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group">
-                        <img src={thumbnailPreview} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                        <Image
+                          src={thumbnailPreview}
+                          alt="Thumbnail preview"
+                          fill
+                          className="object-cover"
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button type="button" onClick={() => { setThumbnailFile(null); setThumbnailPreview(""); }} className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors">Remove</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setThumbnailFile(null);
+                              setThumbnailPreview("");
+                            }}
+                            className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors"
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                     ) : (
                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
                         <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
-                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">Click to upload thumbnail</span>
-                        <span className="text-[10px] text-gray-300 mt-1">PNG, JPG up to 5MB</span>
-                        <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
+                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
+                          Click to upload thumbnail
+                        </span>
+                        <span className="text-[10px] text-gray-300 mt-1">
+                          PNG, JPG up to 5MB
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleThumbnailChange}
+                          className="hidden"
+                        />
                       </label>
                     )}
                   </div>
@@ -797,29 +1139,141 @@ export default function AdminCourses() {
                 <>
                   {/* Product selector */}
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Product</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Product
+                    </label>
                     <div className="flex gap-4 mb-3">
                       <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="radio" checked={productMode === "existing"} onChange={() => setProductMode("existing")} className="accent-brand-primary" />
+                        <input
+                          type="radio"
+                          checked={productMode === "existing"}
+                          onChange={() => setProductMode("existing")}
+                          className="accent-brand-primary"
+                        />
                         Choose Existing
                       </label>
                       <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="radio" checked={productMode === "new"} onChange={() => setProductMode("new")} className="accent-brand-primary" />
+                        <input
+                          type="radio"
+                          checked={productMode === "new"}
+                          onChange={() => setProductMode("new")}
+                          className="accent-brand-primary"
+                        />
                         Create New
                       </label>
                     </div>
 
                     {productMode === "existing" && (
-                      <select
-                        value={selectedProductId}
-                        onChange={(e) => setSelectedProductId(e.target.value)}
-                        className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 ${!selectedProductId ? "text-gray-400" : "text-gray-900"}`}
-                      >
-                        <option value="">Select product...</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={String(p.id)}>{p.title}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        {/* Custom dropdown trigger */}
+                        <button
+                          type="button"
+                          onClick={() => setProductDropdownOpen(!productDropdownOpen)}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${
+                            productDropdownOpen
+                              ? "border-brand-primary ring-2 ring-brand-primary/20"
+                              : "border-gray-200 hover:border-gray-300"
+                          } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
+                        >
+                          <span className="truncate">
+                            {selectedProductId
+                              ? products.find((p) => String(p.id) === selectedProductId)?.title ?? "Select product..."
+                              : "Select product..."}
+                          </span>
+                          <svg
+                            className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform duration-200 ${productDropdownOpen ? "rotate-180" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {/* Custom dropdown menu */}
+                        {productDropdownOpen && (
+                          <>
+                            {/* Invisible backdrop to close dropdown on outside click */}
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setProductDropdownOpen(false)}
+                            />
+                            <div className="absolute z-20 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                              {products.length === 0 ? (
+                                <div className="px-4 py-6 text-center">
+                                  <p className="text-sm text-gray-400 font-medium">
+                                    No products yet.
+                                  </p>
+                                  <p className="text-xs text-gray-300 mt-1">
+                                    Create one using the &quot;Create New&quot; option.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="max-h-52 overflow-y-auto py-1">
+                                  {products.map((product) => {
+                                    const isSelected = selectedProductId === String(product.id);
+                                    return (
+                                      <div
+                                        key={product.id}
+                                        onClick={() => {
+                                          setSelectedProductId(String(product.id));
+                                          setProductDropdownOpen(false);
+                                        }}
+                                        className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
+                                          isSelected
+                                            ? "bg-brand-primary/5"
+                                            : "hover:bg-gray-50"
+                                        }`}
+                                      >
+                                        {/* Product label */}
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                          {/* Selection indicator */}
+                                          <span
+                                            className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
+                                              isSelected
+                                                ? "bg-brand-primary"
+                                                : "bg-transparent group-hover:bg-gray-300"
+                                            }`}
+                                          />
+                                          <span
+                                            className={`text-[14px] truncate transition-colors ${
+                                              isSelected
+                                                ? "font-semibold text-brand-primary"
+                                                : "font-medium text-gray-700 group-hover:text-gray-900"
+                                            }`}
+                                          >
+                                            {product.title}
+                                          </span>
+                                        </div>
+                                        {/* Delete button inside dropdown */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setProductDropdownOpen(false);
+                                            void handleDeleteProduct(product);
+                                          }}
+                                          disabled={isDeletingProduct}
+                                          className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                          title={`Delete ${product.title}`}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {/* Products count footer */}
+                              <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60">
+                                <p className="text-[11px] text-gray-400 font-medium">
+                                  {products.length} product{products.length !== 1 ? "s" : ""} available
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
 
                     {productMode === "new" && (
@@ -834,22 +1288,43 @@ export default function AdminCourses() {
                         <textarea
                           placeholder="Product description (optional)"
                           value={newProductDescription}
-                          onChange={(e) => setNewProductDescription(e.target.value)}
+                          onChange={(e) =>
+                            setNewProductDescription(e.target.value)
+                          }
                           rows={2}
                           className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
                         />
                         {newProductThumbnailPreview ? (
                           <div className="relative w-full h-28 rounded-lg overflow-hidden border border-gray-200 group">
-                            <img src={newProductThumbnailPreview} alt="Product thumbnail" className="w-full h-full object-cover" />
+                            <Image
+                              src={newProductThumbnailPreview}
+                              alt="Product thumbnail"
+                              fill
+                              className="object-cover"
+                            />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button type="button" onClick={() => { setNewProductThumbnailFile(null); setNewProductThumbnailPreview(""); }} className="bg-white text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold">Remove</button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewProductThumbnailFile(null);
+                                  setNewProductThumbnailPreview("");
+                                }}
+                                className="bg-white text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold"
+                              >
+                                Remove
+                              </button>
                             </div>
                           </div>
                         ) : (
                           <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-brand-primary transition-colors">
                             <Upload className="w-4 h-4" />
                             <span>Upload product thumbnail (optional)</span>
-                            <input type="file" accept="image/*" onChange={handleNewProductThumbnailChange} className="hidden" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleNewProductThumbnailChange}
+                              className="hidden"
+                            />
                           </label>
                         )}
                       </div>
@@ -859,36 +1334,65 @@ export default function AdminCourses() {
                   {/* Month + Year + Schedule + Start Date */}
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Month</label>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Month
+                      </label>
                       <select
                         value={batchMonth}
                         onChange={(e) => setBatchMonth(e.target.value)}
                         className={`w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-brand-primary ${!batchMonth ? "text-gray-400" : "text-gray-900"}`}
                       >
                         <option value="">Month</option>
-                        {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m) => (
-                          <option key={m} value={m}>{m}</option>
+                        {[
+                          "January",
+                          "February",
+                          "March",
+                          "April",
+                          "May",
+                          "June",
+                          "July",
+                          "August",
+                          "September",
+                          "October",
+                          "November",
+                          "December",
+                        ].map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Year</label>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Year
+                      </label>
                       <select
                         value={batchYear}
                         onChange={(e) => setBatchYear(e.target.value)}
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary"
                       >
-                        {[0,1,2].map((offset) => {
+                        {[0, 1, 2].map((offset) => {
                           const y = String(new Date().getFullYear() + offset);
-                          return <option key={y} value={y}>{y}</option>;
+                          return (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          );
                         })}
                       </select>
                     </div>
                     <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Schedule</label>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Schedule
+                      </label>
                       <select
                         value={batchSchedule}
-                        onChange={(e) => setBatchSchedule(e.target.value as "weekday" | "weekend")}
+                        onChange={(e) =>
+                          setBatchSchedule(
+                            e.target.value as "weekday" | "weekend",
+                          )
+                        }
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary"
                       >
                         <option value="weekday">Weekday</option>
@@ -897,28 +1401,122 @@ export default function AdminCourses() {
                     </div>
                   </div>
 
-                  {/* Start Date */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Start Date (Optional)</label>
-                    <input
-                      type="date"
-                      value={startDateField}
-                      onChange={(e) => setStartDateField(e.target.value)}
-                      className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-semibold outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
-                    />
-                  </div>
 
                   {/* Generated internal title preview */}
                   {generatedTitle && (
                     <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
-                      <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Internal Course Title (auto-generated)</p>
-                      <p className="text-sm font-bold text-blue-900">{generatedTitle}</p>
+                      <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">
+                        Internal Course Title (auto-generated)
+                      </p>
+                      <p className="text-sm font-bold text-blue-900">
+                        {generatedTitle}
+                      </p>
                     </div>
                   )}
 
+                  {/* ── Assign Members ── */}
+                  {isEditing && (
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
+                        <Users size={14} /> Assign Members
+                      </label>
+                      <Select
+                        isMulti
+                        options={scholarSelectOptions}
+                        value={selectedScholars}
+                        onChange={(v) => setSelectedScholars((v ?? []) as readonly SelectOption[])}
+                        placeholder="Select scholars..."
+                        isLoading={isLoadingMembers}
+                        isDisabled={isLoadingMembers}
+                        classNamePrefix="react-select"
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            borderColor: "#e5e7eb",
+                            borderRadius: "0.5rem",
+                            fontSize: "0.875rem",
+                            minHeight: "42px",
+                            boxShadow: "none",
+                            "&:hover": { borderColor: "#d1d5db" },
+                          }),
+                          multiValue: (base) => ({
+                            ...base,
+                            backgroundColor: "#eff6ff",
+                            borderRadius: "9999px",
+                            border: "1px solid #bfdbfe",
+                          }),
+                          multiValueLabel: (base) => ({
+                            ...base,
+                            color: "#1e40af",
+                            fontWeight: 600,
+                            fontSize: "11px",
+                            padding: "2px 6px",
+                          }),
+                          multiValueRemove: (base) => ({
+                            ...base,
+                            color: "#93c5fd",
+                            "&:hover": { backgroundColor: "#dbeafe", color: "#1d4ed8" },
+                          }),
+                          placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
+                          menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* ── Assign Mentors / Instructors ── */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
+                      <Users size={14} className="text-purple-500" /> Assign Mentors / Instructors
+                    </label>
+                    <Select
+                      isMulti
+                      options={mentorSelectOptions}
+                      value={selectedMentors}
+                      onChange={(v) => setSelectedMentors((v ?? []) as readonly SelectOption[])}
+                      placeholder="Select mentors..."
+                      isLoading={isLoadingMembers}
+                      isDisabled={isLoadingMembers}
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#e5e7eb",
+                          borderRadius: "0.5rem",
+                          fontSize: "0.875rem",
+                          minHeight: "42px",
+                          boxShadow: "none",
+                          "&:hover": { borderColor: "#d1d5db" },
+                        }),
+                        multiValue: (base) => ({
+                          ...base,
+                          backgroundColor: "#faf5ff",
+                          borderRadius: "9999px",
+                          border: "1px solid #e9d5ff",
+                        }),
+                        multiValueLabel: (base) => ({
+                          ...base,
+                          color: "#7e22ce",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          padding: "2px 6px",
+                        }),
+                        multiValueRemove: (base) => ({
+                          ...base,
+                          color: "#c084fc",
+                          "&:hover": { backgroundColor: "#f3e8ff", color: "#7e22ce" },
+                        }),
+                        placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
+                        menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                      }}
+                    />
+                  </div>
+
                   {/* Description */}
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Description</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Description
+                    </label>
                     <textarea
                       value={courseDescription}
                       onChange={(e) => setCourseDescription(e.target.value)}
@@ -930,64 +1528,129 @@ export default function AdminCourses() {
 
                   {/* Thumbnail */}
                   <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Course Thumbnail</label>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Course Thumbnail
+                    </label>
                     {thumbnailPreview ? (
                       <div className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group">
-                        <img src={thumbnailPreview} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                        <Image
+                          src={thumbnailPreview}
+                          alt="Thumbnail preview"
+                          fill
+                          className="object-cover"
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button type="button" onClick={() => { setThumbnailFile(null); setThumbnailPreview(""); }} className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors">Remove</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setThumbnailFile(null);
+                              setThumbnailPreview("");
+                            }}
+                            className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors"
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                     ) : (
                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
                         <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
-                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">Click to upload thumbnail</span>
-                        <span className="text-[10px] text-gray-300 mt-1">PNG, JPG up to 5MB</span>
-                        <input type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
+                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
+                          Click to upload thumbnail
+                        </span>
+                        <span className="text-[10px] text-gray-300 mt-1">
+                          PNG, JPG up to 5MB
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleThumbnailChange}
+                          className="hidden"
+                        />
                       </label>
                     )}
+                  </div>
+
+                  {/* Start Date */}
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Start Date (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={startDateField}
+                      onChange={(e) => setStartDateField(e.target.value)}
+                      className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-semibold outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
+                    />
                   </div>
 
                   {/* Modules */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Modules (Optional)</label>
-                      <button type="button" onClick={handleAddModule} className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors">
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Modules (Optional)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAddModule}
+                        className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
                         <Plus className="w-3 h-3" /> Add Module
                       </button>
                     </div>
                     {modules.map((module, index) => (
-                      <div key={index} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+                      <div
+                        key={index}
+                        className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50"
+                      >
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
                             placeholder={`Module ${index + 1} Title`}
                             value={module.title}
-                            onChange={(e) => handleModuleChange(index, "title", e.target.value)}
+                            onChange={(e) =>
+                              handleModuleChange(index, "title", e.target.value)
+                            }
                             className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
                           />
-                          <button type="button" onClick={() => handleRemoveModule(index)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveModule(index)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                          >
                             <X className="w-4 h-4" />
                           </button>
                         </div>
                         <textarea
                           placeholder={`Description for Module ${index + 1} (optional)`}
                           value={module.description}
-                          onChange={(e) => handleModuleChange(index, "description", e.target.value)}
+                          onChange={(e) =>
+                            handleModuleChange(
+                              index,
+                              "description",
+                              e.target.value,
+                            )
+                          }
                           rows={2}
                           className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
                         />
                       </div>
                     ))}
                     {modules.length === 0 && (
-                      <p className="text-xs text-gray-400 italic">No modules yet. All batches inherit modules from this course.</p>
+                      <p className="text-xs text-gray-400 italic">
+                        No modules yet.
+                      </p>
                     )}
                   </div>
+
+
                 </>
               )}
 
               {modalMessage && (
-                <p className={`text-xs font-medium ${modalMessage.type === "success" ? "text-emerald-600" : "text-red-600"}`}>
+                <p
+                  className={`text-xs font-medium ${modalMessage.type === "success" ? "text-emerald-600" : "text-red-600"}`}
+                >
                   {modalMessage.text}
                 </p>
               )}
@@ -1059,6 +1722,53 @@ export default function AdminCourses() {
               >
                 {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PRODUCT DELETE CONFIRMATION MODAL ─── */}
+      {showProductDeleteConfirm && deletingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-6">
+              <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+                Delete Product
+              </h3>
+              <p className="text-[15px] leading-relaxed text-gray-500 text-center">
+                Are you sure you want to delete{" "}
+                <strong className="text-gray-900 font-semibold">
+                  &ldquo;{deletingProduct.title}&rdquo;
+                </strong>
+                ? This product will be permanently removed from the catalog.
+              </p>
+              {modalMessage?.type === "error" && (
+                <p className="text-xs text-red-600 text-center mt-3 font-medium bg-red-50 rounded-lg px-3 py-2">
+                  {modalMessage.text}
+                </p>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowProductDeleteConfirm(false);
+                  setDeletingProduct(null);
+                }}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteProduct}
+                disabled={isDeletingProduct}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isDeletingProduct && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isDeletingProduct ? "Deleting..." : "Yes, Delete"}
               </button>
             </div>
           </div>

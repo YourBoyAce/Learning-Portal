@@ -114,3 +114,24 @@ export async function deleteAdminCourse(
   if (deleteError) throw new Error(deleteError.message);
 }
 
+
+export async function createCourseModule(
+  accessToken: string,
+  courseId: string | number,
+  title: string,
+  description: string,
+) {
+  const supabaseAdmin = await getAdminClient(accessToken);
+  const { data, error } = await supabaseAdmin
+    .from("coursemodules")
+    .insert({
+      maincourse_id: normalizeId(courseId),
+      title: title.trim(),
+      description: description.trim(),
+    })
+    .select("id, title, created_at")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}

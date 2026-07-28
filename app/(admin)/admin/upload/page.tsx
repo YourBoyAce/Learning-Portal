@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
+import { Modal } from "@/components/ui/modal";
+import { createCourseModule } from "@/app/actions/admin-courses";
 
 type Course = {
   id: string | number;
@@ -18,12 +20,12 @@ type Course = {
   batch_name?: string | null;
   batch_schedule_types?: ("weekday" | "weekend")[];
   course_type?: string;
+  product_id?: string | number | null;
 };
 
-type Batch = {
+type Product = {
   id: string | number;
-  name: string;
-  schedule_type?: string | null;
+  title: string;
 };
 
 type Module = {
@@ -37,16 +39,21 @@ export default function UploadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCourseId = searchParams.get("courseId") || "";
-  const preselectedBatchId = searchParams.get("batchId") || "";
+
 
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
 
   const [selectedCurriculum, setSelectedCurriculum] = useState(preselectedCourseId);
-  const [selectedBatchId, setSelectedBatchId] = useState(preselectedBatchId);
+  const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedModuleId, setSelectedModuleId] = useState("");
+  const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
+  const [newModuleTitle, setNewModuleTitle] = useState("");
+  const [newModuleDescription, setNewModuleDescription] = useState("");
+  const [isCreatingModule, setIsCreatingModule] = useState(false);
+
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(null);
@@ -54,7 +61,7 @@ export default function UploadPage() {
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isBatchesLoading, setIsBatchesLoading] = useState(false);
+
   const [isModulesLoading, setIsModulesLoading] = useState(false);
 
   const [error, setError] = useState("");
@@ -98,6 +105,17 @@ export default function UploadPage() {
 
       const loadedCourses = Array.isArray(result?.courses) ? result.courses : [];
       setCourses(loadedCourses);
+
+      const productsRes = await fetch("/api/admin/products", {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+      const productsResult = await productsRes.json().catch(() => null);
+      if (productsRes.ok && Array.isArray(productsResult?.products)) {
+        setProducts(productsResult.products);
+      }
+
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch courses.");
@@ -124,65 +142,24 @@ export default function UploadPage() {
     void init();
   }, []);
 
-  // When course changes, load its batches
+
+  // Filter courses by selected product
+  const filteredCourses = useMemo(() => {
+    if (!selectedProductId) return [];
+    return activeCourses.filter((c) => String(c.product_id) === String(selectedProductId));
+  }, [activeCourses, selectedProductId]);
+
+  // Reset course and module when product changes
+  useEffect(() => {
+    setSelectedCurriculum("");
+    setSelectedModuleId("");
+    setModules([]);
+  }, [selectedProductId]);
+
+
+  // When course changes, load its modules
   useEffect(() => {
     if (!selectedCurriculum) {
-      setBatches([]);
-      setSelectedBatchId("");
-      setModules([]);
-      setSelectedModuleId("");
-      return;
-    }
-
-    const fetchBatches = async () => {
-      setIsBatchesLoading(true);
-      setSelectedBatchId("");
-      setModules([]);
-      setSelectedModuleId("");
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData.session?.access_token) throw new Error("Not authenticated.");
-
-        // Fetch batches that belong to this course (via course_id or batch_courses junction)
-        const response = await fetch("/api/admin/batches", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(result?.error || "Failed to fetch batches.");
-
-        const allBatches: any[] = Array.isArray(result?.batches) ? result.batches : [];
-
-        // Filter batches that belong to this course
-        const courseBatches = allBatches.filter((b) => {
-          // direct FK
-          if (String(b.course_id) === String(selectedCurriculum)) return true;
-          // junction table
-          if (Array.isArray(b.batch_courses)) {
-            return b.batch_courses.some(
-              (bc: any) => String(bc.course_id) === String(selectedCurriculum),
-            );
-          }
-          return false;
-        });
-
-        setBatches(courseBatches);
-      } catch (err) {
-        console.error("Failed to fetch batches", err);
-        setBatches([]);
-      } finally {
-        setIsBatchesLoading(false);
-      }
-    };
-
-    fetchBatches();
-  }, [selectedCurriculum]);
-
-  // When batch changes, load its modules
-  useEffect(() => {
-    if (!selectedBatchId) {
       setModules([]);
       setSelectedModuleId("");
       return;
@@ -191,59 +168,30 @@ export default function UploadPage() {
     const fetchModules = async () => {
       setIsModulesLoading(true);
       try {
-        // Try fetching modules by batch_id first
         const { data, error } = await supabase
           .from("coursemodules")
           .select("id, title, created_at")
-          .eq("batch_id", selectedBatchId)
+          .eq("maincourse_id", selectedCurriculum)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
           .order("id", { ascending: true });
 
         if (error) {
-          // batch_id column may not exist yet — fall back to course-level modules
-          console.warn("batch_id column not available, falling back to course-level modules:", error.message);
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from("coursemodules")
-            .select("id, title, created_at")
-            .eq("maincourse_id", selectedCurriculum)
-            .order("order_index", { ascending: true, nullsFirst: false })
-            .order("created_at", { ascending: true })
-            .order("id", { ascending: true });
-
-          if (fallbackError) throw fallbackError;
-          setModules(fallbackData || []);
-          return;
+          throw error;
         }
 
-        // If no batch-specific modules found, fall back to course-level modules
-        // (for backward compat with modules created before batch_id was introduced)
-        if (!data || data.length === 0) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from("coursemodules")
-            .select("id, title, created_at")
-            .eq("maincourse_id", selectedCurriculum)
-            .is("batch_id", null)
-            .order("order_index", { ascending: true, nullsFirst: false })
-            .order("created_at", { ascending: true })
-            .order("id", { ascending: true });
-
-          if (fallbackError) throw fallbackError;
-          setModules(fallbackData || []);
-        } else {
-          setModules(data);
-        }
+        setModules(data || []);
       } catch (err) {
         console.error("Failed to fetch modules", err);
         setModules([]);
-        setError("Failed to load modules for this batch.");
+        setError("Failed to load modules for this course.");
       } finally {
         setIsModulesLoading(false);
       }
     };
 
     fetchModules();
-  }, [selectedBatchId, selectedCurriculum]);
+  }, [selectedCurriculum]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -275,6 +223,42 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string>("");
 
+  const handleCreateModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newModuleTitle.trim()) {
+      setError("Please provide a module title.");
+      return;
+    }
+
+    try {
+      setIsCreatingModule(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const newModule = await createCourseModule(
+        sessionData.session.access_token,
+        selectedCurriculum,
+        newModuleTitle,
+        newModuleDescription
+      );
+
+      setModules((prev) => [...prev, newModule]);
+      setSelectedModuleId(String(newModule.id));
+      setIsAddModuleModalOpen(false);
+      setSuccess("Module created successfully!");
+
+      // Clear form
+      setNewModuleTitle("");
+      setNewModuleDescription("");
+    } catch (err: any) {
+      setError(err.message || "Failed to create module");
+    } finally {
+      setIsCreatingModule(false);
+    }
+  };
+
   const handleUploadVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -284,7 +268,7 @@ export default function UploadPage() {
 
     if (
       !selectedCurriculum ||
-      !selectedBatchId ||
+      !selectedProductId ||
       !selectedModuleId ||
       !videoTitle.trim() ||
       !selectedFile
@@ -339,7 +323,7 @@ export default function UploadPage() {
                   ? `${videoTitle.trim()} (Part ${chunkIndex + 1}/${numChunks})`
                   : videoTitle.trim(),
               courseId: selectedCurriculum,
-              batchId: selectedBatchId,
+
               moduleId: selectedModuleId,
             }),
           },
@@ -410,7 +394,7 @@ export default function UploadPage() {
       // Save to DB with course_id + batch_id + module_id
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
-      payload.append("batchId", selectedBatchId);
+      payload.append("batchId", selectedProductId);
       payload.append("moduleId", selectedModuleId);
       payload.append("title", videoTitle.trim());
       payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
@@ -526,17 +510,16 @@ export default function UploadPage() {
               <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Upload New Video</h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
-                {/* Step 1: Select Course */}
+                {/* Select Product */}
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Step 1 — Select Course
+                    Select Product
                   </label>
                   <select
-                    value={selectedCurriculum}
-                    onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                      !selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedProductId ? "!text-gray-400" : "!text-gray-900"
+                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -544,9 +527,45 @@ export default function UploadPage() {
                     }}
                   >
                     <option value="" className="text-gray-400">
-                      Select course...
+                      Select product...
                     </option>
-                    {activeCourses.map((course) => (
+                    {products.map((product) => (
+                      <option
+                        key={product.id}
+                        value={String(product.id)}
+                        className="text-gray-900"
+                      >
+                        {product.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Select Course */}
+                <div>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    Select Course
+                  </label>
+                  <select
+                    value={selectedCurriculum}
+                    onChange={(e) => setSelectedCurriculum(e.target.value)}
+                    disabled={!selectedProductId}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
+                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
+                  >
+                    <option value="" className="text-gray-400">
+                      {!selectedProductId
+                        ? "Select a product first..."
+                        : filteredCourses.length === 0
+                          ? "No courses found for this product"
+                          : "Select course..."}
+                    </option>
+                    {filteredCourses.map((course) => (
                       <option
                         key={course.id}
                         value={String(course.id)}
@@ -558,58 +577,32 @@ export default function UploadPage() {
                   </select>
                 </div>
 
-                {/* Step 2: Select Batch */}
+                {/* Select Module */}
                 <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Step 2 — Select Batch
-                  </label>
-                  <select
-                    value={selectedBatchId}
-                    onChange={(e) => setSelectedBatchId(e.target.value)}
-                    disabled={!selectedCurriculum || isBatchesLoading}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                      !selectedBatchId ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
-                    style={{
-                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                    }}
-                  >
-                    <option value="" className="text-gray-400">
-                      {isBatchesLoading
-                        ? "Loading batches..."
-                        : !selectedCurriculum
-                        ? "Select a course first..."
-                        : batches.length === 0
-                        ? "No batches found for this course"
-                        : "Select batch..."}
-                    </option>
-                    {batches.map((batch) => (
-                      <option
-                        key={batch.id}
-                        value={String(batch.id)}
-                        className="text-gray-900"
-                      >
-                        {batch.name}
-                        {batch.schedule_type ? ` (${batch.schedule_type})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING + " !mb-0"}>
+                      Select Module
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!selectedCurriculum}
+                      onClick={() => {
+                        setNewModuleTitle(`Module ${modules.length + 1}`);
+                        setNewModuleDescription("");
+                        setIsAddModuleModalOpen(true);
+                      }}
+                      className="text-xs font-semibold text-brand-primary hover:text-brand-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      + Add Module
+                    </button>
+                  </div>
 
-                {/* Step 3: Select Module */}
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Step 3 — Select Module
-                  </label>
                   <select
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
-                    disabled={!selectedBatchId || isModulesLoading}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                      !selectedModuleId ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    disabled={!selectedCurriculum || isModulesLoading}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedModuleId ? "!text-gray-400" : "!text-gray-900"
+                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -619,11 +612,11 @@ export default function UploadPage() {
                     <option value="" className="text-gray-400">
                       {isModulesLoading
                         ? "Loading modules..."
-                        : !selectedBatchId
-                        ? "Select a batch first..."
-                        : modules.length === 0
-                        ? "No modules found for this batch"
-                        : "Select module..."}
+                        : !selectedCurriculum
+                          ? "Select a course first..."
+                          : modules.length === 0
+                            ? "No modules found for this course"
+                            : "Select module..."}
                     </option>
                     {modules.map((module) => (
                       <option
@@ -665,9 +658,8 @@ export default function UploadPage() {
                       setModuleThumbnailFile(file);
                       setModuleThumbnailPreview(file ? URL.createObjectURL(file) : "");
                     }}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                      !moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
+                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -690,11 +682,10 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
-                    isDragging
-                      ? "border-brand-primary bg-blue-50"
-                      : "border-dashed border-gray-300 hover:border-gray-400"
-                  }`}
+                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${isDragging
+                    ? "border-brand-primary bg-blue-50"
+                    : "border-dashed border-gray-300 hover:border-gray-400"
+                    }`}
                   onClick={() => document.getElementById("file-input")?.click()}
                 >
                   <input
@@ -785,6 +776,56 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
+      {/* Create Module Modal */}
+      <Modal
+        open={isAddModuleModalOpen}
+        onClose={() => setIsAddModuleModalOpen(false)}
+        panelClassName="max-w-md w-full"
+      >
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-6 text-gray-900">Add New Module</h2>
+          <form onSubmit={handleCreateModule} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Module Name
+              </label>
+              <input
+                type="text"
+                value={newModuleTitle}
+                onChange={(e) => setNewModuleTitle(e.target.value)}
+                placeholder={`Module ${modules.length + 1}`}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description (Optional)
+              </label>
+              <textarea
+                value={newModuleDescription}
+                onChange={(e) => setNewModuleDescription(e.target.value)}
+                placeholder="What will students learn in this module?"
+                rows={3}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              />
+            </div>
+            <div className="pt-2 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddModuleModalOpen(false)}
+                disabled={isCreatingModule}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreatingModule || !newModuleTitle.trim()}>
+                {isCreatingModule ? "Creating..." : "Create Module"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -112,16 +112,6 @@ export default function AdminLayout({
         ? ICONS.BOOKLIGHT
         : ICONS.BOOK,
     },
-
-    {
-      label: "Manage Batches",
-      href: "/admin/batches",
-      active: pathname === "/admin/batches",
-      icon: pathname === "/admin/batches"
-        ? ICONS.BATCHLIGHT
-        : ICONS.BATCH,
-    },
-
     {
       label: "Upload Video",
       href: "/admin/upload",

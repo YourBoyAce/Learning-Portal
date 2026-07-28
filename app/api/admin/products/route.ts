@@ -11,24 +11,43 @@ type AuthContext =
 
 async function authenticateAdmin(request: Request): Promise<AuthContext> {
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-    return { error: NextResponse.json({ error: "Supabase environment variables are not configured." }, { status: 500 }) };
+    return {
+      error: NextResponse.json(
+        { error: "Supabase environment variables are not configured." },
+        { status: 500 },
+      ),
+    };
   }
 
   const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
-  if (!token) return { error: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) };
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+  if (!token)
+    return {
+      error: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
+    };
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const { data: authData, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !authData.user) return { error: NextResponse.json({ error: "Invalid session." }, { status: 401 }) };
+  const { data: authData, error: authError } =
+    await supabase.auth.getUser(token);
+  if (authError || !authData.user)
+    return {
+      error: NextResponse.json({ error: "Invalid session." }, { status: 401 }),
+    };
 
   const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data: profile, error: profileError } = await supabaseUser
-    .from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
+    .from("profiles")
+    .select("role")
+    .eq("id", authData.user.id)
+    .maybeSingle();
   if (profileError || profile?.role?.toLowerCase() !== "admin") {
-    return { error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
+    return {
+      error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
+    };
   }
 
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -48,8 +67,12 @@ export async function GET(request: Request) {
     .select("id, title, description, thumbnail_url, created_at, updated_at")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, products: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(
+    { success: true, products: data ?? [] },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 // POST /api/admin/products — create a product
@@ -59,18 +82,26 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const title = typeof body?.title === "string" ? body.title.trim() : "";
-  const description = typeof body?.description === "string" ? body.description.trim() : "";
-  const thumbnailUrl = typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
+  const description =
+    typeof body?.description === "string" ? body.description.trim() : "";
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
 
-  if (!title) return NextResponse.json({ error: "Title is required." }, { status: 400 });
+  if (!title)
+    return NextResponse.json({ error: "Title is required." }, { status: 400 });
 
   const { data: product, error } = await authContext.supabaseAdmin
     .from("products")
-    .insert({ title, description: description || null, thumbnail_url: thumbnailUrl || null })
+    .insert({
+      title,
+      description: description || null,
+      thumbnail_url: thumbnailUrl || null,
+    })
     .select("id, title, description, thumbnail_url")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true, product });
 }
 
@@ -82,14 +113,22 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   const id = body?.id;
   const title = typeof body?.title === "string" ? body.title.trim() : "";
-  const description = typeof body?.description === "string" ? body.description.trim() : "";
+  const description =
+    typeof body?.description === "string" ? body.description.trim() : "";
 
   const hasThumbnail = "thumbnail_url" in (body || {});
-  const thumbnailUrl = typeof body?.thumbnail_url === "string"
-    ? body.thumbnail_url.trim()
-    : hasThumbnail ? null : undefined;
+  const thumbnailUrl =
+    typeof body?.thumbnail_url === "string"
+      ? body.thumbnail_url.trim()
+      : hasThumbnail
+        ? null
+        : undefined;
 
-  if (!id || !title) return NextResponse.json({ error: "id and title are required." }, { status: 400 });
+  if (!id || !title)
+    return NextResponse.json(
+      { error: "id and title are required." },
+      { status: 400 },
+    );
 
   const { error } = await authContext.supabaseAdmin
     .from("products")
@@ -101,7 +140,8 @@ export async function PUT(request: Request) {
     })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 
@@ -110,15 +150,47 @@ export async function DELETE(request: Request) {
   const authContext = await authenticateAdmin(request);
   if ("error" in authContext) return authContext.error;
 
+  const body = await request.json().catch(() => null);
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "Valid product id is required." }, { status: 400 });
+  const id = body?.id ?? searchParams.get("id");
+  if (!id)
+    return NextResponse.json(
+      { error: "Valid product id is required." },
+      { status: 400 },
+    );
+
+  const normalizedId = Number.isNaN(Number(id)) ? id : Number(id);
+
+  const { data: linkedCourses, error: linkedCoursesError } =
+    await authContext.supabaseAdmin
+      .from("maincourses")
+      .select("id")
+      .eq("product_id", normalizedId)
+      .limit(1);
+
+  if (linkedCoursesError) {
+    return NextResponse.json(
+      { error: linkedCoursesError.message },
+      { status: 500 },
+    );
+  }
+
+  if ((linkedCourses ?? []).length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This product is currently used by an active course and cannot be deleted.",
+      },
+      { status: 409 },
+    );
+  }
 
   const { error } = await authContext.supabaseAdmin
     .from("products")
     .delete()
-    .eq("id", id);
+    .eq("id", normalizedId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
