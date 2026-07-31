@@ -38,47 +38,21 @@ export function useSecurityGatedData() {
         }
 
         // Query the profiles table to see if user has instructor or admin role
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (profile?.role?.toLowerCase() === "instructor" || profile?.role?.toLowerCase() === "admin") {
-          if (mounted) {
-            setTier("Premium");
-            setIsLoading(false);
-          }
-          return;
-        }
-
-        // Query the phase2 schema for active enrollments
-        const { data: enrollment, error } = await supabase
-          .schema("phase2")
-          .from("enrollments")
-          .select("*, bundles(bundle_name)")
-          .eq("user_id", session.user.id)
-          .eq("status", "active")
-          .single();
-
-        if (error || !enrollment) {
-          console.warn("Could not fetch tier from phase-2.enrollments", error);
+        
+        if (!session) {
           if (mounted) setIsLoading(false);
           return;
         }
 
-        // Assuming bundle_name is directly on the bundle object
-        const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter"; // Fallback to Starter
-
-        let resolvedTier: UserTier = "Starter";
-        if (typeof bundleName === "string") {
-          const lowerName = bundleName.toLowerCase();
-          if (lowerName.includes("premium")) resolvedTier = "Premium";
-          else if (lowerName.includes("pro")) resolvedTier = "Pro";
+        // Call the secure server action to bypass RLS on bundles
+        const { getUserTier } = await import('@/app/actions/tier');
+        const resolvedTier = await getUserTier(session.access_token);
+        
+        if (mounted && resolvedTier) {
+          setTier(resolvedTier);
         }
 
         if (mounted) {
-          setTier(resolvedTier);
           setIsLoading(false);
         }
       } catch (err) {

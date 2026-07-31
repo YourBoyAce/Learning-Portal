@@ -213,28 +213,28 @@ export default function Dashboard() {
 
     // Fetch enrolled courses
     const { data: enrollmentsData } = await supabase
-      .from("course_enrollments")
-      .select(
-        `
-        course_id,
-        enrolled_at,
-        maincourses (
+      .schema("phase2")
+      .from("enrollments")
+      .select("course_id, created_at, users!inner(auth_user_id)")
+      .eq("users.auth_user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (enrollmentsData && enrollmentsData.length > 0) {
+      const courseIds = enrollmentsData.map((e: any) => e.course_id);
+      
+      const { data: maincoursesData } = await supabase
+        .from("maincourses")
+        .select(`
           id,
           title,
           description,
           category,
           thumbnail_url
-        )
-      `,
-      )
-      .eq("user_id", user.id)
-      .order("enrolled_at", { ascending: false });
-
-    if (enrollmentsData && enrollmentsData.length > 0) {
-      const validEnrollments = enrollmentsData.filter(
-        (e: any) => e.maincourses,
-      );
-      const mappedCourses = validEnrollments.map((e: any) => e.maincourses);
+        `)
+        .in("id", courseIds);
+        
+      const mappedCourses = maincoursesData || [];
       setEnrolledCourses(mappedCourses);
 
       // Fetch progress for each enrolled course

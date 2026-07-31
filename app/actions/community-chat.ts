@@ -79,14 +79,13 @@ async function checkEnrollment(
     return true;
   }
 
-  const userEmail = userData.user.email?.trim().toLowerCase();
-  if (!userEmail) return false;
-
   const { data: memberRows, error: memberError } = await supabaseAdmin
-    .from("course_members")
-    .select("maincourse_id")
-    .eq("email", userEmail)
-    .eq("maincourse_id", courseId);
+    .schema("phase2")
+    .from("enrollments")
+    .select("course_id, users!inner(auth_user_id)")
+    .eq("users.auth_user_id", userId)
+    .eq("course_id", courseId)
+    .eq("status", "active");
 
   if (memberError) return false;
   return (memberRows ?? []).length > 0;
@@ -405,22 +404,17 @@ export async function getUserCommunities(accessToken: string): Promise<{
 
     const supabaseAdmin = createServiceClient();
     
-    // Get user email
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
-    if (userError || !userData?.user) return { courses: [], error: "User not found" };
-
-    const userEmail = userData.user.email?.trim().toLowerCase();
-    if (!userEmail) return { courses: [], error: "User email not found" };
-
-    // Get courses from course_members
+    // Get courses from phase2.enrollments
     const { data: memberRows, error: memberError } = await supabaseAdmin
-      .from("course_members")
-      .select("maincourse_id")
-      .eq("email", userEmail);
+      .schema("phase2")
+      .from("enrollments")
+      .select("course_id, users!inner(auth_user_id)")
+      .eq("users.auth_user_id", userId)
+      .eq("status", "active");
 
     if (memberError || !memberRows?.length) return { courses: [], error: null };
     
-    const courseIds = Array.from(new Set(memberRows.map((r: any) => r.maincourse_id).filter((id: any) => id !== null)));
+    const courseIds = Array.from(new Set(memberRows.map((r: any) => r.course_id).filter((id: any) => id !== null)));
     if (courseIds.length === 0) return { courses: [], error: null };
 
     // Get course details

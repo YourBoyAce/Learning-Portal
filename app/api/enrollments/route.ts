@@ -79,16 +79,18 @@ export async function GET(request: Request) {
   }
 
   const { data: memberRows, error: memberError } = await authContext.supabaseAdmin
-    .from("course_members")
-    .select("maincourse_id")
-    .eq("email", userEmail);
+    .schema("phase2")
+    .from("enrollments")
+    .select("course_id, batch_type, users!inner(auth_user_id)")
+    .eq("users.auth_user_id", authContext.user.id)
+    .eq("status", "active");
 
   if (memberError) {
     return NextResponse.json({ error: memberError.message }, { status: 500 });
   }
 
   const courseIds = ((memberRows ?? []) as any[])
-    .map((row) => row.maincourse_id)
+    .map((row) => row.course_id)
     .filter((value) => value !== null && value !== undefined);
 
   if (courseIds.length === 0) {
@@ -106,9 +108,13 @@ export async function GET(request: Request) {
   }
 
   const enrollments = ((courseRows ?? []) as any[]).map((course) => {
+    // Find the matching enrollment row to get the batch_type
+    const matchingEnrollment = memberRows?.find(r => r.course_id === course.id);
+    const batchName = matchingEnrollment?.batch_type || course.batch_type || "Weekday";
+
     return {
       batchId: null,
-      batchName: null,
+      batchName: batchName,
       startDate: course.created_at, // fallback
       courseId: course.id,
       courseTitle: course.title ?? "Unassigned Course",

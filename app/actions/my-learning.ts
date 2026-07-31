@@ -7,7 +7,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 type CourseMemberRow = {
-  maincourse_id: number | string;
+  course_id: number | string;
 };
 
 type CourseRow = {
@@ -79,12 +79,14 @@ export async function getMyLearningData(
   }
 
   const { data: memberRows } = await supabaseAdmin
-    .from("course_members")
-    .select("maincourse_id")
-    .eq("email", userEmail);
+    .schema("phase2")
+    .from("enrollments")
+    .select("course_id, users!inner(auth_user_id)")
+    .eq("users.auth_user_id", userId)
+    .eq("status", "active");
 
   const courseIds = ((memberRows ?? []) as CourseMemberRow[])
-    .map((row) => row.maincourse_id)
+    .map((row) => row.course_id)
     .filter((value) => value !== null && value !== undefined);
 
   if (courseIds.length === 0) {

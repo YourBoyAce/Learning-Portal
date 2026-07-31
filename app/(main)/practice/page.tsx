@@ -127,9 +127,11 @@ export default function StudentPracticeCenter() {
 
         // 2. Fetch enrolled course IDs
         const { data: enrollments, error: enrollError } = await supabase
-          .from("course_enrollments")
-          .select("course_id")
-          .eq("user_id", session.user.id);
+          .schema("phase2")
+          .from("enrollments")
+          .select("course_id, users!inner(auth_user_id)")
+          .eq("users.auth_user_id", session.user.id)
+          .eq("status", "active");
 
         if (enrollError) throw enrollError;
         const enrolledIds = (enrollments || []).map(e => String(e.course_id));
@@ -485,6 +487,15 @@ if (artifactsError) {
 
         {/* Tab 2: Artifacts list */}
         {activeTab === "artifacts" && (
+          !isTierLoading && !canAccess("Labs") ? (
+            <div className="py-6">
+              <UpgradeRequired
+                title="Study Materials Gated"
+                description="Downloadable study materials, boilerplates, and exercises are exclusively available to Pro and Premium members. Upgrade your plan to access these resources."
+                requiredTier="Pro"
+              />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {artifacts.map((art) => {
               return (
@@ -536,7 +547,7 @@ if (artifactsError) {
 
             {artifacts.length === 0 && (
               <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                <div className="w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-4\">
+                <div className="w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-4">
                   <DownloadCloud className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">No Study Materials Found</h3>
@@ -546,6 +557,7 @@ if (artifactsError) {
               </div>
             )}
           </div>
+          )
         )}
 
       </div>

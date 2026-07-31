@@ -570,6 +570,7 @@ export async function POST(request: Request) {
   }
 
   // Step 3: Insert maincourse
+  const scheduleType = body?.schedule === "weekend" ? "weekend" : "weekday";
   const { data: newCourse, error: insertError } = await authContext.supabaseAdmin
     .from("maincourses")
     .insert({
@@ -577,6 +578,7 @@ export async function POST(request: Request) {
       description,
       thumbnail_url: thumbnailUrl || null,
       course_type: "active",
+      batch_type: scheduleType,
       ...(productId !== null && { product_id: productId }),
     })
     .select("id")
@@ -650,7 +652,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 6: Auto-enroll scholars into course_enrollments
+  // Step 6: Auto-enroll scholars into phase2.enrollments
   if (assignedScholars.length > 0) {
     const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const authUsers = authUsersResult.data?.users ?? [];
@@ -658,27 +660,50 @@ export async function POST(request: Request) {
     const userIdsToEnroll: string[] = [];
     for (const email of assignedScholars) {
       const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      if (authUser) userIdsToEnroll.push(authUser.id);
+      if (authUser) {
+        // Must resolve the phase2 user id from auth user id
+        const { data: p2User } = await authContext.supabaseAdmin
+          .schema("phase2")
+          .from("users")
+          .select("id")
+          .eq("auth_user_id", authUser.id)
+          .maybeSingle();
+
+        if (p2User) {
+           userIdsToEnroll.push(p2User.id);
+        } else {
+           userIdsToEnroll.push(authUser.id); // fallback for existing records
+        }
+      }
     }
 
     if (userIdsToEnroll.length > 0) {
       const { data: existing } = await authContext.supabaseAdmin
-        .from("course_enrollments")
+        .schema("phase2")
+        .from("enrollments")
         .select("user_id")
         .eq("course_id", newCourse.id)
         .in("user_id", userIdsToEnroll);
 
       const existingUserIds = new Set(
-        ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
+        ((existing ?? []) as any[]).map((e) => e.user_id),
       );
 
       const newEnrollments = userIdsToEnroll
         .filter((id) => !existingUserIds.has(id))
-        .map((id) => ({ user_id: id, course_id: newCourse.id }));
+        .map((id) => ({ 
+           user_id: id, 
+           course_id: newCourse.id,
+           status: "active",
+           batch_type: scheduleType,
+           access_start_date: new Date().toISOString(),
+           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
+        }));
 
       if (newEnrollments.length > 0) {
         const { error: enrollError } = await authContext.supabaseAdmin
-          .from("course_enrollments")
+          .schema("phase2")
+          .from("enrollments")
           .insert(newEnrollments);
 
         if (enrollError) {
@@ -907,50 +932,59 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Re-sync course_enrollments for scholars
+    // Re-sync phase2.enrollments for scholars
     const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const authUsers = authUsersResult.data?.users ?? [];
 
     const userIdsToEnroll: string[] = [];
     for (const email of assignedScholars) {
       const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      if (authUser) userIdsToEnroll.push(authUser.id);
-    }
+      if (authUser) {
+        const { data: p2User } = await authContext.supabaseAdmin
+          .schema("phase2")
+          .from("users")
+          .select("id")
+          .eq("auth_user_id", authUser.id)
+          .maybeSingle();
 
-    // Fetch existing enrollments for this course
-    const { data: existing } = await authContext.supabaseAdmin
-      .from("course_enrollments")
-      .select("user_id")
-      .eq("course_id", id);
-
-    const existingUserIds = new Set(
-      ((existing ?? []) as CourseEnrollmentRow[]).map((e) => e.user_id),
-    );
-
-    const userIdsToEnrollSet = new Set(userIdsToEnroll);
-
-    // Determine which to delete and which to add
-    const toDelete = [...existingUserIds].filter((uid) => !userIdsToEnrollSet.has(uid));
-    const toAdd = userIdsToEnroll.filter((uid) => !existingUserIds.has(uid));
-
-    if (toDelete.length > 0) {
-      const { error: deleteError } = await authContext.supabaseAdmin
-        .from("course_enrollments")
-        .delete()
-        .eq("course_id", id)
-        .in("user_id", toDelete);
-      if (deleteError) {
-        console.error("Enrollment delete error:", deleteError.message);
+        if (p2User) {
+           userIdsToEnroll.push(p2User.id);
+        } else {
+           userIdsToEnroll.push(authUser.id);
+        }
       }
     }
 
-    if (toAdd.length > 0) {
-      const newEnrollments = toAdd.map((uid) => ({ user_id: uid, course_id: id }));
-      const { error: enrollError } = await authContext.supabaseAdmin
-        .from("course_enrollments")
-        .insert(newEnrollments);
-      if (enrollError) {
-        console.error("Enrollment insert error:", enrollError.message);
+    if (userIdsToEnroll.length > 0) {
+      const { data: existing } = await authContext.supabaseAdmin
+        .schema("phase2")
+        .from("enrollments")
+        .select("user_id")
+        .eq("course_id", id)
+        .in("user_id", userIdsToEnroll);
+
+      const existingUserIds = new Set(
+        ((existing ?? []) as any[]).map((e) => e.user_id),
+      );
+
+      const newEnrollments = userIdsToEnroll
+        .filter((uid) => !existingUserIds.has(uid))
+        .map((uid) => ({ 
+           user_id: uid, 
+           course_id: id,
+           status: "active",
+           batch_type: scheduleType,
+           access_start_date: new Date().toISOString(),
+           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
+        }));
+
+      if (newEnrollments.length > 0) {
+        const { error: enrollError } = await authContext.supabaseAdmin
+          .schema("phase2")
+          .from("enrollments")
+          .insert(newEnrollments);
+
+        if (enrollError) console.error("Enrollment error:", enrollError.message);
       }
     }
   }
@@ -992,7 +1026,9 @@ export async function DELETE(request: Request) {
   await authContext.supabaseAdmin.from("batches").update({ course_id: null }).eq("course_id", id);
   await authContext.supabaseAdmin.from("coursemodules").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("user_video_progress").delete().eq("course_id", id);
-  await authContext.supabaseAdmin.from("course_enrollments").delete().eq("course_id", id);
+  // Note: We leave phase2.enrollments intact when deleting a course manually, or we could delete them. 
+  // Let's delete them to clean up:
+  await authContext.supabaseAdmin.schema("phase2").from("enrollments").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("course_ratings").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("certificates").delete().eq("course_id", id);
   await authContext.supabaseAdmin.schema("phase2").from("orders").delete().eq("course_id", id);

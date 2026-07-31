@@ -349,19 +349,31 @@ export default function MyLearningDashboard() {
       const userEmail = session.user.email?.trim().toLowerCase() || "";
 
       const { data: enrollmentsData } = await supabase
-        .from("course_enrollments")
-        .select(`
-        course_id,
-        maincourses (
-          id,
-          title,
-          description,
-          category,
-          thumbnail_url,
-          coursemodules (*)
-        )
-      `)
-        .eq("user_id", session.user.id);
+        .schema("phase2")
+        .from("enrollments")
+        .select("course_id, users!inner(auth_user_id)")
+        .eq("users.auth_user_id", session.user.id)
+        .eq("status", "active");
+
+      let validEnrollments: any[] = [];
+      if (enrollmentsData && enrollmentsData.length > 0) {
+        const courseIds = enrollmentsData.map((e: any) => e.course_id);
+        const { data: maincoursesData } = await supabase
+          .from("maincourses")
+          .select(`
+            id,
+            title,
+            description,
+            category,
+            thumbnail_url,
+            coursemodules (*)
+          `)
+          .in("id", courseIds);
+
+        if (maincoursesData) {
+          validEnrollments = maincoursesData.map(mc => ({ maincourses: mc }));
+        }
+      }
 
       // --------------------------------------------------
       // FETCH VIDEO PROGRESS
@@ -396,11 +408,8 @@ export default function MyLearningDashboard() {
       }
 
       // --------------------------------------------------
-      // VALID ENROLLMENTS
+      // VALID ENROLLMENTS (already structured above)
       // --------------------------------------------------
-      const validEnrollments = enrollmentsData.filter(
-        (e: any) => e.maincourses
-      );
 
       // --------------------------------------------------
       // BUILD CURRICULUM
@@ -783,32 +792,31 @@ export default function MyLearningDashboard() {
             </div>
 
             {/*Completed courses */}
-            <section className="mt-12 text-gray-900">
-              <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                Completed Courses
-              </h2>
+            {(!loading && completedCourses.length > 0) && (
+              <section className="mt-12 text-gray-900">
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                  Completed Courses
+                </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                {loading
-                  ? // ── Skeleton placeholders while fetching ──
-                    [0, 1].map((i) => <CourseCardSkeleton key={i} />)
-                  : completedCourses.map((course) => (
-                      <CourseCard
-                        key={course.id}
-                        id={course.id}
-                        title={course.title}
-                        description={course.description}
-                        thumbnail={course.thumbnail_url}
-                        variant="user"
-                        progressPercentage={100}
-                        showProgress={true}
-                        isCompleted={course.progress === 100}
-                        onCertificateClick={() => setSelectedCertificateCourse(course)}
-                        onClick={() => router.push(`/courses/${course.id}`)}
-                      />
-                    ))}
-              </div>
-            </section>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                  {completedCourses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      id={course.id}
+                      title={course.title}
+                      description={course.description}
+                      thumbnail={course.thumbnail_url}
+                      variant="user"
+                      progressPercentage={100}
+                      showProgress={true}
+                      isCompleted={course.progress === 100}
+                      onCertificateClick={() => setSelectedCertificateCourse(course)}
+                      onClick={() => router.push(`/courses/${course.id}`)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* ─── THE AUTOMATE INSIGHT ─── */}
             <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
