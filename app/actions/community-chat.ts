@@ -71,7 +71,7 @@ async function checkEnrollment(
   // Admin bypass
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("role")
+    .select("role, email")
     .eq("id", userId)
     .single();
 
@@ -79,6 +79,7 @@ async function checkEnrollment(
     return true;
   }
 
+  // Check phase2.enrollments
   const { data: memberRows, error: memberError } = await supabaseAdmin
     .schema("phase2")
     .from("enrollments")
@@ -87,8 +88,25 @@ async function checkEnrollment(
     .eq("course_id", courseId)
     .eq("status", "active");
 
-  if (memberError) return false;
-  return (memberRows ?? []).length > 0;
+  if (!memberError && (memberRows ?? []).length > 0) {
+    return true;
+  }
+
+  // Check course_members for mentors/instructors
+  if (profile?.email) {
+    const { data: courseMemberRows, error: courseMemberError } = await supabaseAdmin
+      .from("course_members")
+      .select("maincourse_id")
+      .eq("email", profile.email)
+      .eq("maincourse_id", courseId)
+      .eq("status", "active");
+      
+    if (!courseMemberError && (courseMemberRows ?? []).length > 0) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function hydrateMessagesWithProfiles(
@@ -155,7 +173,7 @@ export async function fetchInitialMessages(
       .eq("id", userId)
       .single();
 
-    if (profile?.role && profile.role.toLowerCase() === "admin") {
+    if (profile?.role && (profile.role.toLowerCase() === "admin" || profile.role.toLowerCase() === "instructor" || profile.role.toLowerCase() === "mentor")) {
       isAdmin = true;
     }
 
@@ -404,6 +422,21 @@ export async function getUserCommunities(accessToken: string): Promise<{
 
     const supabaseAdmin = createServiceClient();
     
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("role, email")
+      .eq("id", userId)
+      .single();
+
+    // Admin bypass
+    if (profile?.role && profile.role.toLowerCase() === "admin") {
+      const { data: courses, error: courseError } = await supabaseAdmin
+        .from("maincourses")
+        .select("id, title, thumbnail_url");
+      if (courseError) return { courses: [], error: courseError.message };
+      return { courses: courses ?? [], error: null };
+    }
+
     // Get courses from phase2.enrollments
     const { data: memberRows, error: memberError } = await supabaseAdmin
       .schema("phase2")
@@ -412,9 +445,22 @@ export async function getUserCommunities(accessToken: string): Promise<{
       .eq("users.auth_user_id", userId)
       .eq("status", "active");
 
-    if (memberError || !memberRows?.length) return { courses: [], error: null };
+    // Get courses from course_members
+    let courseMemberRows: any[] = [];
+    if (profile?.email) {
+      const { data: cMembers } = await supabaseAdmin
+        .from("course_members")
+        .select("maincourse_id")
+        .eq("email", profile.email)
+        .eq("status", "active");
+      if (cMembers) courseMemberRows = cMembers;
+    }
     
-    const courseIds = Array.from(new Set(memberRows.map((r: any) => r.course_id).filter((id: any) => id !== null)));
+    const enrollmentCourseIds = memberRows?.map((r: any) => r.course_id).filter((id: any) => id !== null) || [];
+    const memberCourseIds = courseMemberRows?.map((r: any) => r.maincourse_id).filter((id: any) => id !== null) || [];
+
+    const courseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+    
     if (courseIds.length === 0) return { courses: [], error: null };
 
     // Get course details

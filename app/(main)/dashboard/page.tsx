@@ -225,7 +225,7 @@ export default function Dashboard() {
       return modules;
     };
 
-    // Fetch enrolled courses
+    // Fetch courses from phase2.enrollments
     const { data: enrollmentsData } = await supabase
       .schema("phase2")
       .from("enrollments")
@@ -234,9 +234,21 @@ export default function Dashboard() {
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
-    if (enrollmentsData && enrollmentsData.length > 0) {
-      const courseIds = enrollmentsData.map((e: any) => e.course_id);
-      
+    // Fetch courses from course_members (where mentors/scholars are directly assigned by email)
+    const { data: courseMembersData } = await supabase
+      .from("course_members")
+      .select("maincourse_id")
+      .eq("email", user.email)
+      .eq("status", "active");
+
+    const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id) || [];
+    const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id) || [];
+    
+    // Combine and deduplicate course IDs
+    const allCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+
+    let mappedCourses: any[] = [];
+    if (allCourseIds.length > 0) {
       const { data: maincoursesData } = await supabase
         .from("maincourses")
         .select(`
@@ -246,9 +258,12 @@ export default function Dashboard() {
           category,
           thumbnail_url
         `)
-        .in("id", courseIds);
+        .in("id", allCourseIds);
         
-      const mappedCourses = maincoursesData || [];
+      mappedCourses = maincoursesData || [];
+    }
+
+    if (mappedCourses.length > 0) {
       setEnrolledCourses(mappedCourses);
 
       // Fetch progress for each enrolled course
@@ -887,12 +902,17 @@ export default function Dashboard() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {enrollments.map((item) => (
-                    <div
-                      key={`${item.batchId}-${item.courseId}`}
-                      className="h-full min-h-[420px] flex items-stretch w-full shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl bg-white border border-gray-100 hover:border-brand-primary/20 cursor-default overflow-hidden group flex-col"
-                    >
+                <Carousel
+                  opts={{ align: "start", loop: false, dragFree: true }}
+                  className="w-full relative"
+                >
+                  <CarouselContent className="-ml-4 pb-2">
+                    {enrollments.map((item) => (
+                      <CarouselItem
+                        key={`${item.batchId}-${item.courseId}`}
+                        className="pl-4 basis-full sm:basis-1/2"
+                      >
+                        <div className="h-full min-h-[420px] flex items-stretch w-full shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl bg-white border border-gray-100 hover:border-brand-primary/20 cursor-default overflow-hidden group flex-col">
                       {/* Thumbnail */}
                       <div className="relative w-full aspect-[16/9] bg-gradient-to-br from-brand-primary/10 to-brand-success/10 overflow-hidden flex-shrink-0">
                         <img
@@ -948,11 +968,19 @@ export default function Dashboard() {
                             </div>
                             <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
                           </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </CarouselItem>
                   ))}
-                </div>
+                  </CarouselContent>
+                  {enrollments.length > 2 && (
+                    <>
+                      <CarouselPrevious className="hidden sm:flex -left-4 bg-white shadow-md border border-gray-100 text-brand-primary hover:bg-gray-50 z-10" />
+                      <CarouselNext className="hidden sm:flex -right-4 bg-white shadow-md border border-gray-100 text-brand-primary hover:bg-gray-50 z-10" />
+                    </>
+                  )}
+                </Carousel>
               )}
             </div>
           </div>
@@ -1192,7 +1220,7 @@ export default function Dashboard() {
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
                       {activeEnrollments.map((enrollment) => (
                         <CarouselItem
-                          key={String(enrollment.batchId)}
+                          key={String(enrollment.courseId)}
                           className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard
@@ -1243,7 +1271,7 @@ export default function Dashboard() {
                     <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
                       {completedEnrollments.map((enrollment) => (
                         <CarouselItem
-                          key={String(enrollment.batchId)}
+                          key={String(enrollment.courseId)}
                           className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
                         >
                           <CourseCard

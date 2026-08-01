@@ -290,7 +290,7 @@ export default function MyLearningDashboard() {
       // --------------------------------------------------
       const { data: profile } = await supabase
         .from("profiles")
-        .select("current_insight_index, full_name")
+        .select("current_insight_index, full_name, role")
         .eq("id", session.user.id)
         .single();
 
@@ -355,9 +355,19 @@ export default function MyLearningDashboard() {
         .eq("users.auth_user_id", session.user.id)
         .eq("status", "active");
 
+      const { data: courseMembersData } = await supabase
+        .from("course_members")
+        .select("maincourse_id")
+        .eq("email", userEmail)
+        .eq("status", "active");
+
+      const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id) || [];
+      const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id) || [];
+      
+      const allCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+
       let validEnrollments: any[] = [];
-      if (enrollmentsData && enrollmentsData.length > 0) {
-        const courseIds = enrollmentsData.map((e: any) => e.course_id);
+      if (allCourseIds.length > 0) {
         const { data: maincoursesData } = await supabase
           .from("maincourses")
           .select(`
@@ -368,7 +378,7 @@ export default function MyLearningDashboard() {
             thumbnail_url,
             coursemodules (*)
           `)
-          .in("id", courseIds);
+          .in("id", allCourseIds);
 
         if (maincoursesData) {
           validEnrollments = maincoursesData.map(mc => ({ maincourses: mc }));
@@ -394,7 +404,7 @@ export default function MyLearningDashboard() {
       // --------------------------------------------------
       // NO COURSES
       // --------------------------------------------------
-      if (!enrollmentsData || enrollmentsData.length === 0) {
+      if (validEnrollments.length === 0) {
         setCurriculum([]);
         setCourseProgress({});
         setWeeklyProgressPct(0);

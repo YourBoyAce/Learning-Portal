@@ -89,9 +89,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: memberError.message }, { status: 500 });
   }
 
-  const courseIds = ((memberRows ?? []) as any[])
+  const { data: courseMembersData, error: courseMemberError } = await authContext.supabaseAdmin
+    .from("course_members")
+    .select("maincourse_id")
+    .eq("email", userEmail)
+    .eq("status", "active");
+
+  const enrollmentCourseIds = ((memberRows ?? []) as any[])
     .map((row) => row.course_id)
     .filter((value) => value !== null && value !== undefined);
+
+  const memberCourseIds = ((courseMembersData ?? []) as any[])
+    .map((row) => row.maincourse_id)
+    .filter((value) => value !== null && value !== undefined);
+
+  const courseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
 
   if (courseIds.length === 0) {
     return NextResponse.json({ success: true, enrollments: [] });
@@ -110,7 +122,8 @@ export async function GET(request: Request) {
   const enrollments = ((courseRows ?? []) as any[]).map((course) => {
     // Find the matching enrollment row to get the batch_type
     const matchingEnrollment = memberRows?.find(r => r.course_id === course.id);
-    const batchName = matchingEnrollment?.batch_type || course.batch_type || "Weekday";
+    const isMentorAssignment = !matchingEnrollment && memberCourseIds.includes(course.id);
+    const batchName = matchingEnrollment?.batch_type || course.batch_type || (isMentorAssignment ? "Mentor Assignment" : "Weekday");
 
     return {
       batchId: null,
