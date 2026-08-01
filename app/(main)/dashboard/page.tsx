@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/carousel"; // <-- Update path to match your folder structure
 import { ICONS } from "@/app/styles/icons";
 import CueCard from "@/app/components/course/CueCard";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Profile = {
   full_name?: string | null;
@@ -52,6 +53,7 @@ interface Insight {
   content: string;
   author: string;
 }
+type LearningActivityDay = { day: string; earnedPoints: number; availablePoints: number; activityPercent: number };
 
 
 export default function Dashboard() {
@@ -132,6 +134,8 @@ export default function Dashboard() {
   //for progress
   const [completedVideoIds, setCompletedVideoIds] = useState<string[]>([]);
   const [allocationPage, setAllocationPage] = useState(0);
+  const [learningActivity, setLearningActivity] = useState<LearningActivityDay[]>([]);
+  const [learningActivityMeta, setLearningActivityMeta] = useState({ earnedToday: 0, availableToday: 0, currentPlan: "" });
 
 
   const loadDashboardData = async () => {
@@ -147,6 +151,16 @@ export default function Dashboard() {
 
     setUserEmail(user.email ?? null);
     setUserId(user.id);
+    if (session?.access_token) {
+      try {
+        const response = await fetch("/api/learning-analytics", { headers: { Authorization: `Bearer ${session.access_token}` } });
+        const analytics = await response.json().catch(() => null);
+        if (response.ok) {
+          setLearningActivity(analytics.dailyPoints || []);
+          setLearningActivityMeta({ earnedToday: analytics.earnedToday || 0, availableToday: analytics.availableToday || 0, currentPlan: analytics.currentPlan || "" });
+        }
+      } catch (error) { console.error("Unable to load learning activity:", error); }
+    }
 
     const { data: fetchedProfile } = await supabase
       .from("profiles")
@@ -1137,6 +1151,15 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        <section className="mb-12 rounded-2xl border border-gray-100 bg-white p-5 sm:p-7 shadow-sm">
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div><h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Learning Activity</h2><p className="mt-1 text-sm text-gray-500">Your completed learning activity this week.</p></div>
+            <div className="text-left sm:text-right"><p className="text-lg font-bold text-brand-primary">{learningActivityMeta.earnedToday} / {learningActivityMeta.availableToday} points</p>{learningActivityMeta.currentPlan && <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{learningActivityMeta.currentPlan}</p>}</div>
+          </div>
+          <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={learningActivity} margin={{ top: 12, right: 12, left: -18, bottom: 0 }}><XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: "#6b7280", fontSize: 12 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "#6b7280", fontSize: 12 }} allowDecimals={false} /><Tooltip formatter={(_value: any, _name: any, item: any) => [`${item.payload.earnedPoints} / ${item.payload.availablePoints} points`, "Activity"]} labelStyle={{ color: "#111827" }} contentStyle={{ borderRadius: 12, borderColor: "#e5e7eb" }} /><Line type="monotone" dataKey="activityPercent" stroke="var(--color-brand-primary, #2283ff)" strokeWidth={3} dot={{ r: 4, fill: "var(--color-brand-primary, #2283ff)", strokeWidth: 0 }} activeDot={{ r: 6 }} /></LineChart></ResponsiveContainer></div>
+          <p className="mt-3 text-xs text-gray-400">Activity is shown relative to the points available in your enrolled courses.</p>
+        </section>
 
         {/* Active Studies Grid / Carousel — driven by batch enrollments */}
         {(() => {

@@ -44,6 +44,18 @@ interface Batch {
   name: string;
 }
 
+interface DatabaseQuiz {
+  id: string;
+  course_id: string | number;
+  course_name?: string;
+  title: string;
+  questions: Question[];
+  passing_score: number;
+  status: "Active" | "Inactive";
+  attempts_count: number;
+  average_score: number;
+}
+
 const DEFAULT_QUESTION_COUNT = 5;
 const MIN_QUESTION_COUNT = 1;
 const MAX_QUESTION_COUNT = 50;
@@ -61,57 +73,25 @@ function createEmptyQuestions(count: number): Question[] {
   return Array.from({ length: count }, (_, i) => createEmptyQuestion(i));
 }
 
-const INITIAL_QUIZZES: Quiz[] = [
-  {
-    id: "quiz-1",
-    title: "Playwright Core Concepts",
-    courseName: "Playwright Mastery",
-    questionsCount: 5,
-    passingScore: 80,
-    attemptsCount: 48,
-    averageScore: 86,
-    status: "Active",
-    questions: [
-      { id: "q-1-1", text: "Which command is used to run Playwright tests in headless mode?", options: ["npx playwright test", "npx playwright test --headed", "npx playwright run", "npx playwright start"], correctAnswer: 0 },
-      { id: "q-1-2", text: "What is the default test timeout in Playwright?", options: ["10 seconds", "30 seconds", "45 seconds", "60 seconds"], correctAnswer: 1 },
-      { id: "q-1-3", text: "Which fixture provides a clean browser context for each test?", options: ["browser", "context", "page", "request"], correctAnswer: 2 },
-      { id: "q-1-4", text: "How do you generate codegen scripts in Playwright?", options: ["npx playwright record", "npx playwright codegen", "npx playwright generate", "npx playwright build"], correctAnswer: 1 },
-      { id: "q-1-5", text: "Which method is used to wait for a network response in Playwright?", options: ["page.waitForLoadState()", "page.waitForNavigation()", "page.waitForResponse()", "page.waitForSelector()"], correctAnswer: 2 },
-    ],
-  },
-  {
-    id: "quiz-2",
-    title: "GitHub Actions CI/CD Basics",
-    courseName: "CI/CD Foundations",
-    questionsCount: 3,
-    passingScore: 70,
-    attemptsCount: 32,
-    averageScore: 78,
-    status: "Active",
-    questions: [
-      { id: "q-2-1", text: "In GitHub Actions, what is the default filename and extension for workflows?", options: [".github/workflows/main.json", ".github/workflows/main.yml", "config/workflows/main.yml", ".github/actions/main.yml"], correctAnswer: 1 },
-      { id: "q-2-2", text: "Which keyword defines the triggers for a GitHub Actions workflow?", options: ["trigger", "events", "on", "when"], correctAnswer: 2 },
-      { id: "q-2-3", text: "Where do self-hosted runners execute workflow jobs?", options: ["On GitHub's cloud virtual machines", "On your own local or cloud infrastructure", "Directly in the web browser console", "Inside the GitHub repository's git folder"], correctAnswer: 1 },
-    ],
-  },
-  {
-    id: "quiz-3",
-    title: "Advanced Locators and Assertions",
-    courseName: "Ultimate Automation",
-    questionsCount: 4,
-    passingScore: 80,
-    attemptsCount: 15,
-    averageScore: 74,
-    status: "Inactive",
-    questions: [
-      { id: "q-3-1", text: "Which Playwright assertion is used to check if an element is visible?", options: ["await expect(locator).toBeVisible()", "await expect(locator).isVisible()", "await expect(locator).toExist()", "await expect(locator).toBePresent()"], correctAnswer: 0 },
-      { id: "q-3-2", text: "Which locator strategy is highly recommended for accessibility-friendly testing?", options: ["page.locator('xpath=...')", "page.getByRole()", "page.locator('.css-class')", "page.locator('#element-id')"], correctAnswer: 1 },
-    ],
-  },
-];
+function mapDatabaseQuiz(quiz: DatabaseQuiz): Quiz {
+  return {
+    id: String(quiz.id),
+    title: String(quiz.title || "Untitled Quiz"),
+    courseName: String(quiz.course_name || "Unknown Course"),
+    courseId: quiz.course_id,
+    questionsCount: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+    passingScore: Number(quiz.passing_score || 80),
+    attemptsCount: Number(quiz.attempts_count || 0),
+    averageScore: Number(quiz.average_score || 0),
+    status: quiz.status === "Inactive" ? "Inactive" : "Active",
+    questions: Array.isArray(quiz.questions) ? quiz.questions : [],
+  };
+}
 
 export default function AdminQuizzes() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>(INITIAL_QUIZZES);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(true);
+  const [isSavingQuiz, setIsSavingQuiz] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCopied, setIsCopied] = useState(false);
 
@@ -140,6 +120,28 @@ export default function AdminQuizzes() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingQuiz, setDeletingQuiz] = useState<Quiz | null>(null);
 
+  const getAccessToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Please log in again to manage quizzes.");
+    return session.access_token;
+  };
+
+  const loadQuizzes = async () => {
+    try {
+      setIsLoadingQuizzes(true);
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/quizzes", { headers: { Authorization: `Bearer ${token}` } });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || "Unable to load quizzes.");
+      setQuizzes((result?.quizzes || []).map(mapDatabaseQuiz));
+    } catch (error) {
+      console.error("Failed to load quizzes:", error);
+      setQuizzes([]);
+    } finally {
+      setIsLoadingQuizzes(false);
+    }
+  };
+
   useEffect(() => {
     const loadCourses = async () => {
       try {
@@ -167,23 +169,10 @@ export default function AdminQuizzes() {
     };
     loadBatches();
 
-    const saved = localStorage.getItem("automate_portal_quizzes");
-    if (saved) {
-      try {
-        setQuizzes(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse quizzes from local storage:", e);
-      }
-    } else {
-      localStorage.setItem("automate_portal_quizzes", JSON.stringify(INITIAL_QUIZZES));
-    }
+    void loadQuizzes();
+    // The API is intentionally loaded once when the admin page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (quizzes && quizzes !== INITIAL_QUIZZES) {
-      localStorage.setItem("automate_portal_quizzes", JSON.stringify(quizzes));
-    }
-  }, [quizzes]);
 
   const handleCreateNew = () => {
     setIsEditing(false);
@@ -276,7 +265,7 @@ export default function AdminQuizzes() {
     setQuestions(updated);
   };
 
-  const handleSaveQuiz = () => {
+  const handleSaveQuiz = async () => {
     if (!quizTitle.trim() || !courseName.trim()) {
       alert("Please enter a quiz title and select or enter a course.");
       return;
@@ -287,43 +276,34 @@ export default function AdminQuizzes() {
       return;
     }
 
-    if (isEditing && editingQuizId) {
-      setQuizzes((prev) =>
-        prev.map((q) =>
-          q.id === editingQuizId
-            ? {
-              ...q,
-              title: quizTitle,
-              courseName,
-              courseId,
-              batchId,
-              batchName: batches.find((b) => String(b.id) === String(batchId))?.name || "",
-              passingScore,
-              status,
-              questionsCount: validQuestions.length,
-              questions: validQuestions,
-            }
-            : q
-        )
-      );
-    } else {
-      const newQuiz: Quiz = {
-        id: `quiz-${Date.now()}`,
-        title: quizTitle,
-        courseName,
-        courseId,
-        batchId,
-        batchName: batches.find((b) => String(b.id) === String(batchId))?.name || "",
-        passingScore,
-        status,
-        questionsCount: validQuestions.length,
-        attemptsCount: 0,
-        averageScore: 0,
-        questions: validQuestions,
-      };
-      setQuizzes((prev) => [newQuiz, ...prev]);
+    if (!courseId) {
+      alert("Please select a course from the course list.");
+      return;
     }
-    setShowModal(false);
+    try {
+      setIsSavingQuiz(true);
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/quizzes", {
+        method: isEditing ? "PUT" : "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(isEditing && editingQuizId ? { id: editingQuizId } : {}),
+          title: quizTitle,
+          courseId,
+          passingScore,
+          status,
+          questions: validQuestions,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || "Unable to save quiz.");
+      setShowModal(false);
+      await loadQuizzes();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to save quiz.");
+    } finally {
+      setIsSavingQuiz(false);
+    }
   };
 
   const handleDeleteClick = (quiz: Quiz) => {
@@ -331,11 +311,22 @@ export default function AdminQuizzes() {
     setShowDeleteConfirm(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (deletingQuiz) {
-      setQuizzes((prev) => prev.filter((q) => q.id !== deletingQuiz.id));
+  const handleConfirmDelete = async () => {
+    if (!deletingQuiz) return;
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/quizzes", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deletingQuiz.id }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || "Unable to delete quiz.");
       setShowDeleteConfirm(false);
       setDeletingQuiz(null);
+      await loadQuizzes();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to delete quiz.");
     }
   };
 
@@ -408,7 +399,11 @@ export default function AdminQuizzes() {
         </div>
 
         {/* Quizzes List */}
-        {filteredQuizzes.length === 0 ? (
+        {isLoadingQuizzes ? (
+          <div className="flex items-center justify-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm text-gray-500">
+            Loading quizzes…
+          </div>
+        ) : filteredQuizzes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
               <HelpCircle className="w-8 h-8 text-gray-400" />
@@ -755,9 +750,10 @@ export default function AdminQuizzes() {
               <button
                 type="button"
                 onClick={handleSaveQuiz}
+                disabled={isSavingQuiz}
                 className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:opacity-90 transition-opacity"
               >
-                {isEditing ? "Save Changes" : "Create Quiz"}
+                {isSavingQuiz ? "Saving…" : isEditing ? "Save Changes" : "Create Quiz"}
               </button>
             </div>
           </div>

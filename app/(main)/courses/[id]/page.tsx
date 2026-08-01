@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
+import { fetchLearnerQuizzes, recordQuizCompletion } from "@/app/lib/quiz-completion";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
@@ -249,26 +250,27 @@ export default function CoursePlayerPage() {
 
   useEffect(() => {
     if (course) {
-      // 1. Fetch quizzes from localStorage
-      const saved = localStorage.getItem("automate_portal_quizzes");
-      let allQuizzes = [];
-      if (saved) {
+      // The authenticated server route verifies the learner's current
+      // course-specific Pro/Premium enrollment before returning definitions.
+      const fetchQuizzes = async () => {
         try {
-          allQuizzes = JSON.parse(saved);
-        } catch (e) {
-          console.error("Failed to parse quizzes:", e);
+          const data = await fetchLearnerQuizzes(String(id));
+          setCourseQuizzes((data || []).map((quiz) => ({
+            id: String(quiz.id),
+            courseId: quiz.course_id,
+            courseName: course.title,
+            title: quiz.title,
+            questions: Array.isArray(quiz.questions) ? quiz.questions : [],
+            questionsCount: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+            passingScore: Number(quiz.passing_score || 80),
+            status: quiz.status,
+          })));
+        } catch (error) {
+          console.error("Failed to fetch quizzes:", error);
+          setCourseQuizzes([]);
         }
-      }
-
-      // 2. Filter quizzes for this course + batch access
-      const filteredQuizzes = allQuizzes.filter((q: any) => {
-        if (q.status !== "Active") return false;
-        const courseMatch = String(q.courseId) === String(id) ||
-          q.courseName.toLowerCase() === course.title.toLowerCase();
-        if (!courseMatch) return false;
-        return true;
-      });
-      setCourseQuizzes(filteredQuizzes);
+      };
+      void fetchQuizzes();
 
       // 3. Fetch artifacts directly from Supabase (admin panel saves to DB, not localStorage)
       const fetchArtifacts = async () => {
@@ -425,7 +427,7 @@ export default function CoursePlayerPage() {
     setCurrentQuestionIndex((prev) => prev + 1);
   };
 
-  const handleViewResults = () => {
+  const handleViewResults = async () => {
     if (!activeQuiz) return;
     const totalQuestions = activeQuiz.questions.length;
     const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
@@ -446,6 +448,11 @@ export default function CoursePlayerPage() {
     }
 
     setQuizStep("results");
+    try {
+      await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
+    } catch (error) {
+      console.error("Unable to record quiz completion:", error);
+    }
   };
 
   const handleRestartQuiz = () => {

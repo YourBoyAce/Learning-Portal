@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
+import { fetchLearnerQuizzes, type LearnerQuizDefinition, recordQuizCompletion } from "@/app/lib/quiz-completion";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -99,8 +100,6 @@ export default function StudentPracticeCenter() {
   }, [searchParams]);
   
   // Enrolled Courses & Data State
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState<string[]>([]);
-  const [coursesMap, setCoursesMap] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [artifacts, setArtifacts] = useState<any[]>([]);
   const [bestScores, setBestScores] = useState<Record<string, Record<string, number>>>({}); // courseId -> quizId -> score
@@ -135,7 +134,6 @@ export default function StudentPracticeCenter() {
 
         if (enrollError) throw enrollError;
         const enrolledIds = (enrollments || []).map(e => String(e.course_id));
-        setEnrolledCourseIds(enrolledIds);
 
         // 3. Fetch courses to build Name mapping
         const { data: dbCourses } = await supabase
@@ -143,30 +141,35 @@ export default function StudentPracticeCenter() {
           .select("id, title");
 
         const mapping: Record<string, string> = {};
-        const enrolledTitles: string[] = [];
         if (dbCourses) {
           dbCourses.forEach(c => {
             mapping[String(c.id)] = c.title;
-            if (enrolledIds.includes(String(c.id))) {
-              enrolledTitles.push(c.title.toLowerCase());
-            }
           });
-          setCoursesMap(mapping);
         }
 
-        // 4. Load & Filter Quizzes from localStorage
-        const savedQuizzes = localStorage.getItem("automate_portal_quizzes");
-        let allQuizzes = [];
-        if (savedQuizzes) {
-          try { allQuizzes = JSON.parse(savedQuizzes); } catch (e) { console.error(e); }
+        // The authenticated server route verifies the learner's active,
+        // course-specific Pro/Premium enrollment before returning definitions.
+        let quizRows: LearnerQuizDefinition[] = [];
+        try {
+          quizRows = await fetchLearnerQuizzes();
+        } catch (quizError) {
+          console.error("Quiz fetch error:", quizError);
+          setQuizzes([]);
         }
-
-        const filteredQuizzes = allQuizzes.filter((q: any) => {
-          if (q.status !== "Active") return false;
-          return enrolledIds.includes(String(q.courseId)) ||
-            enrolledTitles.includes(q.courseName.toLowerCase());
-        });
-        setQuizzes(filteredQuizzes);
+        if (quizRows.length > 0) {
+          setQuizzes((quizRows || []).map((quiz) => ({
+            id: String(quiz.id),
+            courseId: quiz.course_id,
+            courseName: mapping[String(quiz.course_id)] || "Unknown Course",
+            title: quiz.title,
+            questions: Array.isArray(quiz.questions) ? quiz.questions : [],
+            questionsCount: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+            passingScore: Number(quiz.passing_score || 80),
+            status: quiz.status,
+          })));
+        } else {
+          setQuizzes([]);
+        }
 
 // 5. Load Artifacts from Supabase
 const { data: artifactsData, error: artifactsError } = await supabase
@@ -262,7 +265,7 @@ if (artifactsError) {
     setCurrentQuestionIndex(prev => prev + 1);
   };
 
-  const handleViewResults = () => {
+  const handleViewResults = async () => {
     if (!activeQuiz) return;
     const totalQuestions = activeQuiz.questions.length;
     const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
@@ -288,6 +291,11 @@ if (artifactsError) {
     }
     
     setQuizStep("results");
+    try {
+      await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
+    } catch (error) {
+      console.error("Unable to record quiz completion:", error);
+    }
   };
 
   const handleRestartQuiz = () => {
