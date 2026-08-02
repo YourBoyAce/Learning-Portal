@@ -24,6 +24,10 @@ import {
   LogOut,
   Trash2,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  ShieldCheck,
 } from "lucide-react";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 
@@ -88,6 +92,10 @@ export default function AdminUsers() {
   const [filterQuery, setFilterQuery] = useState("");
   const [filterType, setFilterType] = useState<"email" | "role">("email");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<"users" | "mentors" | "admins">("users");
+  const ITEMS_PER_PAGE = 6;
 
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -209,11 +217,35 @@ export default function AdminUsers() {
     setIsSubmitting(false);
   };
 
+  const getCategory = (r: string) => {
+    const roleStr = r?.toLowerCase() || "";
+    if (roleStr === "admin") return "admins";
+    if (roleStr === "instructor" || roleStr === "mentor") return "mentors";
+    return "users";
+  };
+
+  const usersCategory = users.filter((u) => getCategory(u.role) === "users");
+  const mentorsCategory = users.filter((u) => getCategory(u.role) === "mentors");
+  const adminsCategory = users.filter((u) => getCategory(u.role) === "admins");
+  const activeCategoryUsers =
+    activeTab === "users"
+      ? usersCategory
+      : activeTab === "mentors"
+        ? mentorsCategory
+        : adminsCategory;
+
   const handleDownloadCSV = () => {
-    const headers = ["ID", "Name", "Email", "Role", "Sessions Today", "Time Spent Today"];
+    const headers = [
+      "ID",
+      "Name",
+      "Email",
+      "Role",
+      "Sessions Today",
+      "Time Spent Today",
+    ];
     const csvContent = [
       headers.join(","),
-      ...users.map(
+      ...activeCategoryUsers.map(
         (u) =>
           `"${u.id}","${u.name}","${u.email}","${u.role}","${u.todaySessions.length}","${formatDuration(u.todayTimeSpentSeconds)}"`,
       ),
@@ -222,7 +254,7 @@ export default function AdminUsers() {
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "users.csv";
+    link.download = `${activeTab}.csv`;
     link.click();
   };
 
@@ -256,13 +288,26 @@ export default function AdminUsers() {
     }
   };
 
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = activeCategoryUsers.filter((user) => {
     if (!filterQuery) return true;
     const query = filterQuery.toLowerCase();
     if (filterType === "email") return user.email.toLowerCase().includes(query);
     if (filterType === "role") return user.role.toLowerCase().includes(query);
     return true;
   });
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedUsers = filteredUsers.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="min-h-screen bg-surface-subtle p-4 sm:p-6 lg:p-10 font-sans text-gray-900">
@@ -456,7 +501,84 @@ export default function AdminUsers() {
           {/* RIGHT COLUMN: USER REGISTRY TABLE */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-2"}>User Registry</h3>
+              <div className="flex flex-wrap items-center gap-4">
+                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>User Registry</h3>
+
+                {/* TAB TOGGLE: USERS VS MENTORS VS ADMINS */}
+                <div className="flex items-center gap-1 bg-gray-100/80 p-1 rounded-xl">
+                  <button
+                    onClick={() => {
+                      setActiveTab("users");
+                      setCurrentPage(1);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      activeTab === "users"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <Users size={14} />
+                    Users
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                        activeTab === "users"
+                          ? "bg-brand-primary/10 text-brand-primary font-bold"
+                          : "bg-gray-200/70 text-gray-600"
+                      }`}
+                    >
+                      {usersCategory.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab("mentors");
+                      setCurrentPage(1);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      activeTab === "mentors"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <GraduationCap size={14} />
+                    Mentors
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                        activeTab === "mentors"
+                          ? "bg-purple-500/10 text-purple-600 font-bold"
+                          : "bg-gray-200/70 text-gray-600"
+                      }`}
+                    >
+                      {mentorsCategory.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab("admins");
+                      setCurrentPage(1);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      activeTab === "admins"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <ShieldCheck size={14} />
+                    Admins
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                        activeTab === "admins"
+                          ? "bg-red-500/10 text-red-600 font-bold"
+                          : "bg-gray-200/70 text-gray-600"
+                      }`}
+                    >
+                      {adminsCategory.length}
+                    </span>
+                  </button>
+                </div>
+              </div>
 
               <div className="flex items-center gap-3">
                 <div className="relative flex items-center">
@@ -467,7 +589,10 @@ export default function AdminUsers() {
                     type="text"
                     placeholder={`Search by ${filterType}...`}
                     value={filterQuery}
-                    onChange={(e) => setFilterQuery(e.target.value)}
+                    onChange={(e) => {
+                      setFilterQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="w-full sm:w-[200px] pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-primary"
                   />
                 </div>
@@ -486,6 +611,7 @@ export default function AdminUsers() {
                       <button
                         onClick={() => {
                           setFilterType("email");
+                          setCurrentPage(1);
                           setShowFilterDropdown(false);
                         }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "email" ? "text-brand-primary font-semibold" : "text-gray-600"}`}
@@ -496,6 +622,7 @@ export default function AdminUsers() {
                       <button
                         onClick={() => {
                           setFilterType("role");
+                          setCurrentPage(1);
                           setShowFilterDropdown(false);
                         }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${filterType === "role" ? "text-brand-primary font-semibold" : "text-gray-600"}`}
@@ -522,7 +649,7 @@ export default function AdminUsers() {
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      User
+                      {activeTab === "mentors" ? "Mentor" : activeTab === "admins" ? "Admin" : "User"}
                     </th>
                     <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
                       Role
@@ -542,17 +669,17 @@ export default function AdminUsers() {
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="text-center py-10 text-gray-500">
-                        Loading users...
+                        Loading {activeTab}...
                       </td>
                     </tr>
                   ) : filteredUsers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-10 text-gray-500">
-                        No users found.
+                        No {activeTab} found.
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user) => (
+                    paginatedUsers.map((user) => (
                       <tr
                         key={user.id}
                         className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors"
@@ -679,6 +806,77 @@ export default function AdminUsers() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {!loading && filteredUsers.length > 0 && (
+              <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/30">
+                <p className="text-xs text-gray-500 font-medium">
+                  Showing{" "}
+                  <span className="font-semibold text-gray-800">
+                    {startIndex + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-semibold text-gray-800">
+                    {Math.min(startIndex + ITEMS_PER_PAGE, filteredUsers.length)}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-gray-800">
+                    {filteredUsers.length}
+                  </span>{" "}
+                  {activeTab}
+                </p>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(
+                      (page) =>
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - currentPage) <= 1,
+                    )
+                    .map((page, idx, array) => {
+                      const showEllipsis = idx > 0 && page - array[idx - 1] > 1;
+                      return (
+                        <div key={page} className="flex items-center gap-1">
+                          {showEllipsis && (
+                            <span className="px-1 text-xs text-gray-400 select-none">
+                              ...
+                            </span>
+                          )}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
+                              currentPage === page
+                                ? "bg-brand-primary text-white shadow-sm"
+                                : "text-gray-600 border border-gray-200 hover:bg-white"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Next Page"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
