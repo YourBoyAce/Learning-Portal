@@ -41,9 +41,9 @@ interface Artifact {
   filePath?: string;
 }
 
-interface Batch {
+interface Product {
   id: number | string;
-  name: string;
+  title: string;
 }
 
 
@@ -117,12 +117,12 @@ export default function AdminArtifacts() {
   const [deletingArtifact, setDeletingArtifact] =
     useState<Artifact | null>(null);
 
-  const [batchId, setBatchId] = useState<string | number>("");
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | number>("");
+  const [products, setProducts] = useState<Product[]>([]);
 
   // Courses
   const [dbCourses, setDbCourses] = useState<
-    { id: string | number; title: string }[]
+    { id: string | number; title: string; product_id?: number | string | null }[]
   >([]);
 
   /* =========================================================
@@ -132,18 +132,18 @@ export default function AdminArtifacts() {
   useEffect(() => {
     loadCourses();
     loadArtifacts();
-    loadBatches();
+    loadProducts();
   }, []);
 
-  const loadBatches = async () => {
+  const loadProducts = async () => {
     try {
       const { data, error } = await supabase
-        .from("batches")
-        .select("id, name")
-        .order("name", { ascending: true });
-      if (data && !error) setBatches(data);
+        .from("products")
+        .select("id, title")
+        .order("title", { ascending: true });
+      if (data && !error) setProducts(data);
     } catch (err) {
-      console.error("Failed to load batches:", err);
+      console.error("Failed to load products:", err);
     }
   };
 
@@ -151,7 +151,7 @@ export default function AdminArtifacts() {
     try {
       const { data, error } = await supabase
         .from("maincourses")
-        .select("id, title")
+        .select("id, title, product_id")
         .order("title", { ascending: true });
 
       if (error) {
@@ -212,31 +212,16 @@ export default function AdminArtifacts() {
 
   const handleCreateNew = () => {
     setIsEditing(false);
-
     setEditingArtifactId(null);
-
     setArtName("");
-
     setArtType("PDF");
-
-    if (dbCourses.length > 0) {
-      setCourseId(dbCourses[0].id);
-      setCourseName(dbCourses[0].title);
-    } else {
-      setCourseId("");
-      setCourseName("");
-    }
-
+    setCourseId("");
+    setCourseName("");
+    setSelectedProductId("");
     setArtSize("1.0 MB");
-
     setStatus("Published");
-
     setDescription("");
-
     setSelectedFile(null);
-
-    setBatchId("");
-
     setShowModal(true);
   };
 
@@ -246,27 +231,24 @@ export default function AdminArtifacts() {
 
   const handleEdit = (art: Artifact) => {
     setIsEditing(true);
-
     setEditingArtifactId(art.id);
-
     setArtName(art.name);
-
     setArtType(art.type);
-
     setCourseName(art.courseName);
-
     setCourseId(art.courseId || "");
-
-    setBatchId(art.batchId || "");
+    
+    if (art.courseId) {
+      const match = dbCourses.find(c => String(c.id) === String(art.courseId));
+      if (match && match.product_id) setSelectedProductId(String(match.product_id));
+      else setSelectedProductId("");
+    } else {
+      setSelectedProductId("");
+    }
 
     setArtSize(art.size);
-
     setStatus(art.status);
-
     setDescription(art.description);
-
     setSelectedFile(null);
-
     setShowModal(true);
   };
 
@@ -408,7 +390,6 @@ export default function AdminArtifacts() {
             type: artType,
             description,
             course_id: courseId,
-            batch_id: batchId || null,
             size: artSize,
             status,
             file_url:
@@ -436,7 +417,6 @@ export default function AdminArtifacts() {
             type: artType,
             description,
             course_id: courseId,
-            batch_id: batchId || null,
             size: artSize,
             status,
             file_url: fileUrl,
@@ -922,56 +902,58 @@ export default function AdminArtifacts() {
                 />
               </div>
 
-              {/* Course Selection */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                  Associated Course
-                </label>
-                <select
-                  value={courseId}
-                  onChange={(e) => {
-                    const selectedId = e.target.value;
-                    setCourseId(selectedId);
-                    const courseObj = dbCourses.find((c) => String(c.id) === String(selectedId));
-                    if (courseObj) {
-                      setCourseName(courseObj.title);
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
-                >
-                  {dbCourses.length > 0 ? (
-                    dbCourses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title}
+              {/* Product and Course */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Product */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Product
+                  </label>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => {
+                      setSelectedProductId(e.target.value);
+                      setCourseId("");
+                      setCourseName("");
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                  >
+                    <option value="">— Select Product —</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
                       </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Playwright Mastery">Playwright Mastery</option>
-                      <option value="CI/CD Foundations">CI/CD Foundations</option>
-                      <option value="Ultimate Automation">Ultimate Automation</option>
-                    </>
-                  )}
-                </select>
-              </div>
+                    ))}
+                  </select>
+                </div>
 
-              {/* Assigned Batch */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                  Assigned Batch
-                </label>
-                <select
-                  value={batchId}
-                  onChange={(e) => setBatchId(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
-                >
-                  <option value="">— No Batch —</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                {/* Course Selection */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Associated Course
+                  </label>
+                  <select
+                    value={courseId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setCourseId(selectedId);
+                      const courseObj = dbCourses.find((c) => String(c.id) === String(selectedId));
+                      if (courseObj) {
+                        setCourseName(courseObj.title);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                  >
+                    <option value="">— Select Course —</option>
+                    {dbCourses
+                      .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
 
               {/* Type & Status */}

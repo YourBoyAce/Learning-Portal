@@ -243,7 +243,7 @@ export default function Dashboard() {
 
     const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id) || [];
     const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id) || [];
-    
+
     // Combine and deduplicate course IDs
     const allCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
 
@@ -259,7 +259,7 @@ export default function Dashboard() {
           thumbnail_url
         `)
         .in("id", allCourseIds);
-        
+
       mappedCourses = maincoursesData || [];
     }
 
@@ -785,7 +785,7 @@ export default function Dashboard() {
         </div>
 
         {/* Upcoming Webinars Widget */}
-        {/* --- Side-by-Side Layout: Webinars & Course Allocations --- */}
+        {/* --- Side-by-Side Layout: Webinars & Learning Activity Graph --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
 
           {/* 1. Upcoming Webinars Widget */}
@@ -873,117 +873,80 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 2. Enrollment Summary / Course Allocations Widget */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-7 shadow-sm flex flex-col h-full">
-
-            <div className="flex items-center justify-between mb-6 pb-5 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center">
-                  <Image src={ICONS.USERS} alt="Users" width={20} height={20} />
-                </div>
-                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                  Course Allocations
-                </h2>
-              </div>
-              <span className="text-[10px] font-bold px-3 py-1.5 bg-surface-accent text-brand-primary rounded-md uppercase tracking-widest border border-brand-primary/10">
-                {enrollments.length} Active
-              </span>
+          <section className="h-full flex flex-col rounded-2xl border border-gray-100 bg-white p-5 sm:p-7 shadow-sm">
+            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div><h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Learning Activity</h2><p className="mt-1 text-sm text-gray-500">Your completed learning activity this week.</p></div>
+              <div className="text-left sm:text-right"><p className="text-lg font-bold text-brand-primary">{learningActivityMeta.earnedToday} / {learningActivityMeta.availableToday} points</p>{learningActivityMeta.currentPlan && <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{learningActivityMeta.currentPlan}</p>}</div>
             </div>
-
-            <div className="flex-1 flex flex-col">
-              {enrollments.length === 0 ? (
-                <div className="h-full py-8 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
-                    <FolderOpen className="text-gray-400 w-8 h-8" />
-                  </div>
-                  <p className="text-gray-800 font-semibold text-lg mb-1">No Active Cohorts</p>
-                  <p className="text-gray-500 text-sm max-w-[200px]">
-                    You haven't been allocated to any specific batches yet.
-                  </p>
-                </div>
-              ) : (
-                <Carousel
-                  opts={{ align: "start", loop: false, dragFree: true }}
-                  className="w-full relative"
+            <div className="flex-1 min-h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={learningActivity}
+                  margin={{
+                    top: 16,
+                    right: 16,
+                    left: 8,
+                    bottom: 8,
+                  }}
                 >
-                  <CarouselContent className="-ml-4 pb-2">
-                    {enrollments.map((item) => (
-                      <CarouselItem
-                        key={`${item.batchId}-${item.courseId}`}
-                        className="pl-4 basis-full sm:basis-1/2"
-                      >
-                        <div className="h-full min-h-[420px] flex items-stretch w-full shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl bg-white border border-gray-100 hover:border-brand-primary/20 cursor-default overflow-hidden group flex-col">
-                      {/* Thumbnail */}
-                      <div className="relative w-full aspect-[16/9] bg-gradient-to-br from-brand-primary/10 to-brand-success/10 overflow-hidden flex-shrink-0">
-                        <img
-                          src={item.courseThumbnail || "https://images.unsplash.com/photo-1498050108023-c5249f4df085"}
-                          alt={item.courseTitle}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                  <XAxis
+                    dataKey="day"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{
+                      fill: "#6b7280",
+                      fontSize: 12,
+                    }}
+                    padding={{
+                      left: 12,
+                      right: 12,
+                    }}
+                  />
 
-                        {/* Category Badge */}
-                        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-brand-primary uppercase tracking-widest shadow-md">
-                          {item.courseCategory || "General"}
-                        </div>
-                      </div>
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{
+                      fill: "#6b7280",
+                      fontSize: 12,
+                    }}
+                    allowDecimals={false}
+                    width={32}
+                  />
 
-                      {/* Content */}
-                      <div className="flex-1 flex flex-col px-6 pt-5 pb-5">
-                        <h3 className="font-bold text-gray-900 mb-2 leading-snug line-clamp-2 text-sm group-hover:text-brand-primary transition-colors">
-                          {item.courseTitle}
-                        </h3>
+                  <Tooltip
+                    formatter={(_value: any, _name: any, item: any) => [
+                      `${item.payload.earnedPoints} / ${item.payload.availablePoints} points`,
+                      "Activity",
+                    ]}
+                    labelStyle={{
+                      color: "#111827",
+                    }}
+                    contentStyle={{
+                      borderRadius: 12,
+                      borderColor: "#e5e7eb",
+                    }}
+                  />
 
-                        <p className="text-gray-600 text-xs line-clamp-2 mb-4 flex-1">
-                          {item.courseDescription || "No description available."}
-                        </p>
-
-                        {/* Batch info */}
-                        <div className="space-y-3 pt-3 border-t border-gray-100">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Batch</span>
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-brand-primary/10 text-brand-primary text-[10px] font-bold uppercase tracking-wider truncate max-w-[140px]" title={item.batchName}>
-                              {item.batchName}
-                            </span>
-                          </div>
-
-                          {item.startDate && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Start Date</span>
-                              <span className="text-[11px] font-semibold text-gray-700">
-                                {new Date(item.startDate).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric"
-                                })}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Status */}
-                          <div className="flex items-center gap-2 pt-2">
-                            <div className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </div>
-                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
-                          </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CarouselItem>
-                  ))}
-                  </CarouselContent>
-                  {enrollments.length > 2 && (
-                    <>
-                      <CarouselPrevious className="hidden sm:flex -left-4 bg-white shadow-md border border-gray-100 text-brand-primary hover:bg-gray-50 z-10" />
-                      <CarouselNext className="hidden sm:flex -right-4 bg-white shadow-md border border-gray-100 text-brand-primary hover:bg-gray-50 z-10" />
-                    </>
-                  )}
-                </Carousel>
-              )}
+                  <Line
+                    type="monotone"
+                    dataKey="activityPercent"
+                    stroke="var(--color-brand-primary, #2283ff)"
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: "var(--color-brand-primary, #2283ff)",
+                      strokeWidth: 0,
+                    }}
+                    activeDot={{
+                      r: 6,
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-          </div>
+            <p className="mt-3 text-xs text-gray-400">Activity is shown relative to the points available in your enrolled courses.</p>
+          </section>
 
         </div>
 
@@ -1180,14 +1143,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <section className="mb-12 rounded-2xl border border-gray-100 bg-white p-5 sm:p-7 shadow-sm">
-          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div><h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Learning Activity</h2><p className="mt-1 text-sm text-gray-500">Your completed learning activity this week.</p></div>
-            <div className="text-left sm:text-right"><p className="text-lg font-bold text-brand-primary">{learningActivityMeta.earnedToday} / {learningActivityMeta.availableToday} points</p>{learningActivityMeta.currentPlan && <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{learningActivityMeta.currentPlan}</p>}</div>
-          </div>
-          <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={learningActivity} margin={{ top: 12, right: 12, left: -18, bottom: 0 }}><XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: "#6b7280", fontSize: 12 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "#6b7280", fontSize: 12 }} allowDecimals={false} /><Tooltip formatter={(_value: any, _name: any, item: any) => [`${item.payload.earnedPoints} / ${item.payload.availablePoints} points`, "Activity"]} labelStyle={{ color: "#111827" }} contentStyle={{ borderRadius: 12, borderColor: "#e5e7eb" }} /><Line type="monotone" dataKey="activityPercent" stroke="var(--color-brand-primary, #2283ff)" strokeWidth={3} dot={{ r: 4, fill: "var(--color-brand-primary, #2283ff)", strokeWidth: 0 }} activeDot={{ r: 6 }} /></LineChart></ResponsiveContainer></div>
-          <p className="mt-3 text-xs text-gray-400">Activity is shown relative to the points available in your enrolled courses.</p>
-        </section>
+
 
         {/* Active Studies Grid / Carousel — driven by batch enrollments */}
         {(() => {

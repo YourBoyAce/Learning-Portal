@@ -801,6 +801,9 @@ export default function AdminCourses() {
       return dateB - dateA; // Descending order (newest first)
     });
 
+  const activeCoursesCount = courses.filter((c) => c.course_type !== "upcoming").length;
+  const upcomingCoursesCount = courses.filter((c) => c.course_type === "upcoming").length;
+
   const stats = [
     {
       label: "Total Courses",
@@ -809,8 +812,13 @@ export default function AdminCourses() {
     },
     {
       label: "Active Courses",
-      value: courses.length.toString(),
+      value: activeCoursesCount.toString(),
       icon: ICONS.GLOBE,
+    },
+    {
+      label: "Upcoming Courses",
+      value: upcomingCoursesCount.toString(),
+      icon: ICONS.CLOCK,
     },
   ];
 
@@ -844,7 +852,7 @@ export default function AdminCourses() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}

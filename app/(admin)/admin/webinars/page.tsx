@@ -35,9 +35,9 @@ interface Webinar {
   batch_id?: number | string | null;
 }
 
-interface Batch {
+interface Product {
   id: number | string;
-  name: string;
+  title: string;
 }
 
 export default function AdminWebinarsPage() {
@@ -66,24 +66,39 @@ export default function AdminWebinarsPage() {
   const [status, setStatus] = useState("streaming");
   const [linkText, setLinkText] = useState("");
   const [attendeesCount, setAttendeesCount] = useState(0);
-  const [batchId, setBatchId] = useState<string | number>("");
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | number>("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string; product_id?: number | string | null }[]>([]);
+  const [courseId, setCourseId] = useState<string | number>("");
 
   useEffect(() => {
     /* eslint-disable */
     fetchWebinars();
-    fetchBatches();
+    fetchProducts();
+    fetchCourses();
   }, []);
 
-  const fetchBatches = async () => {
+  const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
-        .from("batches")
-        .select("id, name")
-        .order("name", { ascending: true });
-      if (data && !error) setBatches(data);
+        .from("products")
+        .select("id, title")
+        .order("title", { ascending: true });
+      if (data && !error) setProducts(data);
     } catch (err) {
-      console.error("Failed to fetch batches:", err);
+      console.error("Failed to fetch products:", err);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("maincourses")
+        .select("id, title, product_id")
+        .order("title", { ascending: true });
+      if (data && !error) setDbCourses(data);
+    } catch (err) {
+      console.error("Failed to fetch courses:", err);
     }
   };
 
@@ -112,11 +127,12 @@ export default function AdminWebinarsPage() {
       setSubtitle(webinar.subtitle || "");
       setDescription(webinar.description || "");
       setEventDate(webinar.event_date || "");
-      setIcon(webinar.icon || "ðŸ“‹");
+      setIcon(webinar.icon || "📋");
       setStatus(webinar.status || "streaming");
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
-      setBatchId(webinar.batch_id || "");
+      setSelectedProductId("");
+      setCourseId("");
     } else {
       setIsEditing(false);
       setEditingId(null);
@@ -124,11 +140,12 @@ export default function AdminWebinarsPage() {
       setSubtitle("");
       setDescription("");
       setEventDate("");
-      setIcon("ðŸ“‹");
+      setIcon("📋");
       setStatus("streaming");
       setLinkText("");
       setAttendeesCount(0);
-      setBatchId("");
+      setSelectedProductId("");
+      setCourseId("");
     }
     setShowModal(true);
   };
@@ -150,7 +167,6 @@ export default function AdminWebinarsPage() {
         status,
         link_text: linkText,
         attendees_count: attendeesCount,
-        batch_id: batchId || null,
       };
 
       if (isEditing && editingId) {
@@ -467,22 +483,46 @@ export default function AdminWebinarsPage() {
                     </select>
                   </div>
 
-                  {/* Assigned Batch */}
+                  {/* Product */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                      Assigned Batch
+                      Product
                     </label>
                     <select
-                      value={batchId}
-                      onChange={(e) => setBatchId(e.target.value)}
+                      value={selectedProductId}
+                      onChange={(e) => {
+                        setSelectedProductId(e.target.value);
+                        setCourseId("");
+                      }}
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
-                      <option value="">— No Batch —</option>
-                      {batches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
+                      <option value="">— Select Product —</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
                         </option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Associated Course */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                      Associated Course
+                    </label>
+                    <select
+                      value={courseId}
+                      onChange={(e) => setCourseId(e.target.value)}
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
+                    >
+                      <option value="">— Select Course —</option>
+                      {dbCourses
+                        .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.title}
+                          </option>
+                        ))}
                     </select>
                   </div>
 

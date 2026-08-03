@@ -39,9 +39,9 @@ interface Quiz {
   questions: Question[];
 }
 
-interface Batch {
+interface Product {
   id: number | string;
-  name: string;
+  title: string;
 }
 
 interface DatabaseQuiz {
@@ -109,9 +109,9 @@ export default function AdminQuizzes() {
   const [questions, setQuestions] = useState<Question[]>(() =>
     createEmptyQuestions(DEFAULT_QUESTION_COUNT),
   );
-  const [batchId, setBatchId] = useState<string | number>("");
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | number>("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string; product_id?: number | string | null }[]>([]);
 
   // AI Assist question count — drives how many question slots appear below
   const [qCount, setQCount] = useState(DEFAULT_QUESTION_COUNT);
@@ -147,7 +147,7 @@ export default function AdminQuizzes() {
       try {
         const { data, error } = await supabase
           .from("maincourses")
-          .select("id, title")
+          .select("id, title, product_id")
           .order("title", { ascending: true });
         if (data && !error) setDbCourses(data);
       } catch (err) {
@@ -156,18 +156,18 @@ export default function AdminQuizzes() {
     };
     loadCourses();
 
-    const loadBatches = async () => {
+    const loadProducts = async () => {
       try {
         const { data, error } = await supabase
-          .from("batches")
-          .select("id, name")
-          .order("name", { ascending: true });
-        if (data && !error) setBatches(data);
+          .from("products")
+          .select("id, title")
+          .order("title", { ascending: true });
+        if (data && !error) setProducts(data);
       } catch (err) {
-        console.error("Failed to load batches:", err);
+        console.error("Failed to load products:", err);
       }
     };
-    loadBatches();
+    loadProducts();
 
     void loadQuizzes();
     // The API is intentionally loaded once when the admin page opens.
@@ -178,16 +178,11 @@ export default function AdminQuizzes() {
     setIsEditing(false);
     setEditingQuizId(null);
     setQuizTitle("");
-    if (dbCourses.length > 0) {
-      setCourseId(dbCourses[0].id);
-      setCourseName(dbCourses[0].title);
-    } else {
-      setCourseId("");
-      setCourseName("Playwright Mastery");
-    }
+    setCourseName("");
+    setCourseId("");
+    setSelectedProductId("");
     setPassingScore(80);
     setStatus("Active");
-    setBatchId("");
     setQCount(DEFAULT_QUESTION_COUNT);
     setQuestions(createEmptyQuestions(DEFAULT_QUESTION_COUNT));
     setShowModal(true);
@@ -222,7 +217,15 @@ export default function AdminQuizzes() {
     setQuizTitle(quiz.title);
     setCourseName(quiz.courseName);
     setCourseId(quiz.courseId || "");
-    setBatchId(quiz.batchId || "");
+
+    if (quiz.courseId) {
+      const match = dbCourses.find(c => String(c.id) === String(quiz.courseId));
+      if (match && match.product_id) setSelectedProductId(String(match.product_id));
+      else setSelectedProductId("");
+    } else {
+      setSelectedProductId("");
+    }
+
     setPassingScore(quiz.passingScore);
     setStatus(quiz.status);
     const loadedQuestions =
@@ -597,6 +600,26 @@ export default function AdminQuizzes() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
+                {/* Product */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Product</label>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => {
+                      setSelectedProductId(e.target.value);
+                      setCourseId("");
+                      setCourseName("");
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                  >
+                    <option value="">— Select Product —</option>
+                    {products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Course */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
                   <select
@@ -609,152 +632,134 @@ export default function AdminQuizzes() {
                     }}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
-                    {dbCourses.length === 0 ? (
-                      <>
-                        <option value="Playwright Mastery">Playwright Mastery</option>
-                        <option value="CI/CD Foundations">CI/CD Foundations</option>
-                        <option value="Ultimate Automation">Ultimate Automation</option>
-                      </>
-                    ) : (
-                      dbCourses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)
-                    )}
+                    <option value="">— Select Course —</option>
+                    {dbCourses
+                      .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
+                      .map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                   </select>
                 </div>
-              </div>
 
-              {/* Batch */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Assigned Batch</label>
-                <select
-                  value={batchId}
-                  onChange={(e) => setBatchId(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                >
-                  <option value="">— No Batch —</option>
-                  {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-
-              {/* Passing Score & Status */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Passing Score (%)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={passingScore}
-                    onChange={(e) => setPassingScore(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Status</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Questions List */}
-              <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Questions List</label>
-                  <button
-                    type="button"
-                    onClick={handleAddQuestion}
-                    className="text-brand-primary text-xs font-semibold flex items-center gap-1 border border-brand-primary/20 px-3 py-1.5 rounded-lg hover:bg-brand-primary/10 transition-colors"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    Add Question
-                  </button>
-                </div>
-
-                {questions.map((question, qIdx) => (
-                  <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-                    <div className="flex items-start gap-4">
-                      <span className="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold flex items-center justify-center shrink-0">
-                        {qIdx + 1}
-                      </span>
-                      <textarea
-                        placeholder="Type your multiple choice question here..."
-                        value={question.text}
-                        onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
-                        rows={2}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
-                      />
-                      {questions.length > MIN_QUESTION_COUNT && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveQuestion(qIdx)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Options */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
-                      {question.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-gray-400 uppercase w-4">
-                            {String.fromCharCode(65 + oIdx)}
-                          </span>
-                          <input
-                            type="text"
-                            placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
-                            value={opt}
-                            onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Correct Answer */}
-                    <div className="flex items-center gap-3 sm:pl-10 pt-2 border-t border-dashed border-gray-100">
-                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                        Correct Answer:
-                      </label>
-                      <select
-                        value={question.correctAnswer}
-                        onChange={(e) => handleCorrectAnswerChange(qIdx, Number(e.target.value))}
-                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
-                      >
-                        <option value={0}>Option A</option>
-                        <option value={1}>Option B</option>
-                        <option value={2}>Option C</option>
-                        <option value={3}>Option D</option>
-                      </select>
-                    </div>
+                {/* Passing Score & Status */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Passing Score (%)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={passingScore}
+                      onChange={(e) => setPassingScore(Number(e.target.value))}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                    />
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Status</label>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
 
-            {/* Modal Footer */}
-            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveQuiz}
-                disabled={isSavingQuiz}
-                className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:opacity-90 transition-opacity"
-              >
-                {isSavingQuiz ? "Saving…" : isEditing ? "Save Changes" : "Create Quiz"}
-              </button>
+                {/* Questions List */}
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Questions List</label>
+                    <button
+                      type="button"
+                      onClick={handleAddQuestion}
+                      className="text-brand-primary text-xs font-semibold flex items-center gap-1 border border-brand-primary/20 px-3 py-1.5 rounded-lg hover:bg-brand-primary/10 transition-colors"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      Add Question
+                    </button>
+                  </div>
+
+                  {questions.map((question, qIdx) => (
+                    <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <span className="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold flex items-center justify-center shrink-0">
+                          {qIdx + 1}
+                        </span>
+                        <textarea
+                          placeholder="Type your multiple choice question here..."
+                          value={question.text}
+                          onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                          rows={2}
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
+                        />
+                        {questions.length > MIN_QUESTION_COUNT && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveQuestion(qIdx)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Options */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
+                        {question.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-gray-400 uppercase w-4">
+                              {String.fromCharCode(65 + oIdx)}
+                            </span>
+                            <input
+                              type="text"
+                              placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
+                              value={opt}
+                              onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Correct Answer */}
+                      <div className="flex items-center gap-3 sm:pl-10 pt-2 border-t border-dashed border-gray-100">
+                        <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                          Correct Answer:
+                        </label>
+                        <select
+                          value={question.correctAnswer}
+                          onChange={(e) => handleCorrectAnswerChange(qIdx, Number(e.target.value))}
+                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
+                        >
+                          <option value={0}>Option A</option>
+                          <option value={1}>Option B</option>
+                          <option value={2}>Option C</option>
+                          <option value={3}>Option D</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveQuiz}
+                  disabled={isSavingQuiz}
+                  className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  {isSavingQuiz ? "Saving…" : isEditing ? "Save Changes" : "Create Quiz"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
