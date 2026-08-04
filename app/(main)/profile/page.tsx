@@ -358,7 +358,7 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
 export default function ProfilePage() {
@@ -379,6 +379,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
     type: "",
     text: "",
@@ -495,6 +496,31 @@ export default function ProfilePage() {
     }
   };
 
+  const generateStrongPassword = () => {
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const specials = "!@#$%^&*()_+~`|}{[]:;?><,./-=";
+    
+    let password = "";
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += specials[Math.floor(Math.random() * specials.length)];
+    
+    const allChars = uppercase + lowercase + numbers + specials;
+    for (let i = 0; i < 8; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    password = password.split('').sort(() => 0.5 - Math.random()).join('');
+    
+    setNewPassword(password);
+    setConfirmPassword(password);
+    setShowPassword(true);
+    setPasswordMessage({ type: "success", text: "Strong password suggested and applied!" });
+  };
+
   // --- New Password Update Handler ---
   const handleUpdatePassword = async () => {
     if (!newPassword || !confirmPassword) {
@@ -507,8 +533,13 @@ export default function ProfilePage() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPasswordMessage({ type: "error", text: "Password must be at least 6 characters long." });
+    const hasUppercase = /[A-Z]/.test(newPassword);
+    const hasLowercase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecial = /[!@#$%^&*()_+~`|}{[\]:;?><,./-=]/.test(newPassword);
+
+    if (newPassword.length < 8 || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+      setPasswordMessage({ type: "error", text: "Password must be at least 8 characters long, with 1 uppercase, 1 lowercase, 1 number, and 1 special character." });
       return;
     }
 
@@ -673,35 +704,71 @@ export default function ProfilePage() {
                 </h3>
               </div>
 
-              <p className="text-[13px] text-gray-500 mb-6">
-                Update the default password provided by your administrator to secure your account.
-              </p>
+              <div className="mb-6">
+                <p className="text-[13px] text-gray-500 mb-2">
+                  Update the default password provided by your administrator to secure your account.
+                </p>
+                <ul className="text-[12px] text-gray-400 list-disc list-inside">
+                  <li>At least 8 characters long</li>
+                  <li>At least 1 uppercase letter</li>
+                  <li>At least 1 lowercase letter</li>
+                  <li>At least 1 number</li>
+                  <li>At least 1 special character</li>
+                </ul>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
-                    NEW PASSWORD
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
-                    placeholder="••••••••"
-                  />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                      NEW PASSWORD
+                    </label>
+                    <button
+                      type="button"
+                      onClick={generateStrongPassword}
+                      className="text-[10px] text-brand-primary font-bold uppercase tracking-wider hover:underline"
+                    >
+                      Suggest Password
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors pr-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
                     CONFIRM PASSWORD
                   </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors pr-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
