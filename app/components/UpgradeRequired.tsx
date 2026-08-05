@@ -13,6 +13,7 @@ interface UpgradeRequiredProps {
   userEmail?: string;
   userName?: string;
   userPhone?: string;
+  compact?: boolean;
 }
 
 export function UpgradeRequired({
@@ -23,6 +24,7 @@ export function UpgradeRequired({
   userEmail: propEmail,
   userName: propName,
   userPhone: propPhone,
+  compact = false,
 }: UpgradeRequiredProps) {
   const [email, setEmail] = useState(propEmail || "");
   const [name, setName] = useState(propName || "");
@@ -39,10 +41,10 @@ export function UpgradeRequired({
     async function fetchUser() {
       // If we already have everything, no need to fetch
       if (propEmail && propName && propPhone) return;
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       if (!propEmail) setEmail(user.email || "");
 
       const { data: profile } = await supabase
@@ -50,7 +52,7 @@ export function UpgradeRequired({
         .select("full_name, phone")
         .eq("id", user.id)
         .single();
-      
+
       if (!propName) {
         setName(profile?.full_name || user.user_metadata?.full_name || "");
       }
@@ -69,37 +71,39 @@ export function UpgradeRequired({
   const plansUrl = url.toString();
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-lg transition-all duration-300 hover:shadow-xl sm:p-12 max-w-xl mx-auto my-8">
+    <div className={`relative overflow-hidden border border-gray-100 bg-white text-center transition-all duration-300 hover:shadow-xl mx-auto ${compact ? "rounded-xl p-6 shadow-sm w-full h-full flex flex-col justify-center items-center" : "rounded-3xl p-6 sm:p-12 max-w-xl my-8 shadow-lg"}`}>
       {/* Decorative gradients */}
-      <div className="absolute -left-16 -top-16 h-32 w-32 rounded-full bg-blue-500/10 blur-3xl" />
+      <div className="absolute -left-16 -top-16 h-28 w-32 rounded-full bg-blue-500/10 blur-3xl" />
       <div className="absolute -right-16 -bottom-16 h-32 w-32 rounded-full bg-purple-500/10 blur-3xl" />
 
       {/* Lock Icon Section */}
-      <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-brand-primary border border-blue-100/50 shadow-inner">
-        <Lock className="h-9 w-9 text-brand-heading animate-pulse" />
-        <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-white shadow-md">
+      <div className="relative mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-brand-primary border border-blue-100/50 shadow-inner">
+        <Lock className="h-5 w-5 text-brand-heading animate-pulse" />
+        <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white shadow-md">
           <Sparkles className="h-3 w-3" />
         </div>
       </div>
 
       {/* Content */}
-      <h3 className="mb-3 font-sans text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+      <h3 className="mb-3 font-sans text-md font-bold tracking-tight text-gray-900 sm:text-xl">
         {title}
       </h3>
-      
+
       {/* Required Tier Badge */}
-      <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 uppercase tracking-wider">
+      <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 tracking-wider">
         Requires {requiredTier} Tier
       </div>
 
-      <p className="mx-auto mb-8 max-w-sm text-sm leading-relaxed text-gray-500 font-medium">
-        {description}
-      </p>
+      {description && (
+        <p className="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-gray-500 font-medium">
+          {description}
+        </p>
+      )}
 
       {/* Action Button */}
       <Button
         asChild
-        className="w-full sm:w-auto px-8 py-6 rounded-2xl bg-gradient-to-r from-brand-heading to-brand-primary hover:from-brand-heading-hover hover:to-brand-primary/95 text-white font-bold tracking-wide shadow-md shadow-blue-900/10 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
+        className="w-[50%] sm:w-auto px-6 py-4 rounded-2xl bg-gradient-to-r from-brand-heading to-brand-primary hover:from-brand-heading-hover hover:to-brand-primary/95 text-white font-bold tracking-wide shadow-md shadow-blue-900/10 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
       >
         <a href={plansUrl} target="_blank" rel="noopener noreferrer">
           Upgrade My Plan <ArrowRight className="h-4 w-4" />

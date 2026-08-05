@@ -9,6 +9,8 @@ import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { BookOpen, CheckCircle2, FolderOpen, Users, ShieldAlert, X } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
+import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import Image from "next/image";
 import {
   Carousel,
@@ -47,6 +49,8 @@ type CalendarEvent = {
   event_date: string;
   event_time: string;
   event_type: "video" | "course" | "session" | "webinar";
+  meet_link?: string;
+  mentorName?: string;
 };
 interface Insight {
   id: number;
@@ -96,6 +100,7 @@ export default function Dashboard() {
   const router = useRouter();
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
+  const { isLoading: isTierLoading, canAccess } = useSecurityGatedData();
   const [showPasswordWarning, setShowPasswordWarning] = useState(false);
 
   useEffect(() => {
@@ -169,16 +174,43 @@ export default function Dashboard() {
       .single();
 
     const today = new Date().toISOString().split("T")[0];
+
+    // TODO: Replace with shared Mentor Session helper once Mentor module can be safely refactored.
     const { data: calendarRows } = await supabase
       .from("calendar_events")
-      .select("id,title,description,event_date,event_time,event_type")
-      .eq("user_id", user.id)
+      .select("id,title,description,event_date,event_time,event_type,user_id,meet_link,tag")
+      .like("tag", "%status:accepted%")
+      .like("description", `%Student ID: ${user.id}%`)
       .gte("event_date", today)
       .order("event_date", { ascending: true })
       .order("event_time", { ascending: true })
       .limit(5);
 
-    setUpcomingEvents((calendarRows ?? []) as CalendarEvent[]);
+    let mappedMentorEvents: any[] = [];
+    if (calendarRows && calendarRows.length > 0) {
+      const mentorIds = Array.from(new Set(calendarRows.map((e) => e.user_id)));
+      const { data: mentorProfiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", mentorIds);
+
+      const mentorsMap = new Map();
+      if (mentorProfiles) {
+        mentorProfiles.forEach((p) => mentorsMap.set(p.id, p));
+      }
+
+      mappedMentorEvents = calendarRows.map((event) => {
+        const mentor = mentorsMap.get(event.user_id);
+        const mentorName = mentor?.full_name || "Instructor";
+
+        return {
+          ...event,
+          mentorName,
+        };
+      });
+    }
+
+    setUpcomingEvents(mappedMentorEvents as CalendarEvent[]);
 
     if (session?.access_token) {
       const enrollmentsResponse = await fetch("/api/enrollments", {
@@ -788,12 +820,12 @@ export default function Dashboard() {
         {/* --- Side-by-Side Layout: Webinars & Learning Activity Graph --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
 
-          {/* 1. Upcoming Webinars Widget */}
-          <div className="bg-surface-accent rounded-2xl p-6 md:p-7 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col h-full">
+          {/* 1. Upcoming Mentor Session Widget */}
+          <div className="bg-surface-accent rounded-2xl p-4 md:p-5 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col ">
 
             <div className="flex items-center justify-between mb-3 relative z-10">
               <span className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em]">
-                Live Sessions
+                Live 1-on-1
               </span>
               <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-brand-primary rounded-md border border-brand-primary/20">
                 {upcomingEvents.length} UPCOMING
@@ -801,19 +833,28 @@ export default function Dashboard() {
             </div>
 
             <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-1 relative z-10`}>
-              Upcoming Webinars
+              Upcoming Mentor Session
             </h2>
-            <p className="text-sm text-gray-600 mb-5 relative z-10">
+            <p className="text-sm text-gray-600 mb-1 relative z-10">
               Exclusive live knowledge sessions from your curators.
             </p>
 
             <div className="flex-1 flex flex-col">
-              {upcomingEvents.length === 0 ? (
+              {!isTierLoading && !canAccess("Mentorship") ? (
+                <div className="flex-1 pb-2">
+                  <UpgradeRequired
+                    title="1-on-1 Mentorship Locked"
+                    description=""
+                    requiredTier="Pro"
+                    compact={true}
+                  />
+                </div>
+              ) : upcomingEvents.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
                   <div className="w-14 h-14 bg-surface-subtle rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                    <Image src={ICONS.CALENDAR} alt="Certificate" width={20} height={20} />
+                    <Image src={ICONS.CALENDAR} alt="Calendar" width={20} height={20} />
                   </div>
-                  <p className="text-gray-700 font-medium">No live sessions scheduled yet.</p>
+                  <p className="text-gray-700 font-medium">No upcoming mentor sessions</p>
                   <p className="text-xs text-gray-500 mt-1">Check back later or visit your calendar.</p>
                 </div>
               ) : (
@@ -845,26 +886,38 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand-primary transition-colors mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand-primary transition-colors mb-1">
                           {event.title}
                         </h3>
+                        {event.mentorName && (
+                          <p className="text-xs font-bold text-gray-700 mb-2">
+                            With: {event.mentorName}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                          {event.description?.trim() || "Deep dive into advanced concepts with our industry experts."}
+                          {event.description?.replace(/Requested by:.*?\)/, "").replace(/Student ID:.*/, "").trim() || "Deep dive into advanced concepts with our industry experts."}
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-brand-primary/10 flex items-center justify-between mt-auto">
-                        <div className="space-y-0.5">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
-                          <p className="text-xs font-black text-brand-primary">
-                            {formatEventLabel(event.event_date, event.event_time)}
-                          </p>
+                      <div className="pt-4 border-t border-brand-primary/10 flex flex-col gap-3 mt-auto">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
+                            <p className="text-xs font-black text-brand-primary">
+                              {formatEventLabel(event.event_date, event.event_time)}
+                            </p>
+                          </div>
+                          <button className={`w-9 h-9 rounded-lg flex items-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                          </button>
                         </div>
-                        <button className={`w-9 h-9 rounded-lg flex items-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}>
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                          </svg>
-                        </button>
+                        {event.meet_link && (
+                          <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-brand-primary hover:underline text-center w-full block py-2 bg-brand-primary/10 rounded-md">
+                            Join Meeting
+                          </a>
+                        )}
                       </div>
                     </div>
                   ))}

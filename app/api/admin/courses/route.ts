@@ -771,6 +771,7 @@ export async function PUT(request: Request) {
   const productTitle = body?.product_title as string | undefined;
   const month = typeof body?.month === "string" ? body.month.trim() : "";
   const scheduleLabel = body?.schedule === "weekend" ? "Weekend" : "Weekday";
+  const scheduleType = body?.schedule === "weekend" ? "weekend" : "weekday";
 
   if (productTitle && month) {
     titleUpdate = `${productTitle} - ${month} ${scheduleLabel}`;
