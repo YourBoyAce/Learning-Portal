@@ -100,3 +100,79 @@ export function useSecurityGatedData() {
 
   return { tier, isLoading, canAccess, fetchGatedData };
 }
+
+/**
+ * Course-aware permission hook.
+ *
+ * When `courseId` is provided the tier is resolved strictly for that course
+ * (one course = one plan). Buying Course B on Pro does NOT upgrade Course A.
+ *
+ * When `courseId` is omitted the hook falls back to the global max-tier lookup
+ * (same behaviour as the legacy `useSecurityGatedData` hook) — suitable for
+ * pages without a course context (dashboard, profile, etc.).
+ */
+export function useCoursePermissions(courseId?: string) {
+  const [tier, setTier] = useState<UserTier>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchTier() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          if (mounted) setIsLoading(false);
+          return;
+        }
+
+        // Demo/test override — always Premium regardless of course
+        const demoEmails = ["demouser@gmail.com", "user@example.com", "premium@gmail.com"];
+        if (demoEmails.includes(session.user.email ?? "")) {
+          if (mounted) {
+            setTier("Premium");
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        let resolvedTier: UserTier;
+
+        if (courseId) {
+          // Course-specific tier: scoped to (user, course) pair
+          const { getCourseUserTier } = await import('@/app/actions/tier');
+          resolvedTier = await getCourseUserTier(session.access_token, courseId);
+        } else {
+          // Global fallback: highest tier across all enrollments
+          const { getUserTier } = await import('@/app/actions/tier');
+          resolvedTier = await getUserTier(session.access_token);
+        }
+
+        if (mounted) {
+          setTier(resolvedTier);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("Error evaluating course permissions:", err);
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    fetchTier();
+
+    return () => {
+      mounted = false;
+    };
+  // Re-run if courseId changes (e.g., user navigates between courses)
+  }, [courseId]);
+
+  const canAccess = useCallback(
+    (feature: Feature): boolean => {
+      if (!tier) return false;
+      return TIER_FEATURES[tier].includes(feature);
+    },
+    [tier],
+  );
+
+  return { tier, isLoading, canAccess };
+}

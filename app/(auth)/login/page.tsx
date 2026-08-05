@@ -15,8 +15,12 @@ type VerificationMethod = "email" | "phone";
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const urlEmail = searchParams.get("email");
+  // ?message= is set by the checkout flow for existing users (no auto-login)
+  const urlMessage = searchParams.get("message");
+  // ?newUser=true is set by the checkout flow for first-time buyers (triggers auto-login)
+  const isNewUserFromCheckout = searchParams.get("newUser") === "true";
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(urlEmail ?? "");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
   const [maskedEmail, setMaskedEmail] = useState("");
@@ -27,10 +31,11 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [autoLoginInProgress, setAutoLoginInProgress] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "info" | "warning" } | null>(
-    null,
+    // Immediately populate from ?message= query param if present (existing users)
+    urlMessage ? { message: urlMessage, type: "info" } : null,
   );
+  const [autoLoginInProgress, setAutoLoginInProgress] = useState(false);
   const autoLoginAttempted = useRef(false);
 
   const router = useRouter();
@@ -70,6 +75,7 @@ function LoginPageInner() {
     });
   };
 
+  // Redirect already-logged-in users to their home route
   useEffect(() => {
     const checkExistingSession = async () => {
       const {
@@ -79,15 +85,21 @@ function LoginPageInner() {
         await routeUserBasedOnRole(session.user.id);
       }
     };
-    checkExistingSession();
+    void checkExistingSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!urlEmail || autoLoginAttempted.current) return;
-    autoLoginAttempted.current = true;
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-    setEmail(urlEmail);
+  // Auto-login for brand-new users arriving from checkout (?email=...&newUser=true)
+  // Existing users are redirected with ?message= instead and never hit this path.
+  useEffect(() => {
+    if (!urlEmail || !isNewUserFromCheckout || autoLoginAttempted.current) return;
+    autoLoginAttempted.current = true;
 
     const attemptAutoLogin = async () => {
       setAutoLoginInProgress(true);
@@ -99,9 +111,10 @@ function LoginPageInner() {
         });
 
         if (authError || !data.user) {
+          // Auto-login failed (e.g., password was already changed) — fall back to manual
           setAutoLoginInProgress(false);
           setToast({
-            message: "Welcome back! Please enter your existing password to access your new content.",
+            message: "Your account is ready. Please enter your password to continue.",
             type: "info",
           });
           return;
@@ -116,26 +129,15 @@ function LoginPageInner() {
         if (profileError || !profile) {
           await supabase.auth.signOut();
           setAutoLoginInProgress(false);
-          setError(
-            "Invalid credentials. Please contact an administrator to create your account.",
-          );
+          setError("Account setup incomplete. Please contact support.");
           return;
         }
 
-        if (profile.role?.toLowerCase() === "admin") {
-          await supabase.auth.signOut();
-          setAutoLoginInProgress(false);
-          setPassword("");
-          setToast({
-            message: "Admin accounts require manual login. Please enter your password.",
-            type: "info",
-          });
-          return;
-        }
-
+        // New users from checkout are never admin — skip admin 2FA path
         await recordLogin(data.user.id);
 
         if (typeof window !== "undefined") {
+          // Prompt user to change default password on next visit
           sessionStorage.setItem("show_password_change_warning", "true");
         }
 
@@ -144,20 +146,16 @@ function LoginPageInner() {
       } catch {
         setAutoLoginInProgress(false);
         setToast({
-          message: "Welcome back! Please enter your existing password to access your new content.",
+          message: "Your account is ready. Please enter your password to continue.",
           type: "info",
         });
       }
     };
 
     void attemptAutoLogin();
-  }, [urlEmail]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlEmail, isNewUserFromCheckout]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 8000);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   const resetToCredentials = () => {
     setStep("credentials");
@@ -270,7 +268,7 @@ function LoginPageInner() {
             Setting up your workspace&hellip;
           </p>
           <p className="text-xs text-gray-400">
-            Please wait while we verify your account.
+            Please wait while we log you in automatically.
           </p>
         </div>
       </div>

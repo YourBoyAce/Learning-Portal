@@ -618,128 +618,126 @@ export default function AdminQuizzes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Course */}
+              {/* Associated Course — full row */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
+                <select
+                  value={courseId || courseName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const match = dbCourses.find((c) => String(c.id) === String(val) || c.title === val);
+                    if (match) { setCourseId(match.id); setCourseName(match.title); }
+                    else { setCourseId(""); setCourseName(val); }
+                  }}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                >
+                  <option value="">— Select Course —</option>
+                  {dbCourses
+                    .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
+                    .map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                </select>
+              </div>
+
+              {/* Passing Score & Status — side by side */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Passing Score</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={passingScore}
+                    onChange={(e) => setPassingScore(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Status</label>
                   <select
-                    value={courseId || courseName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const match = dbCourses.find((c) => String(c.id) === String(val) || c.title === val);
-                      if (match) { setCourseId(match.id); setCourseName(match.title); }
-                      else { setCourseId(""); setCourseName(val); }
-                    }}
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
-                    <option value="">— Select Course —</option>
-                    {dbCourses
-                      .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
-                      .map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
                 </div>
+              </div>
 
-                {/* Passing Score & Status */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Passing Score (%)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={passingScore}
-                      onChange={(e) => setPassingScore(Number(e.target.value))}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Status</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
+              {/* Questions List — full width */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Questions List</label>
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="text-brand-primary text-xs font-semibold flex items-center gap-1 border border-brand-primary/20 px-3 py-1.5 rounded-lg hover:bg-brand-primary/10 transition-colors"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Add Question
+                  </button>
                 </div>
 
-                {/* Questions List */}
-                <div className="space-y-4 pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Questions List</label>
-                    <button
-                      type="button"
-                      onClick={handleAddQuestion}
-                      className="text-brand-primary text-xs font-semibold flex items-center gap-1 border border-brand-primary/20 px-3 py-1.5 rounded-lg hover:bg-brand-primary/10 transition-colors"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      Add Question
-                    </button>
-                  </div>
-
-                  {questions.map((question, qIdx) => (
-                    <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-                      <div className="flex items-start gap-4">
-                        <span className="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold flex items-center justify-center shrink-0">
-                          {qIdx + 1}
-                        </span>
-                        <textarea
-                          placeholder="Type your multiple choice question here..."
-                          value={question.text}
-                          onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
-                          rows={2}
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
-                        />
-                        {questions.length > MIN_QUESTION_COUNT && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveQuestion(qIdx)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Options */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
-                        {question.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-gray-400 uppercase w-4">
-                              {String.fromCharCode(65 + oIdx)}
-                            </span>
-                            <input
-                              type="text"
-                              placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
-                              value={opt}
-                              onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
-                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Correct Answer */}
-                      <div className="flex items-center gap-3 sm:pl-10 pt-2 border-t border-dashed border-gray-100">
-                        <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                          Correct Answer:
-                        </label>
-                        <select
-                          value={question.correctAnswer}
-                          onChange={(e) => handleCorrectAnswerChange(qIdx, Number(e.target.value))}
-                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
+                {questions.map((question, qIdx) => (
+                  <div key={question.id} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div className="flex items-start gap-4">
+                      <span className="w-6 h-6 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-bold flex items-center justify-center shrink-0">
+                        {qIdx + 1}
+                      </span>
+                      <textarea
+                        placeholder="Type your multiple choice question here..."
+                        value={question.text}
+                        onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                        rows={2}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-gray-50/50"
+                      />
+                      {questions.length > MIN_QUESTION_COUNT && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuestion(qIdx)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                         >
-                          <option value={0}>Option A</option>
-                          <option value={1}>Option B</option>
-                          <option value={2}>Option C</option>
-                          <option value={3}>Option D</option>
-                        </select>
-                      </div>
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
+
+                    {/* Options */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:pl-10">
+                      {question.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-gray-400 uppercase w-4">
+                            {String.fromCharCode(65 + oIdx)}
+                          </span>
+                          <input
+                            type="text"
+                            placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
+                            value={opt}
+                            onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
+                            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Correct Answer */}
+                    <div className="flex items-center gap-3 sm:pl-10 pt-2 border-t border-dashed border-gray-100">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                        Correct Answer:
+                      </label>
+                      <select
+                        value={question.correctAnswer}
+                        onChange={(e) => handleCorrectAnswerChange(qIdx, Number(e.target.value))}
+                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary"
+                      >
+                        <option value={0}>Option A</option>
+                        <option value={1}>Option B</option>
+                        <option value={2}>Option C</option>
+                        <option value={3}>Option D</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Modal Footer */}

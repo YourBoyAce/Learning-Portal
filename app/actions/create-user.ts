@@ -210,16 +210,75 @@ export async function updateUserRole(userId: string, newRole: string) {
 }
 
 export async function deleteUser(userId: string) {
+  // userId here is the Supabase Auth UUID (= profiles.id).
+  // We must wipe all three layers so that the same email is treated
+  // as a brand-new user if they purchase again later.
+  //
+  // Deletion order (dependencies first):
+  //   1. phase2 child rows (enrollments, orders) → keyed by phase2.users.id
+  //   2. phase2.users                            → keyed by auth_user_id
+  //   3. profiles                                → explicit (in case no auth cascade)
+  //   4. auth.users                              → last
   try {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (error) throw new Error(error.message);
+    // ── Step 1: resolve the phase2.users.id for this auth user ──────────
+    const { data: phase2User } = await supabaseAdmin
+      .schema("phase2" as any)
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+
+    if (phase2User?.id) {
+      const p2id = phase2User.id;
+
+      // Delete enrollments
+      await supabaseAdmin
+        .schema("phase2" as any)
+        .from("enrollments")
+        .delete()
+        .eq("user_id", p2id);
+
+      // Delete orders (payments cascade from orders if FK is set)
+      await supabaseAdmin
+        .schema("phase2" as any)
+        .from("orders")
+        .delete()
+        .eq("user_id", p2id);
+
+      // Delete the phase2.users row
+      const { error: phase2Error } = await supabaseAdmin
+        .schema("phase2" as any)
+        .from("users")
+        .delete()
+        .eq("id", p2id);
+
+      if (phase2Error) {
+        console.error("[deleteUser] phase2.users delete error:", phase2Error);
+      }
+    }
+
+    // ── Step 2: delete from public.profiles ─────────────────────────────
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+
+    if (profileError) {
+      console.error("[deleteUser] profiles delete error:", profileError);
+    }
+
+    // ── Step 3: delete the auth account ─────────────────────────────────
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (authError) throw new Error(authError.message);
 
     revalidatePath("/admin/users");
     return { success: true };
   } catch (error: unknown) {
+    console.error("[deleteUser] Unexpected error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
+
