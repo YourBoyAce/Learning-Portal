@@ -1,20 +1,73 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Lock, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/app/lib/supabase";
 
 interface UpgradeRequiredProps {
   title?: string;
   description?: string;
   requiredTier?: "Starter" | "Pro" | "Premium";
+  courseSlug?: string;
+  userEmail?: string;
+  userName?: string;
+  userPhone?: string;
 }
 
 export function UpgradeRequired({
   title = "Premium Feature Locked",
   description = "This advanced learning tool is reserved for members of higher tiers. Upgrade today to unlock full curriculum access, live cohort sessions, interactive quizzes, and more.",
   requiredTier = "Pro",
+  courseSlug,
+  userEmail: propEmail,
+  userName: propName,
+  userPhone: propPhone,
 }: UpgradeRequiredProps) {
+  const [email, setEmail] = useState(propEmail || "");
+  const [name, setName] = useState(propName || "");
+  const [phone, setPhone] = useState(propPhone || "");
+
+  // Keep state in sync if props change (e.g. parent fetches data)
+  useEffect(() => {
+    if (propEmail) setEmail(propEmail);
+    if (propName) setName(propName);
+    if (propPhone) setPhone(propPhone);
+  }, [propEmail, propName, propPhone]);
+
+  useEffect(() => {
+    async function fetchUser() {
+      // If we already have everything, no need to fetch
+      if (propEmail && propName && propPhone) return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      if (!propEmail) setEmail(user.email || "");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", user.id)
+        .single();
+      
+      if (!propName) {
+        setName(profile?.full_name || user.user_metadata?.full_name || "");
+      }
+      if (!propPhone) {
+        setPhone(profile?.phone || user.user_metadata?.phone || "");
+      }
+    }
+    fetchUser();
+  }, [propEmail, propName, propPhone]);
+
+  const url = new URL("http://localhost:3000/plans");
+  if (courseSlug) url.searchParams.set("course", courseSlug);
+  if (email) url.searchParams.set("email", email);
+  if (name) url.searchParams.set("name", name);
+  if (phone) url.searchParams.set("phone", phone);
+  const plansUrl = url.toString();
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-lg transition-all duration-300 hover:shadow-xl sm:p-12 max-w-xl mx-auto my-8">
       {/* Decorative gradients */}
@@ -48,7 +101,7 @@ export function UpgradeRequired({
         asChild
         className="w-full sm:w-auto px-8 py-6 rounded-2xl bg-gradient-to-r from-brand-heading to-brand-primary hover:from-brand-heading-hover hover:to-brand-primary/95 text-white font-bold tracking-wide shadow-md shadow-blue-900/10 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
       >
-        <a href="http://localhost:3000/plans" target="_blank" rel="noopener noreferrer">
+        <a href={plansUrl} target="_blank" rel="noopener noreferrer">
           Upgrade My Plan <ArrowRight className="h-4 w-4" />
         </a>
       </Button>

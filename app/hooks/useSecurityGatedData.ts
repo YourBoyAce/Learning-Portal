@@ -5,12 +5,12 @@ import { supabase } from "@/app/lib/supabase";
 
 export type UserTier = "Starter" | "Pro" | "Premium" | null;
 
-export type Feature = "Videos" | "Chat" | "Ratings" | "Labs" | "Quizzes" | "Webinars";
+export type Feature = "Videos" | "Chat" | "Ratings" | "Labs" | "Quizzes" | "Webinars" | "Mentorship";
 
 const TIER_FEATURES: Record<NonNullable<UserTier>, Feature[]> = {
   Starter: ["Videos", "Chat", "Ratings"],
-  Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes"],
-  Premium: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Webinars"],
+  Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Mentorship"],
+  Premium: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Webinars", "Mentorship"],
 };
 
 export function useSecurityGatedData() {
