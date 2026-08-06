@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import { BookOpen, CheckCircle2, FolderOpen, Users, ShieldAlert, X } from "lucide-react";
+import { BookOpen, CheckCircle2, FolderOpen, Users, ShieldAlert, X, ArrowUpRight } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
@@ -173,41 +173,81 @@ export default function Dashboard() {
       .eq("id", user.id)
       .single();
 
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    // Current local time as HH:MM:SS for same-day comparison
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    const userRole = fetchedProfile?.role?.toLowerCase() || "user";
+    const isMentorOrAdmin = userRole === "instructor" || userRole === "admin";
 
-    // TODO: Replace with shared Mentor Session helper once Mentor module can be safely refactored.
-    const { data: calendarRows } = await supabase
+    // Mentors own the calendar_events rows (user_id = mentor), so query by user_id.
+    // Students are referenced via "Student ID: <id>" in the description, so query by that.
+    // Note: .gte("event_date", today) only filters by date — same-day past events are
+    // excluded client-side below using currentTime.
+    let calendarQuery = supabase
       .from("calendar_events")
       .select("id,title,description,event_date,event_time,event_type,user_id,meet_link,tag")
       .like("tag", "%status:accepted%")
-      .like("description", `%Student ID: ${user.id}%`)
       .gte("event_date", today)
       .order("event_date", { ascending: true })
       .order("event_time", { ascending: true })
-      .limit(5);
+      .limit(10); // Fetch more than needed so client-side time filter doesn't reduce below 5
+
+    if (isMentorOrAdmin) {
+      calendarQuery = calendarQuery.eq("user_id", user.id);
+    } else {
+      calendarQuery = calendarQuery.like("description", `%Student ID: ${user.id}%`);
+    }
+
+    const { data: rawCalendarRows } = await calendarQuery;
+
+    // Filter out same-day events whose time has already passed, then cap at 5
+    const calendarRows = (rawCalendarRows || [])
+      .filter((e) => {
+        if (e.event_date > today) return true;
+        if (e.event_date === today) return e.event_time >= currentTime;
+        return false;
+      })
+      .slice(0, 5);
 
     let mappedMentorEvents: any[] = [];
     if (calendarRows && calendarRows.length > 0) {
-      const mentorIds = Array.from(new Set(calendarRows.map((e) => e.user_id)));
-      const { data: mentorProfiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", mentorIds);
+      if (isMentorOrAdmin) {
+        // For mentors: extract student name from the event description
+        mappedMentorEvents = calendarRows.map((event) => {
+          let studentName = "Student";
+          const desc = event.description || "";
+          const reqMatch = desc.match(/Requested by:\s*([^(]+)\s*\(/);
+          if (reqMatch) studentName = reqMatch[1].trim();
 
-      const mentorsMap = new Map();
-      if (mentorProfiles) {
-        mentorProfiles.forEach((p) => mentorsMap.set(p.id, p));
+          return {
+            ...event,
+            mentorName: studentName,
+          };
+        });
+      } else {
+        // For students: look up the mentor's name from profiles
+        const mentorIds = Array.from(new Set(calendarRows.map((e) => e.user_id)));
+        const { data: mentorProfiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", mentorIds);
+
+        const mentorsMap = new Map();
+        if (mentorProfiles) {
+          mentorProfiles.forEach((p) => mentorsMap.set(p.id, p));
+        }
+
+        mappedMentorEvents = calendarRows.map((event) => {
+          const mentor = mentorsMap.get(event.user_id);
+          const mentorName = mentor?.full_name || "Instructor";
+
+          return {
+            ...event,
+            mentorName,
+          };
+        });
       }
-
-      mappedMentorEvents = calendarRows.map((event) => {
-        const mentor = mentorsMap.get(event.user_id);
-        const mentorName = mentor?.full_name || "Instructor";
-
-        return {
-          ...event,
-          mentorName,
-        };
-      });
     }
 
     setUpcomingEvents(mappedMentorEvents as CalendarEvent[]);
@@ -899,24 +939,26 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-brand-primary/10 flex flex-col gap-3 mt-auto">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
-                            <p className="text-xs font-black text-brand-primary">
-                              {formatEventLabel(event.event_date, event.event_time)}
-                            </p>
-                          </div>
-                          <button className={`w-9 h-9 rounded-lg flex items-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                          </button>
+                      <div className="pt-4 border-t border-brand-primary/10 flex items-center justify-between mt-auto">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
+                          <p className="text-xs font-black text-brand-primary">
+                            {formatEventLabel(event.event_date, event.event_time)}
+                          </p>
                         </div>
-                        {event.meet_link && (
-                          <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-brand-primary hover:underline text-center w-full block py-2 bg-brand-primary/10 rounded-md">
-                            Join Meeting
+                        {event.meet_link ? (
+                          <a
+                            href={event.meet_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+                          >
+                            <ArrowUpRight size={16} />
                           </a>
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-300 bg-gray-100 cursor-not-allowed">
+                            <ArrowUpRight size={16} />
+                          </div>
                         )}
                       </div>
                     </div>
