@@ -18,7 +18,6 @@ type Course = {
   thumbnail_url?: string | undefined;
   created_at?: string | undefined;
   batch_name?: string | null;
-  batch_schedule_types?: ("weekday" | "weekend")[];
   course_type?: string;
   product_id?: string | number | null;
 };
@@ -755,7 +754,6 @@ export default function UploadPage() {
                     description={course.description}
                     thumbnail={course.thumbnail_url}
                     batchName={course.batch_name}
-                    batchScheduleTypes={course.batch_schedule_types}
                     courseStatus="active"
                     variant="admin"
                     showProgress={false}
