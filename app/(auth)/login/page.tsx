@@ -61,9 +61,24 @@ function LoginPageInner() {
 
     if (profile.role?.toLowerCase() === "admin") {
       router.push("/admin");
-    } else {
-      router.push("/dashboard");
+      return;
     }
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        const { getUserTier } = await import('@/app/actions/tier');
+        const tier = await getUserTier(session.access_token);
+        if (tier === "Premium") {
+          router.push("/premium");
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch user tier during login:", err);
+    }
+    
+    router.push("/dashboard");
   };
 
   const recordLogin = async (userId: string) => {
@@ -142,7 +157,7 @@ function LoginPageInner() {
         }
 
         router.refresh();
-        router.push("/dashboard");
+        await routeUserBasedOnRole(data.user.id);
       } catch {
         setAutoLoginInProgress(false);
         setToast({
