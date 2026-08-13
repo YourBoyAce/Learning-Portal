@@ -43,7 +43,7 @@ import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 // IMPORT OUR NEW VIDEO PLAYER
 import CourseVideoPlayer from "./components/CourseVideoPlayer";
 import { ICONS } from "@/app/styles/icons";
-import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { useCoursePermissions } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 
 
@@ -161,7 +161,7 @@ export default function CoursePlayerPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const { isLoading: isTierLoading, tier, canAccess } = useSecurityGatedData();
+  const { isLoading: isTierLoading, tier, canAccess } = useCoursePermissions(String(id));
   const isCurrentlyLoading = loading || isTierLoading;
 
   useEffect(() => {

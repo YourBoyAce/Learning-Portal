@@ -12,25 +12,38 @@ import { Mail, Phone, Loader2, ShieldAlert, X } from "lucide-react";
 type LoginStep = "credentials" | "chooseMethod";
 type VerificationMethod = "email" | "phone";
 
+const DEMO_PREMIUM_EMAILS = [
+  "premium@gmail.com",
+  "demouser@gmail.com",
+  "user@example.com",
+];
+
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const urlEmail = searchParams.get("email");
+  // ?message= is set by the checkout flow for existing users (no auto-login)
+  const urlMessage = searchParams.get("message");
+  // ?newUser=true is set by the checkout flow for first-time buyers (triggers auto-login)
+  const isNewUserFromCheckout = searchParams.get("newUser") === "true";
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(urlEmail ?? "");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
   const [maskedEmail, setMaskedEmail] = useState("");
   const [savedPhone, setSavedPhone] = useState("");
-  const [activeVerification, setActiveVerification] = useState<VerificationMethod | null>(
-    null,
-  );
+  const [activeVerification, setActiveVerification] =
+    useState<VerificationMethod | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [autoLoginInProgress, setAutoLoginInProgress] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "info" | "warning" } | null>(
-    null,
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "info" | "warning";
+  } | null>(
+    // Immediately populate from ?message= query param if present (existing users)
+    urlMessage ? { message: urlMessage, type: "info" } : null,
   );
+  const [autoLoginInProgress, setAutoLoginInProgress] = useState(false);
   const autoLoginAttempted = useRef(false);
 
   const router = useRouter();
@@ -56,9 +69,40 @@ function LoginPageInner() {
 
     if (profile.role?.toLowerCase() === "admin") {
       router.push("/admin");
-    } else {
-      router.push("/dashboard");
+      return;
     }
+
+    if (profile.role?.toLowerCase() === "instructor") {
+      router.push("/mentor");
+      return;
+    }
+
+    const signedInEmail =
+      (await supabase.auth.getUser()).data?.user?.email?.trim().toLowerCase() ??
+      "";
+
+    if (DEMO_PREMIUM_EMAILS.includes(signedInEmail)) {
+      router.push("/premium");
+      return;
+    }
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        const { getUserTier } = await import("@/app/actions/tier");
+        const tier = await getUserTier(session.access_token);
+        if (tier === "Premium") {
+          router.push("/premium");
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch user tier during login:", err);
+    }
+
+    router.push("/dashboard");
   };
 
   const recordLogin = async (userId: string) => {
@@ -70,6 +114,7 @@ function LoginPageInner() {
     });
   };
 
+  // Redirect already-logged-in users to their home route
   useEffect(() => {
     const checkExistingSession = async () => {
       const {
@@ -79,29 +124,39 @@ function LoginPageInner() {
         await routeUserBasedOnRole(session.user.id);
       }
     };
-    checkExistingSession();
+    void checkExistingSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!urlEmail || autoLoginAttempted.current) return;
-    autoLoginAttempted.current = true;
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-    setEmail(urlEmail);
+  // Auto-login for brand-new users arriving from checkout (?email=...&newUser=true)
+  // Existing users are redirected with ?message= instead and never hit this path.
+  useEffect(() => {
+    if (!urlEmail || !isNewUserFromCheckout || autoLoginAttempted.current)
+      return;
+    autoLoginAttempted.current = true;
 
     const attemptAutoLogin = async () => {
       setAutoLoginInProgress(true);
 
       try {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
-          email: urlEmail,
-          password: "Welcome123!",
-        });
+        const { data, error: authError } =
+          await supabase.auth.signInWithPassword({
+            email: urlEmail,
+            password: "Welcome123!",
+          });
 
         if (authError || !data.user) {
+          // Auto-login failed (e.g., password was already changed) — fall back to manual
           setAutoLoginInProgress(false);
           setToast({
-            message: "Welcome back! Please enter your existing password to access your new content.",
+            message:
+              "Your account is ready. Please enter your password to continue.",
             type: "info",
           });
           return;
@@ -116,48 +171,33 @@ function LoginPageInner() {
         if (profileError || !profile) {
           await supabase.auth.signOut();
           setAutoLoginInProgress(false);
-          setError(
-            "Invalid credentials. Please contact an administrator to create your account.",
-          );
+          setError("Account setup incomplete. Please contact support.");
           return;
         }
 
-        if (profile.role?.toLowerCase() === "admin") {
-          await supabase.auth.signOut();
-          setAutoLoginInProgress(false);
-          setPassword("");
-          setToast({
-            message: "Admin accounts require manual login. Please enter your password.",
-            type: "info",
-          });
-          return;
-        }
-
+        // New users from checkout are never admin — skip admin 2FA path
         await recordLogin(data.user.id);
 
         if (typeof window !== "undefined") {
+          // Prompt user to change default password on next visit
           sessionStorage.setItem("show_password_change_warning", "true");
         }
 
         router.refresh();
-        router.push("/dashboard");
+        await routeUserBasedOnRole(data.user.id);
       } catch {
         setAutoLoginInProgress(false);
         setToast({
-          message: "Welcome back! Please enter your existing password to access your new content.",
+          message:
+            "Your account is ready. Please enter your password to continue.",
           type: "info",
         });
       }
     };
 
     void attemptAutoLogin();
-  }, [urlEmail]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 8000);
-    return () => clearTimeout(timer);
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlEmail, isNewUserFromCheckout]);
 
   const resetToCredentials = () => {
     setStep("credentials");
@@ -174,7 +214,9 @@ function LoginPageInner() {
     });
 
     if (authError || !data.user) {
-      setError(authError?.message || "Unable to complete sign in. Please try again.");
+      setError(
+        authError?.message || "Unable to complete sign in. Please try again.",
+      );
       resetToCredentials();
       setLoading(false);
       return;
@@ -263,14 +305,20 @@ function LoginPageInner() {
   if (autoLoginInProgress) {
     return (
       <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center gap-6">
-        <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+        <Image
+          src="/logo.svg"
+          alt="Auto-Mate"
+          width={160}
+          height={48}
+          className="object-contain"
+        />
         <div className="flex flex-col items-center gap-4 bg-white border border-gray-200 rounded-xl shadow-sm px-10 py-8">
           <Loader2 className="h-8 w-8 animate-spin text-[#1682F1]" />
           <p className="text-sm font-medium text-gray-600">
             Setting up your workspace&hellip;
           </p>
           <p className="text-xs text-gray-400">
-            Please wait while we verify your account.
+            Please wait while we log you in automatically.
           </p>
         </div>
       </div>
@@ -292,7 +340,9 @@ function LoginPageInner() {
               }`}
           >
             <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
-            <p className="text-sm font-medium leading-snug flex-1">{toast.message}</p>
+            <p className="text-sm font-medium leading-snug flex-1">
+              {toast.message}
+            </p>
             <button
               onClick={() => setToast(null)}
               className="shrink-0 p-0.5 rounded hover:bg-black/5 transition"
@@ -304,7 +354,13 @@ function LoginPageInner() {
         )}
 
         <div className="text-center mb-4 shrink-0 flex flex-col items-center">
-          <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+          <Image
+            src="/logo.svg"
+            alt="Auto-Mate"
+            width={160}
+            height={48}
+            className="object-contain"
+          />
         </div>
 
         <div className="w-full max-w-md mx-auto shrink-0">
@@ -314,7 +370,9 @@ function LoginPageInner() {
           >
             {step === "credentials" ? (
               <>
-                <h2 className="text-base font-semibold text-gray-800">Welcome Back</h2>
+                <h2 className="text-base font-semibold text-gray-800">
+                  Welcome Back
+                </h2>
                 <p className="text-xs text-gray-500 mt-1 mb-3">
                   Please enter your credentials to continue your journey.
                 </p>
@@ -373,10 +431,12 @@ function LoginPageInner() {
               </>
             ) : (
               <>
-                <h2 className="text-base font-semibold text-gray-800">Verify Admin Login</h2>
+                <h2 className="text-base font-semibold text-gray-800">
+                  Verify Admin Login
+                </h2>
                 <p className="text-xs text-gray-500 mt-1 mb-4">
-                  Your admin credentials are valid. Choose how you would like to receive your
-                  verification code.
+                  Your admin credentials are valid. Choose how you would like to
+                  receive your verification code.
                 </p>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -416,7 +476,9 @@ function LoginPageInner() {
                     <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
                       <Phone className="h-5 w-5" />
                     </div>
-                    <p className="text-sm font-semibold text-gray-800">Phone Number</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Phone Number
+                    </p>
                     <p className="mt-1 text-xs text-gray-500 break-words">
                       {savedPhone
                         ? "Send a code automatically to your registered admin phone."
@@ -442,7 +504,11 @@ function LoginPageInner() {
             )}
 
             {step === "credentials" && (
-              <Button type="submit" disabled={loading} className="w-full mt-6 justify-center">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-6 justify-center"
+              >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -480,12 +546,20 @@ function LoginPageInner() {
             }}
           >
             <div className="w-6 h-6 mb-2">
-              <Image src={ICONS.BULB} alt="Info" width={24} height={24} className="object-contain" />
+              <Image
+                src={ICONS.BULB}
+                alt="Info"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
             </div>
-            <h3 className="font-semibold text-xs text-gray-800 mb-1">Did you know?</h3>
+            <h3 className="font-semibold text-xs text-gray-800 mb-1">
+              Did you know?
+            </h3>
             <p className="text-xs text-gray-600 leading-relaxed">
-              Students who review their curriculum at least three times a week demonstrate 40% higher
-              retention of abstract concepts.
+              Students who review their curriculum at least three times a week
+              demonstrate 40% higher retention of abstract concepts.
             </p>
           </div>
         </div>
@@ -516,7 +590,13 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center gap-6">
-          <Image src="/logo.svg" alt="Auto-Mate" width={160} height={48} className="object-contain" />
+          <Image
+            src="/logo.svg"
+            alt="Auto-Mate"
+            width={160}
+            height={48}
+            className="object-contain"
+          />
           <Loader2 className="h-8 w-8 animate-spin text-[#1682F1]" />
         </div>
       }

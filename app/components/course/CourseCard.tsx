@@ -5,7 +5,6 @@ import Image from "next/image";
 import { ICONS } from "@/app/styles/icons";
 import { PLACEHOLDER_IMAGE } from "@/lib/utils";
 
-type ScheduleType = "weekday" | "weekend";
 type CourseStatus = "active" | "upcoming";
 
 type CourseCardProps = {
@@ -20,7 +19,6 @@ type CourseCardProps = {
   variant?: "user" | "admin";
   courseStatus?: CourseStatus;
   batchName?: string | null;
-  batchScheduleTypes?: ScheduleType[];
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -30,21 +28,6 @@ type CourseCardProps = {
 };
 
 
-function ScheduleBadge({ type }: { type: ScheduleType }) {
-  const isWeekend = type === "weekend";
-
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border leading-none ${
-        isWeekend
-          ? "bg-purple-50 text-purple-800 border-purple-100"
-          : "bg-amber-50 text-amber-900 border-amber-100"
-      }`}
-    >
-      {isWeekend ? "Weekend" : "Weekday"}
-    </span>
-  );
-}
 
 function CourseStatusBadge({ status }: { status: CourseStatus }) {
   const isUpcoming = status === "upcoming";
@@ -72,7 +55,6 @@ export default function CourseCard({
   variant = "user",
   courseStatus,
   batchName,
-  batchScheduleTypes = [],
   onClick,
   onEdit,
   onDelete,
@@ -82,19 +64,6 @@ export default function CourseCard({
 }: CourseCardProps) {
   const isAdmin = variant === "admin";
 
-  const showScheduleInTitle =
-    isAdmin && batchName === undefined && batchScheduleTypes.length > 0;
-  const showScheduleInFooter =
-    batchName !== undefined && batchScheduleTypes.length > 0;
-
-  const scheduleBadges = (
-    <div className="flex items-center gap-1.5 shrink-0">
-      {batchScheduleTypes.map((type) => (
-        <ScheduleBadge key={type} type={type} />
-      ))}
-    </div>
-  );
-
   const contentBlock = (
     <>
       <div className="flex items-center justify-between gap-2.5 mb-2">
@@ -103,8 +72,6 @@ export default function CourseCard({
         </h3>
         {isAdmin && courseStatus ? (
           <CourseStatusBadge status={courseStatus} />
-        ) : showScheduleInTitle ? (
-          scheduleBadges
         ) : (
           !isAdmin &&
           category && (
@@ -136,7 +103,6 @@ export default function CourseCard({
           <p className="text-base font-bold text-gray-950 truncate min-w-0 flex-1 leading-tight">
             {batchName || "No batch assigned"}
           </p>
-          {showScheduleInFooter && scheduleBadges}
         </div>
       )}
 

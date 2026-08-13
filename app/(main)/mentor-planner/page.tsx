@@ -7,6 +7,7 @@ import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import UserAvatar from "@/app/components/UserAvatar";
+import { getPremiumMentors } from "@/app/actions/get-premium-mentors";
 import { Button } from "@/components/ui/button";
 import Cal, { getCalApi } from "@calcom/embed-react";
 import {
@@ -63,6 +64,9 @@ export default function MentorConnectPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("");
+  const [currentUserPhone, setCurrentUserPhone] = useState<string>("");
 
   // Student view states
   const [mentors, setMentors] = useState<Mentor[]>([]);
@@ -152,26 +156,23 @@ export default function MentorConnectPage() {
         if (authError || !user) return;
 
         setCurrentUserId(user.id);
+        setCurrentUserEmail(user.email || "");
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, full_name, phone")
           .eq("id", user.id)
           .single();
 
         const role = profile?.role || "user";
         setCurrentUserRole(role);
+        if (profile?.full_name) setCurrentUserName(profile.full_name);
+        if (profile?.phone) setCurrentUserPhone(profile.phone);
 
-        // Fetch user events if they are mentor/admin
         if (role === "instructor" || role === "admin") {
           await loadCalendarEvents(user.id);
         } else {
-          // If they are a student, load available mentors based on assigned batch
-          if (user.email) {
-            await loadMentors(user.email);
-          } else {
-            setMentors([]);
-          }
+          await loadMentors();
         }
       } catch (err) {
         console.error("Error loading user state:", err);
@@ -183,64 +184,25 @@ export default function MentorConnectPage() {
     loadUser();
   }, []);
 
-  // Fetch mentors for Student View based on their assigned batch
-  async function loadMentors(studentEmail: string) {
+  // Fetch mentors for Student View based on their premium courses
+  async function loadMentors() {
     try {
-      // 1. Get all courses where the student is a member
-      const { data: userCourseMembers, error: courseError } = await supabase
-        .from("course_members")
-        .select("maincourse_id")
-        .eq("email", studentEmail);
-
-      if (courseError) throw courseError;
-
-      if (!userCourseMembers || userCourseMembers.length === 0) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
         setMentors([]);
         return;
       }
 
-      const courseIds = userCourseMembers.map((cm: any) => cm.maincourse_id).filter(Boolean);
+      const { mentors: premiumMentors, error } = await getPremiumMentors(session.access_token);
 
-      // 2. Find all emails inside course_members for those course IDs
-      const { data: siblingCourseMembers, error: siblingError } = await supabase
-        .from("course_members")
-        .select("email")
-        .in("maincourse_id", courseIds);
-
-      if (siblingError) throw siblingError;
-
-      const mentorEmails = (siblingCourseMembers ?? [])
-        .map((cm: any) => cm.email?.trim().toLowerCase())
-        .filter(Boolean);
-
-      if (mentorEmails.length === 0) {
-        setMentors([]);
-        return;
+      if (error) {
+        throw new Error(error);
       }
 
-      // 3. Query profiles where email is in the mentorEmails list, and role is instructor/admin
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, role, cal_link, mentor_bio, mentor_expertise")
-        .in("email", mentorEmails)
-        .in("role", ["instructor", "admin"]);
-
-      if (error) throw error;
-
-      if (data) {
-        const formatted = data.map((item: any) => ({
-          id: item.id,
-          full_name: item.full_name || "Instructor",
-          email: item.email || "",
-          role: item.role === "admin" ? "Lead Mentor" : "Cohort Mentor",
-          cal_link: item.cal_link || "",
-          mentor_bio: item.mentor_bio || "Experienced technical educator ready to help you master your curriculum journey.",
-          mentor_expertise: Array.isArray(item.mentor_expertise) ? item.mentor_expertise : [],
-        }));
-        setMentors(formatted);
-      }
+      setMentors(premiumMentors || []);
     } catch (err) {
       console.error("Error loading mentors:", err);
+      setMentors([]);
     }
   }
 
@@ -1306,7 +1268,7 @@ export default function MentorConnectPage() {
             </p>
           </div>
 
-          {!isCurrentlyLoading && canAccess("Quizzes") && (
+          {!isCurrentlyLoading && canAccess("Mentorship") && (
             <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
               <Sparkles className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-bold text-gray-700">
@@ -1317,21 +1279,35 @@ export default function MentorConnectPage() {
         </div>
 
         {/* Content Section */}
-        {!isTierLoading && !canAccess("Quizzes") ? (
+        {!isTierLoading && !canAccess("Mentorship") ? (
           <div className="py-6">
-            <UpgradeRequired
-              title="Mentor Connect Gated"
-              description="1-on-1 mentor booking sessions are exclusively available to Pro and Premium tier members. Upgrade today to consult directly with instructors, schedule study reviews, and unblock challenges."
-              requiredTier="Pro"
+            <UpgradeRequired 
+              title="1-on-1 Mentorship Locked" 
+              description="1-on-1 mentor booking sessions are exclusively available to Pro and Premium tier members. Upgrade today to consult directly with instructors, schedule study reviews, and unblock challenges." 
+              requiredTier="Pro" 
+              userEmail={currentUserEmail}
+              userName={currentUserName}
+              userPhone={currentUserPhone}
             />
           </div>
         ) : (
           <>
             {/* Mentors Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mentors.map((mentor) => (
-                <div
-                  key={mentor.id}
+            {mentors.length === 0 ? (
+              <div className="py-16 px-4 bg-white border border-gray-100 rounded-3xl text-center shadow-sm max-w-3xl mx-auto my-8">
+                <div className="mx-auto w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mb-4">
+                  <CalendarDays className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No Mentors Assigned</h3>
+                <p className="text-gray-500 text-sm max-w-md mx-auto">
+                  There are no mentors currently assigned to your Pro or Premium courses. If you believe this is a mistake, please reach out to support.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {mentors.map((mentor) => (
+                  <div
+                    key={mentor.id}
                   className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-gray-200 transition-all group min-h-[340px] text-left relative overflow-hidden"
                 >
                   <div className="space-y-5">
@@ -1401,22 +1377,8 @@ export default function MentorConnectPage() {
                   </div>
                 </div>
               ))}
-
-              {/* Empty state */}
-              {!loading && mentors.length === 0 && (
-                <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 text-center px-4 max-w-lg mx-auto">
-                  <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CalendarIcon className="w-8 h-8 text-brand-primary" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">
-                    No Mentors Registered
-                  </h3>
-                  <p className="text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
-                    Once cohort instructors and team leads register their scheduling profiles, they will appear here automatically.
-                  </p>
-                </div>
-              )}
             </div>
+          )}
           </>
         )}
       </div>

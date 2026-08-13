@@ -12,7 +12,6 @@ const supabase = createClient(
 export async function createBatch(
   name: string,
   courseId: string,
-  scheduleType: "weekday" | "weekend",
   createdBy: string,
   productId?: string,
 ) {
@@ -22,7 +21,6 @@ export async function createBatch(
       .insert({
         name,
         course_id: courseId,
-        schedule_type: scheduleType,
         created_by: createdBy,
         ...(productId && { product_id: productId })
       })
@@ -83,7 +81,6 @@ export async function updateBatch(
   batchId: string,
   updates: {
     name?: string;
-    schedule_type?: "weekday" | "weekend";
     product_id?: string | null;
   },
 ) {

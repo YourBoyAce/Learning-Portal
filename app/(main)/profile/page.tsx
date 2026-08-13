@@ -358,7 +358,7 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
 export default function ProfilePage() {
@@ -379,6 +379,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
     type: "",
     text: "",
@@ -495,20 +496,26 @@ export default function ProfilePage() {
     }
   };
 
+  // --- Live password validation rules ---
+  const passwordRules = [
+    { label: "Minimum 8 characters",          met: newPassword.length >= 8 },
+    { label: "At least 1 uppercase letter",    met: /[A-Z]/.test(newPassword) },
+    { label: "At least 1 lowercase letter",    met: /[a-z]/.test(newPassword) },
+    { label: "At least 1 number",              met: /[0-9]/.test(newPassword) },
+    { label: "At least 1 special character",   met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassword) },
+  ];
+  const allRulesMet = passwordRules.every((r) => r.met);
+  const passwordsMatch = newPassword !== "" && newPassword === confirmPassword;
+
   // --- New Password Update Handler ---
   const handleUpdatePassword = async () => {
-    if (!newPassword || !confirmPassword) {
-      setPasswordMessage({ type: "error", text: "Please fill in both password fields." });
+    if (!allRulesMet) {
+      setPasswordMessage({ type: "error", text: "Please satisfy all password requirements before submitting." });
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (!passwordsMatch) {
       setPasswordMessage({ type: "error", text: "Passwords do not match." });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordMessage({ type: "error", text: "Password must be at least 6 characters long." });
       return;
     }
 
@@ -677,31 +684,95 @@ export default function ProfilePage() {
                 Update the default password provided by your administrator to secure your account.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                {/* New Password */}
                 <div>
                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
                     NEW PASSWORD
                   </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="one-time-code"
+                      data-lpignore="true"
+                      data-1p-ignore
+                      className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors pr-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Live validation checklist — visible once user starts typing */}
+                  {newPassword.length > 0 && (
+                    <ul className="mt-3 space-y-1.5">
+                      {passwordRules.map((rule) => (
+                        <li key={rule.label} className="flex items-center gap-2">
+                          {rule.met ? (
+                            <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                              <circle cx="10" cy="10" r="8" />
+                            </svg>
+                          )}
+                          <span className={`text-[11px] font-medium transition-colors ${
+                            rule.met ? "text-emerald-600" : "text-gray-400"
+                          }`}>
+                            {rule.label}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
+                {/* Confirm Password */}
                 <div>
                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
                     CONFIRM PASSWORD
                   </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="one-time-code"
+                      data-lpignore="true"
+                      data-1p-ignore
+                      className={`w-full bg-surface-subtle border rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:bg-white focus:outline-none transition-colors pr-10 ${
+                        confirmPassword.length > 0
+                          ? passwordsMatch
+                            ? "border-emerald-400 focus:border-emerald-400"
+                            : "border-red-300 focus:border-red-400"
+                          : "border-transparent focus:border-brand-primary/30"
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Match indicator */}
+                  {confirmPassword.length > 0 && (
+                    <p className={`mt-2 text-[11px] font-medium ${
+                      passwordsMatch ? "text-emerald-600" : "text-red-500"
+                    }`}>
+                      {passwordsMatch ? "✓ Passwords match" : "✗ Passwords do not match"}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -719,7 +790,7 @@ export default function ProfilePage() {
 
                 <Button
                   onClick={handleUpdatePassword}
-                  disabled={isUpdatingPassword || !newPassword || !confirmPassword}
+                  disabled={isUpdatingPassword || !allRulesMet || !passwordsMatch}
                   variant="outline"
                   className="w-full sm:w-auto text-[13px]"
                 >

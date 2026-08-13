@@ -81,7 +81,7 @@ export async function GET(request: Request) {
   const { data: memberRows, error: memberError } = await authContext.supabaseAdmin
     .schema("phase2")
     .from("enrollments")
-    .select("course_id, batch_type, users!inner(auth_user_id)")
+    .select("course_id, users!inner(auth_user_id)")
     .eq("users.auth_user_id", authContext.user.id)
     .eq("status", "active");
 
@@ -120,10 +120,10 @@ export async function GET(request: Request) {
   }
 
   const enrollments = ((courseRows ?? []) as any[]).map((course) => {
-    // Find the matching enrollment row to get the batch_type
+    // Find the matching enrollment row
     const matchingEnrollment = memberRows?.find(r => r.course_id === course.id);
     const isMentorAssignment = !matchingEnrollment && memberCourseIds.includes(course.id);
-    const batchName = matchingEnrollment?.batch_type || course.batch_type || (isMentorAssignment ? "Mentor Assignment" : "Weekday");
+    const batchName = isMentorAssignment ? "Mentor Assignment" : (matchingEnrollment ? course.title : "");
 
     return {
       batchId: null,

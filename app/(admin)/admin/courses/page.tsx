@@ -149,9 +149,7 @@ export default function AdminCourses() {
   const [batchYear, setBatchYear] = useState(() =>
     String(new Date().getFullYear()),
   );
-  const [batchSchedule, setBatchSchedule] = useState<"weekday" | "weekend">(
-    "weekday",
-  );
+
   const [startDateField, setStartDateField] = useState("");
   // Generated internal title preview
   const generatedTitle = (() => {
@@ -161,8 +159,7 @@ export default function AdminCourses() {
           "")
         : newProductTitle.trim();
     if (!productTitle || !batchMonth) return "";
-    const scheduleLabel = batchSchedule === "weekend" ? "Weekend" : "Weekday";
-    return `${productTitle} - ${batchMonth} ${scheduleLabel}`;
+    return `${productTitle} - ${batchMonth}`;
   })();
 
   // Delete Confirmation State
@@ -246,7 +243,6 @@ export default function AdminCourses() {
     setNewProductThumbnailPreview("");
     setBatchMonth("");
     setBatchYear(String(new Date().getFullYear()));
-    setBatchSchedule("weekday");
     setStartDateField("");
     setSelectedScholars([]);
     setSelectedMentors([]);
@@ -306,22 +302,19 @@ export default function AdminCourses() {
       return;
     }
 
-    // Active maincourse — pre-fill product + month + schedule from title
+    // Active maincourse — pre-fill product + month from title
     setCourseType("active");
     if (course.product_id) {
       setSelectedProductId(String(course.product_id));
       setProductMode("existing");
     }
-    // Parse month, year, and schedule from internal title (e.g. "Playwright - June 2026 Weekday")
-    const titleMatch = course.title.match(/- (\w+)(?: (\d{4}))? (Weekday|Weekend)$/i);
+    // Parse month from internal title (e.g. "Playwright - June" or "Playwright - June 2026")
+    const titleMatch = course.title.match(/- (\w+)(?:\s+(\d{4}))?$/);
     if (titleMatch) {
       setBatchMonth(titleMatch[1]);
       if (titleMatch[2]) {
         setBatchYear(titleMatch[2]);
       }
-      setBatchSchedule(
-        titleMatch[3].toLowerCase() === "weekend" ? "weekend" : "weekday",
-      );
     }
 
     setShowModal(true);
@@ -543,17 +536,16 @@ export default function AdminCourses() {
           : {}),
         ...(productMode === "new"
           ? {
-              new_product_title: newProductTitle.trim(),
-              new_product_description: newProductDescription.trim(),
-              ...(newProductThumbnailUrl && {
-                new_product_thumbnail: newProductThumbnailUrl,
-              }),
-              product_title: newProductTitle.trim(),
-            }
+            new_product_title: newProductTitle.trim(),
+            new_product_description: newProductDescription.trim(),
+            ...(newProductThumbnailUrl && {
+              new_product_thumbnail: newProductThumbnailUrl,
+            }),
+            product_title: newProductTitle.trim(),
+          }
           : {}),
         // Batch fields
         month: batchMonth ? `${batchMonth} ${batchYear}` : "",
-        schedule: batchSchedule,
         start_date: startDateField || null,
         description: courseDescription.trim(),
         ...(finalCourseThumbnailUrl !== undefined && { thumbnail_url: finalCourseThumbnailUrl }),
@@ -801,6 +793,9 @@ export default function AdminCourses() {
       return dateB - dateA; // Descending order (newest first)
     });
 
+  const activeCoursesCount = courses.filter((c) => c.course_type !== "upcoming").length;
+  const upcomingCoursesCount = courses.filter((c) => c.course_type === "upcoming").length;
+
   const stats = [
     {
       label: "Total Courses",
@@ -809,8 +804,13 @@ export default function AdminCourses() {
     },
     {
       label: "Active Courses",
-      value: courses.length.toString(),
+      value: activeCoursesCount.toString(),
       icon: ICONS.GLOBE,
+    },
+    {
+      label: "Upcoming Courses",
+      value: upcomingCoursesCount.toString(),
+      icon: ICONS.CLOCK,
     },
   ];
 
@@ -844,7 +844,7 @@ export default function AdminCourses() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}
@@ -909,7 +909,7 @@ export default function AdminCourses() {
                 ))}
               </div>
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
                 <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Upcoming Courses</h2>
@@ -1232,11 +1232,10 @@ export default function AdminCourses() {
                         <button
                           type="button"
                           onClick={() => setProductDropdownOpen(!productDropdownOpen)}
-                          className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${
-                            productDropdownOpen
-                              ? "border-brand-primary ring-2 ring-brand-primary/20"
-                              : "border-gray-200 hover:border-gray-300"
-                          } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${productDropdownOpen
+                            ? "border-brand-primary ring-2 ring-brand-primary/20"
+                            : "border-gray-200 hover:border-gray-300"
+                            } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
                         >
                           <span className="truncate">
                             {selectedProductId
@@ -1287,21 +1286,19 @@ export default function AdminCourses() {
                                           setSelectedProductId(String(product.id));
                                           setProductDropdownOpen(false);
                                         }}
-                                        className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${
-                                          isSelected && !isEditing
-                                            ? "bg-brand-primary/5"
-                                            : "hover:bg-gray-50"
-                                        }`}
+                                        className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${isSelected && !isEditing
+                                          ? "bg-brand-primary/5"
+                                          : "hover:bg-gray-50"
+                                          }`}
                                       >
                                         {/* Product label */}
                                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                           {/* Selection indicator */}
                                           <span
-                                            className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
-                                              isSelected
-                                                ? "bg-brand-primary"
-                                                : "bg-transparent group-hover:bg-gray-300"
-                                            }`}
+                                            className={`w-2 h-2 rounded-full shrink-0 transition-colors ${isSelected
+                                              ? "bg-brand-primary"
+                                              : "bg-transparent group-hover:bg-gray-300"
+                                              }`}
                                           />
                                           {isEditing ? (
                                             <input
@@ -1324,11 +1321,10 @@ export default function AdminCourses() {
                                             />
                                           ) : (
                                             <span
-                                              className={`text-[14px] truncate transition-colors ${
-                                                isSelected
-                                                  ? "font-semibold text-brand-primary"
-                                                  : "font-medium text-gray-700 group-hover:text-gray-900"
-                                              }`}
+                                              className={`text-[14px] truncate transition-colors ${isSelected
+                                                ? "font-semibold text-brand-primary"
+                                                : "font-medium text-gray-700 group-hover:text-gray-900"
+                                                }`}
                                             >
                                               {product.title}
                                             </span>
@@ -1462,8 +1458,8 @@ export default function AdminCourses() {
                     )}
                   </div>
 
-                  {/* Month + Year + Schedule + Start Date */}
-                  <div className="grid grid-cols-3 gap-3">
+                  {/* Month + Year */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                         Month
@@ -1513,23 +1509,7 @@ export default function AdminCourses() {
                         })}
                       </select>
                     </div>
-                    <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                        Schedule
-                      </label>
-                      <select
-                        value={batchSchedule}
-                        onChange={(e) =>
-                          setBatchSchedule(
-                            e.target.value as "weekday" | "weekend",
-                          )
-                        }
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary"
-                      >
-                        <option value="weekday">Weekday</option>
-                        <option value="weekend">Weekend</option>
-                      </select>
-                    </div>
+
                   </div>
 
 
@@ -1663,7 +1643,7 @@ export default function AdminCourses() {
                       productMode === "existing"
                         ? products.find((p) => String(p.id) === selectedProductId)?.thumbnail_url
                         : newProductThumbnailPreview;
-                        
+
                     const displayThumbnail = thumbnailPreview || defaultThumbnailPreview;
 
                     return (

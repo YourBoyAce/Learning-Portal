@@ -50,6 +50,7 @@ interface CurriculumCourse {
   certificate_url?: string | null;
   certificate_id?: string | null;
   issued_at?: string | null;
+  product_id?: string | number | null;
 }
 
 interface Webinar {
@@ -184,6 +185,9 @@ export default function MyLearningDashboard() {
         {
           user_id: userId,
           course_id: String(selectedCertificateCourse.id),
+          product_id: selectedCertificateCourse.product_id
+            ? String(selectedCertificateCourse.product_id)
+            : null,
           rating: reviewRating,
           review: reviewText.trim(),
           updated_at: new Date().toISOString(),
@@ -376,6 +380,7 @@ export default function MyLearningDashboard() {
             description,
             category,
             thumbnail_url,
+            product_id,
             coursemodules (*)
           `)
           .in("id", allCourseIds);
@@ -530,6 +535,8 @@ export default function MyLearningDashboard() {
               : progressPercentage === 100
                 ? "Completed"
                 : `${completedModules}/${totalModules} Modules`,
+
+          product_id: course.product_id ?? null,
 
         };
       });

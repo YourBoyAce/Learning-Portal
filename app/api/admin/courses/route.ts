@@ -555,14 +555,13 @@ export async function POST(request: Request) {
     productId = createdProduct.id;
   }
 
-  // Step 2: Build internal maincourse title from product + month + schedule
+  // Step 2: Build internal maincourse title from product + month
   let internalTitle: string;
   const productTitle = body?.product_title as string | undefined;
   const month = typeof body?.month === "string" ? body.month.trim() : "";
-  const scheduleLabel = body?.schedule === "weekend" ? "Weekend" : "Weekday";
 
   if (productTitle && month) {
-    internalTitle = `${productTitle} - ${month} ${scheduleLabel}`;
+    internalTitle = `${productTitle} - ${month}`;
   } else if (typeof body?.title === "string" && body.title.trim()) {
     internalTitle = body.title.trim();
   } else {
@@ -570,7 +569,6 @@ export async function POST(request: Request) {
   }
 
   // Step 3: Insert maincourse
-  const scheduleType = body?.schedule === "weekend" ? "weekend" : "weekday";
   const { data: newCourse, error: insertError } = await authContext.supabaseAdmin
     .from("maincourses")
     .insert({
@@ -578,7 +576,6 @@ export async function POST(request: Request) {
       description,
       thumbnail_url: thumbnailUrl || null,
       course_type: "active",
-      batch_type: scheduleType,
       ...(productId !== null && { product_id: productId }),
     })
     .select("id")
@@ -695,7 +692,6 @@ export async function POST(request: Request) {
            user_id: id, 
            course_id: newCourse.id,
            status: "active",
-           batch_type: scheduleType,
            access_start_date: new Date().toISOString(),
            access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
         }));
@@ -766,14 +762,13 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Description is required for active courses." }, { status: 400 });
   }
 
-  // Build the internal title if product + month + schedule provided
+  // Build the internal title if product + month provided
   let titleUpdate: string | undefined;
   const productTitle = body?.product_title as string | undefined;
   const month = typeof body?.month === "string" ? body.month.trim() : "";
-  const scheduleLabel = body?.schedule === "weekend" ? "Weekend" : "Weekday";
 
   if (productTitle && month) {
-    titleUpdate = `${productTitle} - ${month} ${scheduleLabel}`;
+    titleUpdate = `${productTitle} - ${month}`;
   } else if (typeof body?.title === "string" && body.title.trim()) {
     titleUpdate = body.title.trim();
   }
@@ -973,7 +968,6 @@ export async function PUT(request: Request) {
            user_id: uid, 
            course_id: id,
            status: "active",
-           batch_type: scheduleType,
            access_start_date: new Date().toISOString(),
            access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
         }));
@@ -1022,12 +1016,20 @@ export async function DELETE(request: Request) {
   }
 
   // ── Active → delete maincourse and all related data ───────────────────────
+
+  // Fetch the product_id linked to this maincourse before deleting it
+  const { data: courseRow } = await authContext.supabaseAdmin
+    .from("maincourses")
+    .select("product_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  const linkedProductId = (courseRow as any)?.product_id ?? null;
+
   await authContext.supabaseAdmin.from("course_members").delete().eq("maincourse_id", id);
-  await authContext.supabaseAdmin.from("batches").update({ course_id: null }).eq("course_id", id);
+  await authContext.supabaseAdmin.from("batches").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("coursemodules").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("user_video_progress").delete().eq("course_id", id);
-  // Note: We leave phase2.enrollments intact when deleting a course manually, or we could delete them. 
-  // Let's delete them to clean up:
   await authContext.supabaseAdmin.schema("phase2").from("enrollments").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("course_ratings").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("certificates").delete().eq("course_id", id);
@@ -1040,6 +1042,11 @@ export async function DELETE(request: Request) {
 
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  // Delete the linked product so it doesn't reappear as an "upcoming" course
+  if (linkedProductId !== null) {
+    await authContext.supabaseAdmin.from("products").delete().eq("id", linkedProductId);
   }
 
   return NextResponse.json({ success: true });

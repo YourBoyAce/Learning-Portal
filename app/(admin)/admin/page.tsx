@@ -362,7 +362,6 @@ export default function AdminDashboard() {
                           description={course.description}
                           thumbnail={course.thumbnail_url}
                           batchName={course.batch_name}
-                          batchScheduleTypes={course.batch_schedule_types}
                           courseStatus="active"
                           variant="admin"
                           onClick={() => router.push("/admin/courses")}

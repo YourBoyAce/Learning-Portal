@@ -35,9 +35,9 @@ interface Webinar {
   batch_id?: number | string | null;
 }
 
-interface Batch {
+interface Product {
   id: number | string;
-  name: string;
+  title: string;
 }
 
 export default function AdminWebinarsPage() {
@@ -66,24 +66,48 @@ export default function AdminWebinarsPage() {
   const [status, setStatus] = useState("streaming");
   const [linkText, setLinkText] = useState("");
   const [attendeesCount, setAttendeesCount] = useState(0);
-  const [batchId, setBatchId] = useState<string | number>("");
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string | number>(
+    "",
+  );
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dbCourses, setDbCourses] = useState<
+    {
+      id: string | number;
+      title: string;
+      product_id?: number | string | null;
+    }[]
+  >([]);
+  const [courseId, setCourseId] = useState<string | number>("");
+  const [invitePremiumOnly, setInvitePremiumOnly] = useState(false);
 
   useEffect(() => {
     /* eslint-disable */
     fetchWebinars();
-    fetchBatches();
+    fetchProducts();
+    fetchCourses();
   }, []);
 
-  const fetchBatches = async () => {
+  const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
-        .from("batches")
-        .select("id, name")
-        .order("name", { ascending: true });
-      if (data && !error) setBatches(data);
+        .from("products")
+        .select("id, title")
+        .order("title", { ascending: true });
+      if (data && !error) setProducts(data);
     } catch (err) {
-      console.error("Failed to fetch batches:", err);
+      console.error("Failed to fetch products:", err);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("maincourses")
+        .select("id, title, product_id")
+        .order("title", { ascending: true });
+      if (data && !error) setDbCourses(data);
+    } catch (err) {
+      console.error("Failed to fetch courses:", err);
     }
   };
 
@@ -112,11 +136,12 @@ export default function AdminWebinarsPage() {
       setSubtitle(webinar.subtitle || "");
       setDescription(webinar.description || "");
       setEventDate(webinar.event_date || "");
-      setIcon(webinar.icon || "ðŸ“‹");
+      setIcon(webinar.icon || "📋");
       setStatus(webinar.status || "streaming");
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
-      setBatchId(webinar.batch_id || "");
+      setSelectedProductId("");
+      setCourseId("");
     } else {
       setIsEditing(false);
       setEditingId(null);
@@ -124,13 +149,49 @@ export default function AdminWebinarsPage() {
       setSubtitle("");
       setDescription("");
       setEventDate("");
-      setIcon("ðŸ“‹");
+      setIcon("📋");
       setStatus("streaming");
       setLinkText("");
       setAttendeesCount(0);
-      setBatchId("");
+      setSelectedProductId("");
+      setCourseId("");
+      setInvitePremiumOnly(false);
     }
     setShowModal(true);
+  };
+
+  const getPremiumUserIdsForWebinarInvite = async (): Promise<string[]> => {
+    try {
+      const { data, error } = await supabase
+        .schema("phase2")
+        .from("enrollments")
+        .select("users!inner(auth_user_id), bundles!inner(bundle_name)")
+        .eq("status", "active");
+
+      if (error) throw error;
+
+      const premiumUserIds = new Set<string>();
+      (data || []).forEach((row: any) => {
+        const authUserId = row?.users?.auth_user_id;
+        const bundleName = row?.bundles?.bundle_name;
+
+        if (
+          authUserId &&
+          typeof bundleName === "string" &&
+          bundleName.toLowerCase().includes("premium")
+        ) {
+          premiumUserIds.add(authUserId);
+        }
+      });
+
+      return Array.from(premiumUserIds);
+    } catch (error) {
+      console.error(
+        "Failed to resolve premium user IDs for webinar invite:",
+        error,
+      );
+      return [];
+    }
   };
 
   const handleSaveWebinar = async () => {
@@ -150,8 +211,9 @@ export default function AdminWebinarsPage() {
         status,
         link_text: linkText,
         attendees_count: attendeesCount,
-        batch_id: batchId || null,
       };
+
+      let createdWebinarId: number | null = null;
 
       if (isEditing && editingId) {
         const { error } = await supabase
@@ -161,9 +223,50 @@ export default function AdminWebinarsPage() {
         if (error) throw error;
         showToast("Webinar updated successfully.");
       } else {
-        const { error } = await supabase.from("webinars").insert([webinarData]);
+        const { data, error } = await supabase
+          .from("webinars")
+          .insert([webinarData])
+          .select("id")
+          .single();
         if (error) throw error;
-        showToast("Webinar created successfully.");
+        createdWebinarId = data?.id ?? null;
+      }
+
+      if (invitePremiumOnly) {
+        const premiumUserIds = await getPremiumUserIdsForWebinarInvite();
+
+        if (premiumUserIds.length > 0) {
+          const inviteRows = premiumUserIds.map((userId) => ({
+            user_id: userId,
+            title: `Webinar invite: ${title}`,
+            description: `${description || "Join our live webinar."}\n---\nWebinar: ${title}\nDate: ${eventDate}\nHosted by: ${subtitle || "Admin"}\nType: Webinar`,
+            event_date: eventDate ? eventDate.split("T")[0] : "",
+            event_time:
+              eventDate && eventDate.includes("T")
+                ? `${eventDate.split("T")[1]}:00`
+                : "09:00:00",
+            event_type: "webinar",
+            tag: "status:pending|webinar|dur:60",
+          }));
+
+          const { error: inviteError } = await supabase
+            .from("calendar_events")
+            .insert(inviteRows);
+          if (inviteError) throw inviteError;
+          showToast(
+            `Webinar created and invited ${premiumUserIds.length} premium users.`,
+          );
+        } else {
+          showToast(
+            "Webinar created. No premium users were found for invites.",
+          );
+        }
+      } else {
+        showToast(
+          isEditing
+            ? "Webinar updated successfully."
+            : "Webinar created successfully.",
+        );
       }
 
       setShowModal(false);
@@ -185,7 +288,10 @@ export default function AdminWebinarsPage() {
     if (!deletingWebinar) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from("webinars").delete().eq("id", deletingWebinar.id);
+      const { error } = await supabase
+        .from("webinars")
+        .delete()
+        .eq("id", deletingWebinar.id);
       if (error) throw error;
       showToast("Webinar deleted successfully.");
       fetchWebinars();
@@ -219,7 +325,16 @@ export default function AdminWebinarsPage() {
             <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
               Webinar Management
             </h1>
-            <p className={TYPOGRAPHY.BODY.fontSize + " " + TYPOGRAPHY.BODY.lineHeight + " " + TYPOGRAPHY.BODY.fontWeight + " text-gray-600"}>
+            <p
+              className={
+                TYPOGRAPHY.BODY.fontSize +
+                " " +
+                TYPOGRAPHY.BODY.lineHeight +
+                " " +
+                TYPOGRAPHY.BODY.fontWeight +
+                " text-gray-600"
+              }
+            >
               Schedule and curate upcoming webinars for scholars.
             </p>
           </div>
@@ -268,16 +383,24 @@ export default function AdminWebinarsPage() {
             <table className="w-full min-w-[760px] border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                  <th
+                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                  >
                     Webinar Details
                   </th>
-                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                  <th
+                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                  >
                     Schedule
                   </th>
-                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                  <th
+                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                  >
                     Status
                   </th>
-                  <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                  <th
+                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                  >
                     Actions
                   </th>
                 </tr>
@@ -312,7 +435,12 @@ export default function AdminWebinarsPage() {
                             {webinar.icon && webinar.icon.length <= 2 ? (
                               <span>{webinar.icon}</span>
                             ) : (
-                              <Image src={ICONS.GLOBE} alt="icon" width={24} height={24} />
+                              <Image
+                                src={ICONS.GLOBE}
+                                alt="icon"
+                                width={24}
+                                height={24}
+                              />
                             )}
                           </div>
                           <div>
@@ -328,7 +456,10 @@ export default function AdminWebinarsPage() {
                       <td className="py-5 px-6">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                            <Calendar size={14} className="text-brand-primary" />
+                            <Calendar
+                              size={14}
+                              className="text-brand-primary"
+                            />
                             {webinar.event_date}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-gray-400">
@@ -339,10 +470,11 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                            : "bg-blue-50 text-blue-700 border-blue-100"
-                            }`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${
+                            webinar.status === "streaming"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                              : "bg-blue-50 text-blue-700 border-blue-100"
+                          }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${webinar.status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`}
@@ -467,22 +599,50 @@ export default function AdminWebinarsPage() {
                     </select>
                   </div>
 
-                  {/* Assigned Batch */}
+                  {/* Product */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                      Assigned Batch
+                      Product
                     </label>
                     <select
-                      value={batchId}
-                      onChange={(e) => setBatchId(e.target.value)}
+                      value={selectedProductId}
+                      onChange={(e) => {
+                        setSelectedProductId(e.target.value);
+                        setCourseId("");
+                      }}
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
-                      <option value="">— No Batch —</option>
-                      {batches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
+                      <option value="">— Select Product —</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
                         </option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Associated Course */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                      Associated Course
+                    </label>
+                    <select
+                      value={courseId}
+                      onChange={(e) => setCourseId(e.target.value)}
+                      className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
+                    >
+                      <option value="">— Select Course —</option>
+                      {dbCourses
+                        .filter(
+                          (c) =>
+                            !selectedProductId ||
+                            String(c.product_id) === String(selectedProductId),
+                        )
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.title}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -513,6 +673,26 @@ export default function AdminWebinarsPage() {
                       }
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3">
+                      <div>
+                        <div className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                          Invite only premium users
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Creates premium webinar invites for every active
+                          premium-tier learner.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={invitePremiumOnly}
+                        onChange={(e) => setInvitePremiumOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                      />
+                    </label>
                   </div>
 
                   {/* Description */}
@@ -568,8 +748,10 @@ export default function AdminWebinarsPage() {
                 </h3>
                 <p className="text-sm text-gray-500 text-center">
                   Are you sure you want to permanently delete{" "}
-                  <strong className="text-gray-900">{deletingWebinar.title}</strong>?
-                  This action cannot be undone.
+                  <strong className="text-gray-900">
+                    {deletingWebinar.title}
+                  </strong>
+                  ? This action cannot be undone.
                 </p>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
