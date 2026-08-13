@@ -94,11 +94,21 @@ import { normalizePhoneNumber } from "@/app/lib/phone-verification";
 
 export async function createUser(formData: FormData) {
   const username = String(formData.get("username") || "").trim();
-  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const email = String(formData.get("email") || "")
+    .trim()
+    .toLowerCase();
   const password = String(formData.get("password") || "").trim();
-  const role = String(formData.get("role") || "user").trim().toLowerCase();
+  const role = String(formData.get("role") || "user")
+    .trim()
+    .toLowerCase();
+  const plan = String(formData.get("plan") || "starter")
+    .trim()
+    .toLowerCase();
   const phoneInput = String(formData.get("phone") || "").trim();
   const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
+  const normalizedPlan = ["starter", "pro", "premium"].includes(plan)
+    ? plan
+    : "starter";
 
   if (!username || !email || !password || !role) {
     return { success: false, error: "Please fill in all fields" };
@@ -115,11 +125,17 @@ export async function createUser(formData: FormData) {
 
   try {
     // 1. Create the user in auth.users
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          plan: normalizedPlan,
+          full_name: displayName,
+          role,
+        },
+      });
 
     if (authError) {
       console.error("Auth Error:", authError.message);
@@ -143,7 +159,10 @@ export async function createUser(formData: FormData) {
 
       if (profileError) {
         console.error("Profile Error:", profileError.message);
-        return { success: false, error: "User created, but profile failed: " + profileError.message };
+        return {
+          success: false,
+          error: "User created, but profile failed: " + profileError.message,
+        };
       }
 
       // 3. Send the Welcome Email
@@ -151,7 +170,8 @@ export async function createUser(formData: FormData) {
         await transporter.sendMail({
           from: `"The Automate Learning Portal" <${process.env.ADMIN_EMAIL}>`,
           to: email,
-          subject: "Welcome to The Automate Learning Portal! Your Login Details",
+          subject:
+            "Welcome to The Automate Learning Portal! Your Login Details",
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 10px;">
               <h2 style="color: #174778;">Welcome, ${displayName}!</h2>
@@ -268,7 +288,8 @@ export async function deleteUser(userId: string) {
     }
 
     // ── Step 3: delete the auth account ─────────────────────────────────
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    const { error: authError } =
+      await supabaseAdmin.auth.admin.deleteUser(userId);
     if (authError) throw new Error(authError.message);
 
     revalidatePath("/admin/users");
@@ -281,4 +302,3 @@ export async function deleteUser(userId: string) {
     };
   }
 }
-

@@ -5,12 +5,27 @@ import { supabase } from "@/app/lib/supabase";
 
 export type UserTier = "Starter" | "Pro" | "Premium" | null;
 
-export type Feature = "Videos" | "Chat" | "Ratings" | "Labs" | "Quizzes" | "Webinars" | "Mentorship";
+export type Feature =
+  | "Videos"
+  | "Chat"
+  | "Ratings"
+  | "Labs"
+  | "Quizzes"
+  | "Webinars"
+  | "Mentorship";
 
 const TIER_FEATURES: Record<NonNullable<UserTier>, Feature[]> = {
   Starter: ["Videos", "Chat", "Ratings"],
   Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Mentorship"],
-  Premium: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Webinars", "Mentorship"],
+  Premium: [
+    "Videos",
+    "Chat",
+    "Ratings",
+    "Labs",
+    "Quizzes",
+    "Webinars",
+    "Mentorship",
+  ],
 };
 
 export function useSecurityGatedData() {
@@ -22,14 +37,22 @@ export function useSecurityGatedData() {
 
     async function fetchUserTier() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.user) {
           if (mounted) setIsLoading(false);
           return;
         }
 
-        // Specifically grant Premium access to demouser@gmail.com and user@example.com for feature testing
-        if (session.user.email === "demouser@gmail.com" || session.user.email === "user@example.com" || session.user.email === "premium@gmail.com") {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        const role = profile?.role?.toLowerCase() ?? "";
+        if (role === "admin" || role === "instructor") {
           if (mounted) {
             setTier("Premium");
             setIsLoading(false);
@@ -37,17 +60,24 @@ export function useSecurityGatedData() {
           return;
         }
 
-        // Query the profiles table to see if user has instructor or admin role
-        
-        if (!session) {
-          if (mounted) setIsLoading(false);
+        const normalizedEmail = session.user.email?.trim().toLowerCase() ?? "";
+        const demoPremiumEmails = [
+          "demouser@gmail.com",
+          "user@example.com",
+          "premium@gmail.com",
+        ];
+
+        if (demoPremiumEmails.includes(normalizedEmail)) {
+          if (mounted) {
+            setTier("Premium");
+            setIsLoading(false);
+          }
           return;
         }
 
-        // Call the secure server action to bypass RLS on bundles
-        const { getUserTier } = await import('@/app/actions/tier');
+        const { getUserTier } = await import("@/app/actions/tier");
         const resolvedTier = await getUserTier(session.access_token);
-        
+
         if (mounted && resolvedTier) {
           setTier(resolvedTier);
         }
@@ -73,14 +103,23 @@ export function useSecurityGatedData() {
       if (!tier) return false; // Default to locked if tier is not yet loaded or user is invalid
       return TIER_FEATURES[tier].includes(feature);
     },
-    [tier]
+    [tier],
   );
 
   const fetchGatedData = useCallback(
-    async (tableName: string, requiredFeature: Feature, queryBuilder?: (q: any) => any) => {
+    async (
+      tableName: string,
+      requiredFeature: Feature,
+      queryBuilder?: (q: any) => any,
+    ) => {
       if (!tier || !canAccess(requiredFeature)) {
         // Return empty or throw access denied
-        return { data: null, error: new Error("Access Denied: Your current tier does not permit accessing this content.") };
+        return {
+          data: null,
+          error: new Error(
+            "Access Denied: Your current tier does not permit accessing this content.",
+          ),
+        };
       }
 
       try {
@@ -95,7 +134,7 @@ export function useSecurityGatedData() {
         return { data: null, error };
       }
     },
-    [tier, canAccess]
+    [tier, canAccess],
   );
 
   return { tier, isLoading, canAccess, fetchGatedData };
@@ -120,15 +159,22 @@ export function useCoursePermissions(courseId?: string) {
 
     async function fetchTier() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.user) {
           if (mounted) setIsLoading(false);
           return;
         }
 
         // Demo/test override — always Premium regardless of course
-        const demoEmails = ["demouser@gmail.com", "user@example.com", "premium@gmail.com"];
-        if (demoEmails.includes(session.user.email ?? "")) {
+        const demoEmails = [
+          "demouser@gmail.com",
+          "user@example.com",
+          "premium@gmail.com",
+        ];
+        const normalizedEmail = (session.user.email ?? "").trim().toLowerCase();
+        if (demoEmails.includes(normalizedEmail)) {
           if (mounted) {
             setTier("Premium");
             setIsLoading(false);
@@ -140,11 +186,14 @@ export function useCoursePermissions(courseId?: string) {
 
         if (courseId) {
           // Course-specific tier: scoped to (user, course) pair
-          const { getCourseUserTier } = await import('@/app/actions/tier');
-          resolvedTier = await getCourseUserTier(session.access_token, courseId);
+          const { getCourseUserTier } = await import("@/app/actions/tier");
+          resolvedTier = await getCourseUserTier(
+            session.access_token,
+            courseId,
+          );
         } else {
           // Global fallback: highest tier across all enrollments
-          const { getUserTier } = await import('@/app/actions/tier');
+          const { getUserTier } = await import("@/app/actions/tier");
           resolvedTier = await getUserTier(session.access_token);
         }
 
@@ -163,7 +212,7 @@ export function useCoursePermissions(courseId?: string) {
     return () => {
       mounted = false;
     };
-  // Re-run if courseId changes (e.g., user navigates between courses)
+    // Re-run if courseId changes (e.g., user navigates between courses)
   }, [courseId]);
 
   const canAccess = useCallback(

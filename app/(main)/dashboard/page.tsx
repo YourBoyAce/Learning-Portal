@@ -6,7 +6,15 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import { BookOpen, CheckCircle2, FolderOpen, Users, ShieldAlert, X, ArrowUpRight } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  FolderOpen,
+  Users,
+  ShieldAlert,
+  X,
+  ArrowUpRight,
+} from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
@@ -21,7 +29,14 @@ import {
 } from "@/components/ui/carousel"; // <-- Update path to match your folder structure
 import { ICONS } from "@/app/styles/icons";
 import CueCard from "@/app/components/course/CueCard";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 type Profile = {
   full_name?: string | null;
@@ -57,15 +72,28 @@ interface Insight {
   content: string;
   author: string;
 }
-type LearningActivityDay = { day: string; earnedPoints: number; availablePoints: number; activityPercent: number };
-
+type LearningActivityDay = {
+  day: string;
+  earnedPoints: number;
+  availablePoints: number;
+  activityPercent: number;
+};
 
 export default function Dashboard() {
   const normalizeProgressId = (value: unknown) =>
-    String(value ?? "").trim().replaceAll("-", "").toLowerCase();
+    String(value ?? "")
+      .trim()
+      .replaceAll("-", "")
+      .toLowerCase();
 
-  const resolveModuleCompletion = (modules: any[] = [], progressRows: any[] = []) => {
-    const completionByModuleId = new Map<string, { completed: boolean; progressPercentage: number }>();
+  const resolveModuleCompletion = (
+    modules: any[] = [],
+    progressRows: any[] = [],
+  ) => {
+    const completionByModuleId = new Map<
+      string,
+      { completed: boolean; progressPercentage: number }
+    >();
     const updatedAtByModuleId = new Map<string, string>();
 
     for (const progress of progressRows) {
@@ -88,7 +116,7 @@ export default function Dashboard() {
       if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
         completionByModuleId.set(moduleId, {
           completed: Boolean(progress.completed),
-          progressPercentage: Number(progress.progress_percentage || 0)
+          progressPercentage: Number(progress.progress_percentage || 0),
         });
         updatedAtByModuleId.set(moduleId, updatedAt);
       }
@@ -117,11 +145,70 @@ export default function Dashboard() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const forcePremiumDashboard = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      const role = profile?.role?.toLowerCase() ?? "";
+      if (role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+      if (role === "instructor") {
+        router.replace("/mentor");
+        return;
+      }
+
+      const normalizedEmail = session.user.email?.trim().toLowerCase() ?? "";
+      const isDemoPremium = [
+        "premium@gmail.com",
+        "demouser@gmail.com",
+        "user@example.com",
+      ].includes(normalizedEmail);
+
+      if (isDemoPremium) {
+        router.replace("/premium");
+        return;
+      }
+
+      try {
+        const { getUserTier } = await import("@/app/actions/tier");
+        const tier = await getUserTier(session.access_token);
+        if (tier === "Premium") {
+          router.replace("/premium");
+        }
+      } catch (error) {
+        console.error("Unable to resolve tier for premium redirect:", error);
+      }
+    };
+
+    void forcePremiumDashboard();
+  }, [router]);
+
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
-  const [courseProgress, setCourseProgress] = useState<Record<string, { progressPercentage: number; completedModules: number; totalModules: number }>>({});
+  const [courseProgress, setCourseProgress] = useState<
+    Record<
+      string,
+      {
+        progressPercentage: number;
+        completedModules: number;
+        totalModules: number;
+      }
+    >
+  >({});
   const [nextCourse, setNextCourse] = useState<any>(null);
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -139,9 +226,14 @@ export default function Dashboard() {
   //for progress
   const [completedVideoIds, setCompletedVideoIds] = useState<string[]>([]);
   const [allocationPage, setAllocationPage] = useState(0);
-  const [learningActivity, setLearningActivity] = useState<LearningActivityDay[]>([]);
-  const [learningActivityMeta, setLearningActivityMeta] = useState({ earnedToday: 0, availableToday: 0, currentPlan: "" });
-
+  const [learningActivity, setLearningActivity] = useState<
+    LearningActivityDay[]
+  >([]);
+  const [learningActivityMeta, setLearningActivityMeta] = useState({
+    earnedToday: 0,
+    availableToday: 0,
+    currentPlan: "",
+  });
 
   const loadDashboardData = async () => {
     const {
@@ -158,13 +250,21 @@ export default function Dashboard() {
     setUserId(user.id);
     if (session?.access_token) {
       try {
-        const response = await fetch("/api/learning-analytics", { headers: { Authorization: `Bearer ${session.access_token}` } });
+        const response = await fetch("/api/learning-analytics", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
         const analytics = await response.json().catch(() => null);
         if (response.ok) {
           setLearningActivity(analytics.dailyPoints || []);
-          setLearningActivityMeta({ earnedToday: analytics.earnedToday || 0, availableToday: analytics.availableToday || 0, currentPlan: analytics.currentPlan || "" });
+          setLearningActivityMeta({
+            earnedToday: analytics.earnedToday || 0,
+            availableToday: analytics.availableToday || 0,
+            currentPlan: analytics.currentPlan || "",
+          });
         }
-      } catch (error) { console.error("Unable to load learning activity:", error); }
+      } catch (error) {
+        console.error("Unable to load learning activity:", error);
+      }
     }
 
     const { data: fetchedProfile } = await supabase
@@ -186,7 +286,9 @@ export default function Dashboard() {
     // excluded client-side below using currentTime.
     let calendarQuery = supabase
       .from("calendar_events")
-      .select("id,title,description,event_date,event_time,event_type,user_id,meet_link,tag")
+      .select(
+        "id,title,description,event_date,event_time,event_type,user_id,meet_link,tag",
+      )
       .like("tag", "%status:accepted%")
       .gte("event_date", today)
       .order("event_date", { ascending: true })
@@ -196,7 +298,10 @@ export default function Dashboard() {
     if (isMentorOrAdmin) {
       calendarQuery = calendarQuery.eq("user_id", user.id);
     } else {
-      calendarQuery = calendarQuery.like("description", `%Student ID: ${user.id}%`);
+      calendarQuery = calendarQuery.like(
+        "description",
+        `%Student ID: ${user.id}%`,
+      );
     }
 
     const { data: rawCalendarRows } = await calendarQuery;
@@ -227,7 +332,9 @@ export default function Dashboard() {
         });
       } else {
         // For students: look up the mentor's name from profiles
-        const mentorIds = Array.from(new Set(calendarRows.map((e) => e.user_id)));
+        const mentorIds = Array.from(
+          new Set(calendarRows.map((e) => e.user_id)),
+        );
         const { data: mentorProfiles } = await supabase
           .from("profiles")
           .select("id, full_name, email")
@@ -267,7 +374,9 @@ export default function Dashboard() {
         .single();
 
       setCurrentInsightIndex(profile?.current_insight_index || 0);
-      setUserProfileName(profile?.full_name || session.user.email?.split("@")[0] || "Learner");
+      setUserProfileName(
+        profile?.full_name || session.user.email?.split("@")[0] || "Learner",
+      );
       //Fetch Scholarly insights
       const { data: insightsData } = await supabase
         .from("scholarly_insights")
@@ -289,7 +398,6 @@ export default function Dashboard() {
     }
 
     setProfile((fetchedProfile ?? null) as Profile | null);
-
 
     // Helper: modules belong to the course, not the batch.
     // All modules from the parent course are available to all batches.
@@ -313,23 +421,29 @@ export default function Dashboard() {
       .eq("email", user.email)
       .eq("status", "active");
 
-    const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id) || [];
-    const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id) || [];
+    const enrollmentCourseIds =
+      enrollmentsData?.map((e: any) => e.course_id) || [];
+    const memberCourseIds =
+      courseMembersData?.map((m: any) => m.maincourse_id) || [];
 
     // Combine and deduplicate course IDs
-    const allCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+    const allCourseIds = Array.from(
+      new Set([...enrollmentCourseIds, ...memberCourseIds]),
+    );
 
     let mappedCourses: any[] = [];
     if (allCourseIds.length > 0) {
       const { data: maincoursesData } = await supabase
         .from("maincourses")
-        .select(`
+        .select(
+          `
           id,
           title,
           description,
           category,
           thumbnail_url
-        `)
+        `,
+        )
         .in("id", allCourseIds);
 
       mappedCourses = maincoursesData || [];
@@ -340,15 +454,29 @@ export default function Dashboard() {
 
       // Fetch progress for each enrolled course
       if (user.id && mappedCourses.length > 0) {
-        const progressMap: Record<string, { progressPercentage: number; completedModules: number; totalModules: number }> = {};
+        const progressMap: Record<
+          string,
+          {
+            progressPercentage: number;
+            completedModules: number;
+            totalModules: number;
+          }
+        > = {};
 
         for (const course of mappedCourses) {
           try {
             const progress = await getCourseProgress(user.id, course.id);
             progressMap[String(course.id)] = progress;
           } catch (error) {
-            console.error(`Error fetching progress for course ${course.id}:`, error);
-            progressMap[String(course.id)] = { progressPercentage: 0, completedModules: 0, totalModules: 0 };
+            console.error(
+              `Error fetching progress for course ${course.id}:`,
+              error,
+            );
+            progressMap[String(course.id)] = {
+              progressPercentage: 0,
+              completedModules: 0,
+              totalModules: 0,
+            };
           }
         }
 
@@ -367,37 +495,32 @@ export default function Dashboard() {
             .eq("maincourse_id", course.id)
             .order("order_index", { ascending: true });
 
-          const modules = scopeModulesToBatch(String(course.id), rawModules ?? []);
+          const modules = scopeModulesToBatch(
+            String(course.id),
+            rawModules ?? [],
+          );
 
           if (!modules?.length) continue;
 
           const { data: progressData } = await supabase
             .from("user_video_progress")
-            .select(
-              "video_id, completed, updated_at, progress_percentage"
-            )
+            .select("video_id, completed, updated_at, progress_percentage")
             .eq("user_id", user.id)
             .eq("course_id", course.id);
 
           const moduleCompletion = resolveModuleCompletion(
             modules,
-            progressData ?? []
+            progressData ?? [],
           );
 
           const firstIncomplete = modules.find(
-            (m) =>
-              !moduleCompletion.get(String(m.id))?.completed
+            (m) => !moduleCompletion.get(String(m.id))?.completed,
           );
 
           const progressPercent =
-            courseProgress[String(course.id)]
-              ?.progressPercentage ?? 0;
+            courseProgress[String(course.id)]?.progressPercentage ?? 0;
 
-          if (
-            firstIncomplete &&
-            progressPercent > 0 &&
-            progressPercent < 100
-          ) {
+          if (firstIncomplete && progressPercent > 0 && progressPercent < 100) {
             selectedCourse = course;
             selectedModule = firstIncomplete;
             break;
@@ -413,26 +536,26 @@ export default function Dashboard() {
               .eq("maincourse_id", course.id)
               .order("order_index", { ascending: true });
 
-            const modules = scopeModulesToBatch(String(course.id), rawModules ?? []);
+            const modules = scopeModulesToBatch(
+              String(course.id),
+              rawModules ?? [],
+            );
 
             if (!modules?.length) continue;
 
             const { data: progressData } = await supabase
               .from("user_video_progress")
-              .select(
-                "video_id, completed, updated_at, progress_percentage"
-              )
+              .select("video_id, completed, updated_at, progress_percentage")
               .eq("user_id", user.id)
               .eq("course_id", course.id);
 
             const moduleCompletion = resolveModuleCompletion(
               modules,
-              progressData ?? []
+              progressData ?? [],
             );
 
             const firstIncomplete = modules.find(
-              (m) =>
-                !moduleCompletion.get(String(m.id))?.completed
+              (m) => !moduleCompletion.get(String(m.id))?.completed,
             );
 
             if (firstIncomplete) {
@@ -464,7 +587,10 @@ export default function Dashboard() {
             .order("created_at", { ascending: true })
             .order("id", { ascending: true });
 
-          const courseModules = scopeModulesToBatch(String(course.id), rawCourseModules ?? []);
+          const courseModules = scopeModulesToBatch(
+            String(course.id),
+            rawCourseModules ?? [],
+          );
 
           if (courseModules && courseModules.length > 0) {
             allModules = [...allModules, ...courseModules];
@@ -482,7 +608,10 @@ export default function Dashboard() {
             );
 
             const completedIds = courseModules
-              .filter((module: any) => moduleCompletion.get(String(module.id))?.completed)
+              .filter(
+                (module: any) =>
+                  moduleCompletion.get(String(module.id))?.completed,
+              )
               .map((module: any) => String(module.id));
 
             allCompletedVideoIds = [...allCompletedVideoIds, ...completedIds];
@@ -498,7 +627,9 @@ export default function Dashboard() {
 
         for (const courseModule of allModules) {
           // Check if this module is in our completed list
-          const isCompleted = allCompletedVideoIds.includes(String(courseModule.id));
+          const isCompleted = allCompletedVideoIds.includes(
+            String(courseModule.id),
+          );
 
           // Only process completed modules
           if (!isCompleted) {
@@ -510,14 +641,17 @@ export default function Dashboard() {
             continue;
           }
 
-          const durationStr = String(courseModule.duration).toLowerCase().trim();
+          const durationStr = String(courseModule.duration)
+            .toLowerCase()
+            .trim();
           let durationSec = 0;
 
           // Parse duration from format like "HH:MM:SS"
-          if (durationStr.includes(':')) {
-            const parts = durationStr.split(":").map(p => parseInt(p, 10));
+          if (durationStr.includes(":")) {
+            const parts = durationStr.split(":").map((p) => parseInt(p, 10));
             if (parts.length === 3) {
-              durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+              durationSec =
+                (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
             } else if (parts.length === 2) {
               durationSec = (parts[0] || 0) * 60 + (parts[1] || 0);
             } else if (parts.length === 1 && !isNaN(parts[0])) {
@@ -525,7 +659,11 @@ export default function Dashboard() {
             }
           }
           // Try parsing as text format (e.g., "1h 30m 45s")
-          else if (durationStr.includes('h') || durationStr.includes('m') || durationStr.includes('s')) {
+          else if (
+            durationStr.includes("h") ||
+            durationStr.includes("m") ||
+            durationStr.includes("s")
+          ) {
             const hMatch = durationStr.match(/(\d+\.?\d*)\s*h/);
             const mMatch = durationStr.match(/(\d+\.?\d*)\s*m/);
             const sMatch = durationStr.match(/(\d+\.?\d*)\s*s/);
@@ -547,8 +685,13 @@ export default function Dashboard() {
           }
         }
 
-        const hrs = String(Math.floor(totalCompletedSeconds / 3600)).padStart(2, "0");
-        const mins = String(Math.floor((totalCompletedSeconds % 3600) / 60)).padStart(2, "0");
+        const hrs = String(Math.floor(totalCompletedSeconds / 3600)).padStart(
+          2,
+          "0",
+        );
+        const mins = String(
+          Math.floor((totalCompletedSeconds % 3600) / 60),
+        ).padStart(2, "0");
         const secs = String(totalCompletedSeconds % 60).padStart(2, "0");
         setTotalTime(`${hrs}:${mins}:${secs}`);
 
@@ -559,7 +702,10 @@ export default function Dashboard() {
 
         // Build a map of course modules for lookup
         const courseModulesMap = new Map<string, any[]>();
-        const courseProgressMap = new Map<string, Map<string, { completed: boolean }>>();
+        const courseProgressMap = new Map<
+          string,
+          Map<string, { completed: boolean }>
+        >();
 
         for (const course of mappedCourses) {
           const { data: rawCourseModules2 } = await supabase
@@ -570,7 +716,10 @@ export default function Dashboard() {
             .order("created_at", { ascending: true })
             .order("id", { ascending: true });
 
-          const courseModules = scopeModulesToBatch(String(course.id), rawCourseModules2 ?? []);
+          const courseModules = scopeModulesToBatch(
+            String(course.id),
+            rawCourseModules2 ?? [],
+          );
 
           if (courseModules && courseModules.length > 0) {
             courseModulesMap.set(course.id, courseModules);
@@ -583,7 +732,10 @@ export default function Dashboard() {
               .eq("course_id", course.id)
               .order("updated_at", { ascending: false });
 
-            const moduleCompletion = resolveModuleCompletion(courseModules, progressData ?? []);
+            const moduleCompletion = resolveModuleCompletion(
+              courseModules,
+              progressData ?? [],
+            );
             courseProgressMap.set(course.id, moduleCompletion);
 
             // Find the module with most recent activity in this course
@@ -594,11 +746,16 @@ export default function Dashboard() {
                 // Find the matching module
                 const matchingModule = courseModules.find(
                   (m: any) =>
-                    normalizeProgressId(m.id) === normalizeProgressId(progress.video_id) ||
-                    normalizeProgressId(m.video_cf_id) === normalizeProgressId(progress.video_id)
+                    normalizeProgressId(m.id) ===
+                      normalizeProgressId(progress.video_id) ||
+                    normalizeProgressId(m.video_cf_id) ===
+                      normalizeProgressId(progress.video_id),
                 );
 
-                if (matchingModule && (!mostRecentActivity || progressDate > mostRecentActivity)) {
+                if (
+                  matchingModule &&
+                  (!mostRecentActivity || progressDate > mostRecentActivity)
+                ) {
                   mostRecentActivity = progressDate;
                   resumeModule = matchingModule;
                   resumeCourse = course;
@@ -612,13 +769,15 @@ export default function Dashboard() {
         // If we found a recently viewed module, check if it's incomplete
         if (resumeModule && resumeCourse) {
           const moduleCompletion = courseProgressMap.get(resumeCourse.id);
-          const isCompleted = moduleCompletion?.get(String(resumeModule.id))?.completed;
+          const isCompleted = moduleCompletion?.get(
+            String(resumeModule.id),
+          )?.completed;
 
           // If it's completed, try to find an incomplete module in the same course
           if (isCompleted) {
             const courseModules = courseModulesMap.get(resumeCourse.id) || [];
             const incompleteModule = courseModules.find(
-              (m: any) => !moduleCompletion?.get(String(m.id))?.completed
+              (m: any) => !moduleCompletion?.get(String(m.id))?.completed,
             );
 
             if (incompleteModule) {
@@ -638,7 +797,7 @@ export default function Dashboard() {
             const moduleCompletion = courseProgressMap.get(course.id);
 
             const incompleteModule = courseModules.find(
-              (m: any) => !moduleCompletion?.get(String(m.id))?.completed
+              (m: any) => !moduleCompletion?.get(String(m.id))?.completed,
             );
 
             if (incompleteModule) {
@@ -694,17 +853,17 @@ export default function Dashboard() {
     const subscription = supabase
       .channel(`user_video_progress:${userId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'user_video_progress',
+          event: "*",
+          schema: "public",
+          table: "user_video_progress",
           filter: `user_id=eq.${userId}`,
         },
         async () => {
           // Re-load all dashboard data when any progress change occurs
           await loadDashboardData();
-        }
+        },
       )
       .subscribe();
 
@@ -720,8 +879,6 @@ export default function Dashboard() {
       "Learner"
     );
   }, [profile?.full_name, userEmail]);
-
-
 
   const hasEnrollments = enrolledCourses.length > 0;
   const currentInsight = insights[currentInsightIndex] || {
@@ -782,12 +939,7 @@ export default function Dashboard() {
   }).length;
 
   const progressPercentage =
-    totalModules > 0
-      ? Math.round(
-        (completedModules / totalModules) * 100
-      )
-      : 0;
-
+    totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -796,19 +948,28 @@ export default function Dashboard() {
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm animate-in slide-in-from-top-4 fade-in duration-300">
             <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-800">
-                Welcome!
-              </p>
+              <p className="text-sm font-semibold text-amber-800">Welcome!</p>
               <p className="text-xs text-amber-700 mt-0.5">
-                For security purposes, please change your default password in your profile settings.
+                For security purposes, please change your default password in
+                your profile settings.
               </p>
               <button
                 onClick={() => router.push("/profile")}
                 className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700"
               >
                 Change Password
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             </div>
@@ -859,10 +1020,8 @@ export default function Dashboard() {
         {/* Upcoming Webinars Widget */}
         {/* --- Side-by-Side Layout: Webinars & Learning Activity Graph --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
-
           {/* 1. Upcoming Mentor Session Widget */}
           <div className="bg-surface-accent rounded-2xl p-4 md:p-5 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col ">
-
             <div className="flex items-center justify-between mb-3 relative z-10">
               <span className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em]">
                 Live 1-on-1
@@ -872,7 +1031,9 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-1 relative z-10`}>
+            <h2
+              className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-1 relative z-10`}
+            >
               Upcoming Mentor Session
             </h2>
             <p className="text-sm text-gray-600 mb-1 relative z-10">
@@ -892,10 +1053,19 @@ export default function Dashboard() {
               ) : upcomingEvents.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
                   <div className="w-14 h-14 bg-surface-subtle rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                    <Image src={ICONS.CALENDAR} alt="Calendar" width={20} height={20} />
+                    <Image
+                      src={ICONS.CALENDAR}
+                      alt="Calendar"
+                      width={20}
+                      height={20}
+                    />
                   </div>
-                  <p className="text-gray-700 font-medium">No upcoming mentor sessions</p>
-                  <p className="text-xs text-gray-500 mt-1">Check back later or visit your calendar.</p>
+                  <p className="text-gray-700 font-medium">
+                    No upcoming mentor sessions
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Check back later or visit your calendar.
+                  </p>
                 </div>
               ) : (
                 <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide relative z-10">
@@ -935,15 +1105,24 @@ export default function Dashboard() {
                           </p>
                         )}
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                          {event.description?.replace(/Requested by:.*?\)/, "").replace(/Student ID:.*/, "").trim() || "Deep dive into advanced concepts with our industry experts."}
+                          {event.description
+                            ?.replace(/Requested by:.*?\)/, "")
+                            .replace(/Student ID:.*/, "")
+                            .trim() ||
+                            "Deep dive into advanced concepts with our industry experts."}
                         </p>
                       </div>
 
                       <div className="pt-4 border-t border-brand-primary/10 flex items-center justify-between mt-auto">
                         <div className="space-y-0.5">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Commences at</p>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+                            Commences at
+                          </p>
                           <p className="text-xs font-black text-brand-primary">
-                            {formatEventLabel(event.event_date, event.event_time)}
+                            {formatEventLabel(
+                              event.event_date,
+                              event.event_time,
+                            )}
                           </p>
                         </div>
                         {event.meet_link ? (
@@ -970,8 +1149,25 @@ export default function Dashboard() {
 
           <section className="h-full flex flex-col rounded-2xl border border-gray-100 bg-white p-5 sm:p-7 shadow-sm">
             <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div><h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Learning Activity</h2><p className="mt-1 text-sm text-gray-500">Your completed learning activity this week.</p></div>
-              <div className="text-left sm:text-right"><p className="text-lg font-bold text-brand-primary">{learningActivityMeta.earnedToday} / {learningActivityMeta.availableToday} points</p>{learningActivityMeta.currentPlan && <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{learningActivityMeta.currentPlan}</p>}</div>
+              <div>
+                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                  Learning Activity
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Your completed learning activity this week.
+                </p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-lg font-bold text-brand-primary">
+                  {learningActivityMeta.earnedToday} /{" "}
+                  {learningActivityMeta.availableToday} points
+                </p>
+                {learningActivityMeta.currentPlan && (
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    {learningActivityMeta.currentPlan}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="flex-1 min-h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -1040,18 +1236,18 @@ export default function Dashboard() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <p className="mt-3 text-xs text-gray-400">Activity is shown relative to the points available in your enrolled courses.</p>
+            <p className="mt-3 text-xs text-gray-400">
+              Activity is shown relative to the points available in your
+              enrolled courses.
+            </p>
           </section>
-
         </div>
 
         {/* Active Course & Progress — "Up Next" Section */}
         {hasEnrollments && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-
             {/* LEFT SIDE - UP NEXT */}
             <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 sm:p-7 shadow-sm">
-
               {/* Header row */}
               <div className="flex items-start justify-between mb-5">
                 <span className="text-[10px] font-black text-white bg-brand-heading px-3 py-1.5 rounded-md uppercase tracking-widest">
@@ -1063,7 +1259,9 @@ export default function Dashboard() {
                     Total Time
                   </p>
 
-                  <p className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary font-black tracking-tight font-mono`}>
+                  <p
+                    className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary font-black tracking-tight font-mono`}
+                  >
                     {totalTime}
                   </p>
                 </div>
@@ -1084,7 +1282,9 @@ export default function Dashboard() {
                   {/* Course Thumbnail */}
                   <div className="w-20 h-20 sm:w-24 sm:h-24 bg-[#2a2a2a] rounded-xl flex items-center justify-center shrink-0 overflow-hidden border-2 border-gray-200 group-hover:border-brand-primary/30 transition-colors">
                     <img
-                      src={nextCourse?.thumbnail_url || "/images/instructor.png"}
+                      src={
+                        nextCourse?.thumbnail_url || "/images/instructor.png"
+                      }
                       alt={nextCourse?.title || "Course thumbnail"}
                       className="w-full h-full object-contain"
                     />
@@ -1101,7 +1301,6 @@ export default function Dashboard() {
                       <span className="font-semibold text-gray-700">
                         The Automate
                       </span>
-
                       {nextModule.duration && <> • {nextModule.duration}</>}
                     </p>
                   </div>
@@ -1132,7 +1331,8 @@ export default function Dashboard() {
                     You&apos;re all caught up!
                   </h3>
                   <p className="text-sm text-gray-500 max-w-sm">
-                    You&apos;ve completed every module currently available in your enrolled courses.
+                    You&apos;ve completed every module currently available in
+                    your enrolled courses.
                   </p>
                 </div>
               )}
@@ -1140,8 +1340,9 @@ export default function Dashboard() {
 
             {/* RIGHT SIDE - LEARNING PROGRESS */}
             <div className="bg-surface-accent border border-brand-primary/20 rounded-2xl p-6 md:p-7 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md flex flex-col h-full">
-
-              <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-7 relative z-10`}>
+              <h2
+                className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-7 relative z-10`}
+              >
                 Learning Progress
               </h2>
               {/* Circle */}
@@ -1162,9 +1363,21 @@ export default function Dashboard() {
                         className="-rotate-90"
                       >
                         <defs>
-                          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="var(--color-primary)" />
-                            <stop offset="100%" stopColor="var(--color-success)" />
+                          <linearGradient
+                            id="progressGradient"
+                            x1="0%"
+                            y1="0%"
+                            x2="100%"
+                            y2="0%"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="var(--color-primary)"
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="var(--color-success)"
+                            />
                           </linearGradient>
                         </defs>
                         {/* Background Ring */}
@@ -1195,7 +1408,9 @@ export default function Dashboard() {
                       {/* Center Content */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center">
-                          <h1 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary`}>
+                          <h1
+                            className={`${TYPOGRAPHY_CLASSES.SUBHEADING} text-brand-primary`}
+                          >
                             {progressPercentage}%
                           </h1>
 
@@ -1212,12 +1427,13 @@ export default function Dashboard() {
               {/* Stats Wrapped in Glassmorphism */}
               <div className="mt-auto pt-8 relative z-10">
                 <div className="bg-white border border-gray-100 rounded-xl p-5 space-y-4 shadow-sm">
-
                   <div className="flex items-center justify-between border-b border-brand-primary/10 pb-4">
                     <span className="text-sm font-medium text-gray-600">
                       Modules Completed
                     </span>
-                    <span className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}>
+                    <span
+                      className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}
+                    >
                       {completedModules}/{totalModules}
                     </span>
                   </div>
@@ -1226,29 +1442,31 @@ export default function Dashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       Courses Assigned
                     </span>
-                    <span className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}>
+                    <span
+                      className={`${TYPOGRAPHY.BODY.fontSize} font-semibold text-brand-primary`}
+                    >
                       {enrolledCourses.length}
                     </span>
                   </div>
-
                 </div>
               </div>
-
             </div>
           </div>
         )}
-
-
 
         {/* Active Studies Grid / Carousel — driven by batch enrollments */}
         {(() => {
           // Use batch-based enrollments as the primary data source.
           // Progress is still keyed by courseId (that's where user_video_progress rows live).
           const activeEnrollments = enrollments.filter(
-            (e) => (courseProgress[String(e.courseId)]?.progressPercentage || 0) < 100
+            (e) =>
+              (courseProgress[String(e.courseId)]?.progressPercentage || 0) <
+              100,
           );
           const completedEnrollments = enrollments.filter(
-            (e) => (courseProgress[String(e.courseId)]?.progressPercentage || 0) === 100
+            (e) =>
+              (courseProgress[String(e.courseId)]?.progressPercentage || 0) ===
+              100,
           );
 
           return (
@@ -1278,13 +1496,18 @@ export default function Dashboard() {
                             id={String(enrollment.courseId)}
                             title={enrollment.courseTitle}
                             description={enrollment.courseDescription || ""}
-                            thumbnail={(enrollment as any).courseThumbnail || undefined}
+                            thumbnail={
+                              (enrollment as any).courseThumbnail || undefined
+                            }
                             progressPercentage={
-                              courseProgress[String(enrollment.courseId)]?.progressPercentage || 0
+                              courseProgress[String(enrollment.courseId)]
+                                ?.progressPercentage || 0
                             }
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(enrollment.courseId!)}
+                            onClick={() =>
+                              handleOpenCourse(enrollment.courseId!)
+                            }
                           />
                         </CarouselItem>
                       ))}
@@ -1329,13 +1552,18 @@ export default function Dashboard() {
                             id={String(enrollment.courseId)}
                             title={enrollment.courseTitle}
                             description={enrollment.courseDescription || ""}
-                            thumbnail={(enrollment as any).courseThumbnail || undefined}
+                            thumbnail={
+                              (enrollment as any).courseThumbnail || undefined
+                            }
                             progressPercentage={
-                              courseProgress[String(enrollment.courseId)]?.progressPercentage || 0
+                              courseProgress[String(enrollment.courseId)]
+                                ?.progressPercentage || 0
                             }
                             showProgress
                             variant="user"
-                            onClick={() => handleOpenCourse(enrollment.courseId!)}
+                            onClick={() =>
+                              handleOpenCourse(enrollment.courseId!)
+                            }
                           />
                         </CarouselItem>
                       ))}
@@ -1357,45 +1585,47 @@ export default function Dashboard() {
         {/* Upcoming courses section */}
 
         {upcomingCoursesList.length > 0 && (
-          <section><div className="mb-12 relative px-0 sm:px-4 md:px-0">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                Coming Soon
-              </h2>
+          <section>
+            <div className="mb-12 relative px-0 sm:px-4 md:px-0">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                  Coming Soon
+                </h2>
+              </div>
+
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: false,
+                  dragFree: true,
+                }}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
+                  {upcomingCoursesList.map((course) => (
+                    <CarouselItem
+                      key={course.id}
+                      className="pl-4 sm:pl-6 basis-[85vw] sm:basis-[45%] lg:basis-[23%]"
+                    >
+                      <CueCard
+                        title={course.title}
+                        thumbnail={course.thumbnail_url}
+                        onClick={() => console.log("Clicked:", course.title)}
+                      />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+
+                {/* Navigation Arrows */}
+                {upcomingCoursesList.length > 3 && (
+                  <>
+                    <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+                    <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
+                  </>
+                )}
+              </Carousel>
             </div>
-
-            <Carousel
-              opts={{
-                align: "start",
-                loop: false,
-                dragFree: true,
-              }}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
-                {upcomingCoursesList.map((course) => (
-                  <CarouselItem
-                    key={course.id}
-                    className="pl-4 sm:pl-6 basis-[85vw] sm:basis-[45%] lg:basis-[23%]"
-                  >
-                    <CueCard
-                      title={course.title}
-                      thumbnail={course.thumbnail_url}
-                      onClick={() => console.log("Clicked:", course.title)}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-
-              {/* Navigation Arrows */}
-              {upcomingCoursesList.length > 3 && (
-                <>
-                  <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
-                  <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
-                </>
-              )}
-            </Carousel>
-          </div></section>
+          </section>
         )}
 
         <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
@@ -1405,7 +1635,12 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3 mb-4 relative z-10">
             <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-              <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
+              <Image
+                src={ICONS.BOOKLIGHT}
+                alt="Certificate"
+                width={20}
+                height={20}
+              />
             </div>
             <h3 className="font-bold text-brand-heading text-base">
               The Automate Insight
@@ -1436,7 +1671,9 @@ export default function Dashboard() {
               onClick={handleMarkInsightAsRead}
               disabled={insights.length === 0}
               className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
-            > Mark as Read
+            >
+              {" "}
+              Mark as Read
             </Button>
           </div>
         </section>

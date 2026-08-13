@@ -78,6 +78,7 @@ export default function AdminUsers() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("user");
+  const [plan, setPlan] = useState("starter");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formFeedback, setFormFeedback] = useState({ type: "", message: "" });
 
@@ -181,6 +182,7 @@ export default function AdminUsers() {
     formData.append("email", email);
     formData.append("password", password);
     formData.append("role", role);
+    formData.append("plan", plan);
     if (role === "admin") {
       formData.append("phone", phone);
     }
@@ -199,6 +201,7 @@ export default function AdminUsers() {
       setPassword("");
       setPhone("");
       setRole("user");
+      setPlan("starter");
       fetchUsers();
     } else {
       setFormFeedback({
@@ -363,6 +366,26 @@ export default function AdminUsers() {
                     {ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    User Plan
+                  </label>
+                  <select
+                    value={plan}
+                    onChange={(e) => setPlan(e.target.value)}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
+                  >
+                    <option value="starter">Starter</option>
+                    <option value="pro">Pro</option>
+                    <option value="premium">Premium</option>
                   </select>
                 </div>
 

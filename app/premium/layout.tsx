@@ -30,7 +30,34 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    if (!isTierLoading) {
+    if (isTierLoading) return;
+
+    const enforcePremiumAccess = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        router.replace("/login");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      const role = profile?.role?.toLowerCase() ?? "";
+      if (role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+      if (role === "instructor") {
+        router.replace("/mentor");
+        return;
+      }
+
       if (tier === null) {
         router.replace("/login");
         return;
@@ -39,7 +66,9 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
       if (tier !== "Premium") {
         router.replace("/dashboard");
       }
-    }
+    };
+
+    void enforcePremiumAccess();
   }, [isTierLoading, tier, router]);
 
   useEffect(() => {
