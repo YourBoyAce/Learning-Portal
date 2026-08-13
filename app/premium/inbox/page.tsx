@@ -52,7 +52,7 @@ export default function PremiumInboxPage() {
 
       if (error) throw error;
 
-      const mapped = (data || []).map((row: any) => {
+      const mapped: WebinarInvite[] = (data || []).map((row: any) => {
         const tag = row.tag || "";
         let status: WebinarInvite["status"] = "pending";
 
@@ -60,7 +60,7 @@ export default function PremiumInboxPage() {
         else if (tag.includes("status:declined")) status = "declined";
 
         return {
-          id: row.id,
+          id: String(row.id),
           title: row.title || "Live webinar invitation",
           description: row.description || "",
           event_date: row.event_date || "",
@@ -69,6 +69,33 @@ export default function PremiumInboxPage() {
           status,
         };
       });
+
+      // Also load webinars from public webinars table to ensure admin-created webinars are visible
+      const { data: globalWebinars } = await supabase
+        .from("webinars")
+        .select("id, title, subtitle, description, event_date, status")
+        .order("created_at", { ascending: false });
+
+      if (globalWebinars && globalWebinars.length > 0) {
+        globalWebinars.forEach((w: any) => {
+          const isAlreadyInvited = mapped.some(
+            (m) =>
+              m.title.toLowerCase().includes(w.title.toLowerCase()) ||
+              w.title.toLowerCase().includes(m.title.toLowerCase()),
+          );
+          if (!isAlreadyInvited) {
+            mapped.push({
+              id: `webinar-${w.id}`,
+              title: w.title,
+              description: w.description || w.subtitle || "Premium Live Webinar",
+              event_date: w.event_date || new Date().toISOString().split("T")[0],
+              event_time: "10:00:00",
+              tag: "status:pending|webinar",
+              status: "pending",
+            });
+          }
+        });
+      }
 
       setInvites(mapped.filter((invite) => invite.status !== "declined"));
     } catch (error) {

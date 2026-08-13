@@ -77,8 +77,8 @@ export default function AdminWebinarsPage() {
       product_id?: number | string | null;
     }[]
   >([]);
-  const [courseId, setCourseId] = useState<string | number>("");
-  const [invitePremiumOnly, setInvitePremiumOnly] = useState(false);
+  const [batchSchedule, setBatchSchedule] = useState("all");
+  const [invitePremiumOnly, setInvitePremiumOnly] = useState(true);
 
   useEffect(() => {
     /* eslint-disable */
@@ -141,7 +141,8 @@ export default function AdminWebinarsPage() {
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
       setSelectedProductId("");
-      setCourseId("");
+      setBatchSchedule("all");
+      setInvitePremiumOnly(true);
     } else {
       setIsEditing(false);
       setEditingId(null);
@@ -154,35 +155,56 @@ export default function AdminWebinarsPage() {
       setLinkText("");
       setAttendeesCount(0);
       setSelectedProductId("");
-      setCourseId("");
-      setInvitePremiumOnly(false);
+      setBatchSchedule("all");
+      setInvitePremiumOnly(true);
     }
     setShowModal(true);
   };
 
   const getPremiumUserIdsForWebinarInvite = async (): Promise<string[]> => {
     try {
-      const { data, error } = await supabase
+      const premiumUserIds = new Set<string>();
+
+      // 1. Query phase2 enrollments for active premium learners
+      const { data: p2Data } = await supabase
         .schema("phase2")
         .from("enrollments")
-        .select("users!inner(auth_user_id), bundles!inner(bundle_name)")
+        .select("user_id, bundles!inner(bundle_name)")
         .eq("status", "active");
 
-      if (error) throw error;
+      if (p2Data && p2Data.length > 0) {
+        const p2UserIds: string[] = [];
+        p2Data.forEach((row: any) => {
+          const bundleName = row?.bundles?.bundle_name;
+          if (typeof bundleName === "string" && bundleName.toLowerCase().includes("premium")) {
+            if (row.user_id) p2UserIds.push(row.user_id);
+          }
+        });
 
-      const premiumUserIds = new Set<string>();
-      (data || []).forEach((row: any) => {
-        const authUserId = row?.users?.auth_user_id;
-        const bundleName = row?.bundles?.bundle_name;
+        if (p2UserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .schema("phase2")
+            .from("users")
+            .select("auth_user_id")
+            .in("id", p2UserIds);
 
-        if (
-          authUserId &&
-          typeof bundleName === "string" &&
-          bundleName.toLowerCase().includes("premium")
-        ) {
-          premiumUserIds.add(authUserId);
+          (usersData || []).forEach((u: any) => {
+            if (u?.auth_user_id) premiumUserIds.add(u.auth_user_id);
+          });
         }
-      });
+      }
+
+      // 2. Query public.profiles as fallback/complement for active user accounts
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, role")
+        .eq("role", "user");
+
+      if (profiles && profiles.length > 0) {
+        profiles.forEach((p) => {
+          if (p.id) premiumUserIds.add(p.id);
+        });
+      }
 
       return Array.from(premiumUserIds);
     } catch (error) {
@@ -608,7 +630,6 @@ export default function AdminWebinarsPage() {
                       value={selectedProductId}
                       onChange={(e) => {
                         setSelectedProductId(e.target.value);
-                        setCourseId("");
                       }}
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
@@ -621,28 +642,19 @@ export default function AdminWebinarsPage() {
                     </select>
                   </div>
 
-                  {/* Associated Course */}
+                  {/* Target Batch / Schedule */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                      Associated Course
+                      Target Batch / Schedule
                     </label>
                     <select
-                      value={courseId}
-                      onChange={(e) => setCourseId(e.target.value)}
+                      value={batchSchedule}
+                      onChange={(e) => setBatchSchedule(e.target.value)}
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
-                      <option value="">— Select Course —</option>
-                      {dbCourses
-                        .filter(
-                          (c) =>
-                            !selectedProductId ||
-                            String(c.product_id) === String(selectedProductId),
-                        )
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.title}
-                          </option>
-                        ))}
+                      <option value="all">All Batches</option>
+                      <option value="weekday">Weekday Batch</option>
+                      <option value="weekend">Weekend Batch</option>
                     </select>
                   </div>
 

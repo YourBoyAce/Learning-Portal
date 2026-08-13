@@ -93,6 +93,37 @@ export default function LiveWebinarsPage() {
           batchName: undefined,
         }));
 
+        // Include webinars from public webinars table
+        const { data: globalWebinars } = await supabase
+          .from("webinars")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (globalWebinars && globalWebinars.length > 0) {
+          globalWebinars.forEach((gw: any) => {
+            const exists = mapped.some(
+              (m) =>
+                m.title.toLowerCase().includes(gw.title.toLowerCase()) ||
+                gw.title.toLowerCase().includes(m.title.toLowerCase()),
+            );
+            if (!exists) {
+              mapped.push({
+                id: gw.id,
+                title: gw.title,
+                subtitle: gw.subtitle || "Premium live session",
+                description: gw.description || "",
+                event_date: gw.event_date || "",
+                icon: gw.icon || "📋",
+                status: gw.status || "streaming",
+                link_text: gw.link_text || "",
+                attendees_count: gw.attendees_count || 0,
+                batch_id: gw.batch_id || null,
+                batchName: undefined,
+              });
+            }
+          });
+        }
+
         setWebinars(mapped);
       } catch (err) {
         console.error("Error loading accepted webinar invites:", err);

@@ -165,6 +165,29 @@ export async function createUser(formData: FormData) {
         };
       }
 
+      // 2b. Wire to phase2.users table
+      try {
+        const { error: phase2UserError } = await supabaseAdmin
+          .schema("phase2" as any)
+          .from("users")
+          .upsert(
+            {
+              auth_user_id: authData.user.id,
+              email: email,
+              full_name: displayName,
+              role: role,
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "auth_user_id" }
+          );
+
+        if (phase2UserError) {
+          console.error("Phase 2 User sync error:", phase2UserError.message);
+        }
+      } catch (p2Err) {
+        console.error("Phase 2 User creation exception:", p2Err);
+      }
+
       // 3. Send the Welcome Email
       try {
         await transporter.sendMail({

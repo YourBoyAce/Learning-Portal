@@ -1205,28 +1205,36 @@ export default function AdminCourses() {
                     <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                       Product
                     </label>
-                    <div className="flex gap-4 mb-3">
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={productMode === "existing"}
-                          onChange={() => setProductMode("existing")}
-                          className="accent-brand-primary"
-                        />
-                        Choose Existing
-                      </label>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={productMode === "new"}
-                          onChange={() => setProductMode("new")}
-                          className="accent-brand-primary"
-                        />
-                        Create New
-                      </label>
-                    </div>
+                    {isEditing ? (
+                      <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800">
+                        {products.find((p) => String(p.id) === selectedProductId)?.title ||
+                          selectedProductId ||
+                          "Assigned Product"}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex gap-4 mb-3">
+                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={productMode === "existing"}
+                              onChange={() => setProductMode("existing")}
+                              className="accent-brand-primary"
+                            />
+                            Choose Existing
+                          </label>
+                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={productMode === "new"}
+                              onChange={() => setProductMode("new")}
+                              className="accent-brand-primary"
+                            />
+                            Create New
+                          </label>
+                        </div>
 
-                    {productMode === "existing" && (
+                        {productMode === "existing" && (
                       <div className="relative">
                         {/* Custom dropdown trigger */}
                         <button
@@ -1455,6 +1463,8 @@ export default function AdminCourses() {
                           </label>
                         )}
                       </div>
+                    )}
+                      </>
                     )}
                   </div>
 
