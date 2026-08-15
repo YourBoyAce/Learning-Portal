@@ -235,60 +235,111 @@ export default function AdminWebinarsPage() {
         attendees_count: attendeesCount,
       };
 
-      let createdWebinarId: number | null = null;
-
       if (isEditing && editingId) {
+        // ── EDIT: update the webinar row ──────────────────────────────────
         const { error } = await supabase
           .from("webinars")
           .update(webinarData)
           .eq("id", editingId);
         if (error) throw error;
-        showToast("Webinar updated successfully.");
+
+        // Update existing calendar_events invitations for this webinar.
+        // Only title/description/date/time change — user_id, webinar_id and
+        // tag (which holds RSVP status) are intentionally NOT touched.
+        const updatedInviteFields = {
+          title: `Webinar invite: ${title}`,
+          description: `${description || "Join our live webinar."}\n---\nWebinar: ${title}\nDate: ${eventDate}\nHosted by: ${subtitle || "Admin"}\nType: Webinar`,
+          event_date: eventDate ? eventDate.split("T")[0] : "",
+          event_time:
+            eventDate && eventDate.includes("T")
+              ? `${eventDate.split("T")[1]}:00`
+              : "09:00:00",
+          // Stamp webinar_id on rows that previously had NULL (created before this fix)
+          webinar_id: editingId,
+        };
+
+        // Fetch the webinar's OLD title so we can match legacy rows by title.
+        // This handles invitations created before webinar_id was populated.
+        const existingWebinar = webinars.find((w) => w.id === editingId);
+        const oldInviteTitle = `Webinar invite: ${existingWebinar?.title ?? title}`;
+
+        // Try to update by webinar_id first (new rows), then fall back to old title match.
+        const { count: matchCount } = await supabase
+          .from("calendar_events")
+          .select("id", { count: "exact", head: true })
+          .eq("webinar_id", editingId);
+
+        let inviteUpdateError: unknown = null;
+
+        if ((matchCount ?? 0) > 0) {
+          // New rows — matched by webinar_id
+          const { error } = await supabase
+            .from("calendar_events")
+            .update(updatedInviteFields)
+            .eq("webinar_id", editingId);
+          inviteUpdateError = error;
+        } else {
+          // Legacy rows — matched by old invitation title (webinar_id was NULL)
+          const { error } = await supabase
+            .from("calendar_events")
+            .update(updatedInviteFields)
+            .eq("title", oldInviteTitle)
+            .eq("event_type", "webinar");
+          inviteUpdateError = error;
+        }
+
+        if (inviteUpdateError) {
+          // Webinar was updated but invitations could not be synced — surface this clearly.
+          console.error("Invitation update failed:", inviteUpdateError);
+          showToast(
+            "Webinar updated, but invitation sync failed. Please check the console.",
+          );
+        } else {
+          showToast("Webinar updated successfully.");
+        }
       } else {
+        // ── CREATE: insert the webinar, then create invitations ───────────
         const { data, error } = await supabase
           .from("webinars")
           .insert([webinarData])
           .select("id")
           .single();
         if (error) throw error;
-        createdWebinarId = data?.id ?? null;
-      }
+        const createdWebinarId: number | null = data?.id ?? null;
 
-      if (invitePremiumOnly) {
-        const premiumUserIds = await getPremiumUserIdsForWebinarInvite();
+        if (invitePremiumOnly) {
+          const premiumUserIds = await getPremiumUserIdsForWebinarInvite();
 
-        if (premiumUserIds.length > 0) {
-          const inviteRows = premiumUserIds.map((userId) => ({
-            user_id: userId,
-            title: `Webinar invite: ${title}`,
-            description: `${description || "Join our live webinar."}\n---\nWebinar: ${title}\nDate: ${eventDate}\nHosted by: ${subtitle || "Admin"}\nType: Webinar`,
-            event_date: eventDate ? eventDate.split("T")[0] : "",
-            event_time:
-              eventDate && eventDate.includes("T")
-                ? `${eventDate.split("T")[1]}:00`
-                : "09:00:00",
-            event_type: "webinar",
-            tag: "status:pending|webinar|dur:60",
-          }));
+          if (premiumUserIds.length > 0) {
+            const inviteRows = premiumUserIds.map((userId) => ({
+              user_id: userId,
+              title: `Webinar invite: ${title}`,
+              description: `${description || "Join our live webinar."}\n---\nWebinar: ${title}\nDate: ${eventDate}\nHosted by: ${subtitle || "Admin"}\nType: Webinar`,
+              event_date: eventDate ? eventDate.split("T")[0] : "",
+              event_time:
+                eventDate && eventDate.includes("T")
+                  ? `${eventDate.split("T")[1]}:00`
+                  : "09:00:00",
+              event_type: "webinar",
+              tag: "status:pending|webinar|dur:60",
+              webinar_id: createdWebinarId,
+            }));
 
-          const { error: inviteError } = await supabase
-            .from("calendar_events")
-            .insert(inviteRows);
-          if (inviteError) throw inviteError;
-          showToast(
-            `Webinar created and invited ${premiumUserIds.length} premium users.`,
-          );
+            const { error: inviteError } = await supabase
+              .from("calendar_events")
+              .insert(inviteRows);
+            if (inviteError) throw inviteError;
+            showToast(
+              `Webinar created and invited ${premiumUserIds.length} premium users.`,
+            );
+          } else {
+            showToast(
+              "Webinar created. No premium users were found for invites.",
+            );
+          }
         } else {
-          showToast(
-            "Webinar created. No premium users were found for invites.",
-          );
+          showToast("Webinar created successfully.");
         }
-      } else {
-        showToast(
-          isEditing
-            ? "Webinar updated successfully."
-            : "Webinar created successfully.",
-        );
       }
 
       setShowModal(false);
@@ -492,11 +543,10 @@ export default function AdminWebinarsPage() {
                       </td>
                       <td className="py-5 px-6">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${
-                            webinar.status === "streaming"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                               : "bg-blue-50 text-blue-700 border-blue-100"
-                          }`}
+                            }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${webinar.status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`}

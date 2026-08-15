@@ -770,8 +770,10 @@ export async function PUT(request: Request) {
   if (productTitle && month) {
     titleUpdate = `${productTitle} - ${month}`;
   } else if (typeof body?.title === "string" && body.title.trim()) {
+    // Direct title provided (e.g. edit where product/month were not re-selected)
     titleUpdate = body.title.trim();
   }
+  // If titleUpdate remains undefined, the existing title in the DB is preserved.
 
   const updatePayload: Record<string, unknown> = {
     description,

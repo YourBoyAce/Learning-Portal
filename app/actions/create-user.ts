@@ -173,8 +173,8 @@ export async function createUser(formData: FormData) {
           .upsert(
             {
               auth_user_id: authData.user.id,
+              username: username,
               email: email,
-              full_name: displayName,
               role: role,
               created_at: new Date().toISOString(),
             },

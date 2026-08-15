@@ -139,6 +139,7 @@ export default function AdminCourses() {
     "existing",
   );
   const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedProductName, setSelectedProductName] = useState<string>("");
   const [newProductTitle, setNewProductTitle] = useState("");
   const [newProductDescription, setNewProductDescription] = useState("");
   const [newProductThumbnailFile, setNewProductThumbnailFile] =
@@ -159,7 +160,7 @@ export default function AdminCourses() {
           "")
         : newProductTitle.trim();
     if (!productTitle || !batchMonth) return "";
-    return `${productTitle} - ${batchMonth}`;
+    return `${productTitle} - ${batchMonth} ${batchYear}`;
   })();
 
   // Delete Confirmation State
@@ -237,6 +238,7 @@ export default function AdminCourses() {
   const resetActiveFields = () => {
     setProductMode("existing");
     setSelectedProductId("");
+    setSelectedProductName("");
     setNewProductTitle("");
     setNewProductDescription("");
     setNewProductThumbnailFile(null);
@@ -307,13 +309,29 @@ export default function AdminCourses() {
     if (course.product_id) {
       setSelectedProductId(String(course.product_id));
       setProductMode("existing");
+      // Store the product name directly so the edit field shows it immediately
+      // even before the products array renders. Try from loaded products first,
+      // then fall back to parsing from the internal title.
+      const loadedProduct = products.find((p) => String(p.id) === String(course.product_id));
+      if (loadedProduct) {
+        setSelectedProductName(loadedProduct.title);
+      } else {
+        // Parse from title like "Playwright - June 2026 Weekday" → "Playwright"
+        const nameFromTitle = course.title.split(" - ")[0]?.trim() ?? "";
+        setSelectedProductName(nameFromTitle);
+      }
     }
-    // Parse month from internal title (e.g. "Playwright - June" or "Playwright - June 2026")
-    const titleMatch = course.title.match(/- (\w+)(?:\s+(\d{4}))?$/);
+    // Parse month and year from internal title (e.g. "Playwright - June 2026 Weekday")
+    const titleMatch = course.title.match(/- (\w+)(?:\s+(\d{4}))?/);
     if (titleMatch) {
       setBatchMonth(titleMatch[1]);
-      if (titleMatch[2]) {
-        setBatchYear(titleMatch[2]);
+      const parsedYear = titleMatch[2] ? Number(titleMatch[2]) : null;
+      const currentYear = new Date().getFullYear();
+      // Clamp: if the year from the title is in the past, use current year
+      if (parsedYear && parsedYear >= currentYear) {
+        setBatchYear(String(parsedYear));
+      } else {
+        setBatchYear(String(currentYear));
       }
     }
 
@@ -530,6 +548,9 @@ export default function AdminCourses() {
       const body = {
         ...(isEditing && editingCourseId ? { id: editingCourseId } : {}),
         course_type: "active",
+        // For edits, always send the current title as a direct fallback
+        // so the API can update it even if product+month aren't re-selected
+        ...(isEditing && courseTitle.trim() ? { title: courseTitle.trim() } : {}),
         // Product resolution
         ...(productMode === "existing"
           ? { product_id: selectedProductId, product_title: productTitle }
@@ -1206,10 +1227,11 @@ export default function AdminCourses() {
                       Product
                     </label>
                     {isEditing ? (
+                      /* Edit mode — read-only display showing only the assigned product name */
                       <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800">
-                        {products.find((p) => String(p.id) === selectedProductId)?.title ||
-                          selectedProductId ||
-                          "Assigned Product"}
+                        {selectedProductName ||
+                          products.find((p) => String(p.id) === selectedProductId)?.title ||
+                          "No product assigned"}
                       </div>
                     ) : (
                       <>
