@@ -13,8 +13,10 @@ import {
   fetchOlderMessages,
   sendCourseMessage,
   deleteCourseMessage,
+  getMentionablePeople,
   type ChatMessage,
   type FetchMessagesError,
+  type MentionablePerson,
 } from "@/app/actions/community-chat";
 import UserAvatar from "@/app/components/UserAvatar";
 import CommunityChatSkeleton from "@/app/components/chat/CommunityChatSkeleton";
@@ -27,6 +29,11 @@ import {
   ChevronUp,
   Lock,
   Trash2,
+  Paperclip,
+  X,
+  FileText,
+  Image as ImageIcon,
+  AtSign,
 } from "lucide-react";
 
 interface CommunityChatPanelProps {
@@ -55,6 +62,98 @@ function formatTimestamp(isoString: string): string {
   }).format(date);
 }
 
+// ─── Render content with @mention pills ──────────────────────────────────────
+
+function renderContentWithMentions(content: string) {
+  const parts = content.split(/(@\S+(?:\s+\S+)*?(?=\s@|\s*$))/g);
+  return parts.map((part, i) => {
+    if (/^@.+/.test(part)) {
+      return (
+        <span
+          key={i}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary font-semibold text-[0.8em]"
+        >
+          <AtSign size={10} className="shrink-0" />
+          {part.slice(1)}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// ─── Attachment preview in message bubble ────────────────────────────────────
+
+function AttachmentDisplay({
+  url,
+  isOwn,
+}: {
+  url: string;
+  isOwn: boolean;
+}) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const lowerUrl = url.toLowerCase();
+  const isPdf = lowerUrl.includes(".pdf") || lowerUrl.includes("application%2fpdf");
+  const filename = decodeURIComponent(url.split("/").pop()?.split("?")[0] || "attachment");
+
+  if (isPdf) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={[
+          "mt-1.5 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold max-w-[220px] transition-colors",
+          isOwn
+            ? "border-brand-primary/30 bg-brand-primary/5 text-brand-primary hover:bg-brand-primary/10"
+            : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100",
+        ].join(" ")}
+      >
+        <FileText size={16} className="shrink-0" />
+        <span className="truncate">{filename}</span>
+      </a>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setLightboxOpen(true)}
+        className="mt-1.5 block rounded-xl overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt="Attachment"
+          className="max-w-[220px] max-h-[180px] object-cover block"
+          loading="lazy"
+        />
+      </button>
+
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/40 rounded-full p-2"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <X size={20} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt="Attachment"
+            className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Single message bubble ────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -72,10 +171,6 @@ function MessageBubble({
     message.full_name?.trim() || `User ${message.user_id.slice(0, 6)}`;
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleDelete = async () => {
-    setShowDeleteConfirm(true);
-  };
 
   return (
     <div
@@ -95,10 +190,16 @@ function MessageBubble({
           <span className="text-xs font-bold text-gray-800 truncate max-w-[120px]">
             {isOwn ? "You" : displayName}
           </span>
-          {/* Admin role badge — oval pill with brand-primary color */}
+          {/* Admin role badge */}
           {!isOwn && message.role?.toLowerCase() === "admin" && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-primary text-white shrink-0">
               Admin
+            </span>
+          )}
+          {/* Mentor/Instructor role badge */}
+          {!isOwn && (message.role?.toLowerCase() === "mentor" || message.role?.toLowerCase() === "instructor") && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500 text-white shrink-0">
+              Mentor
             </span>
           )}
           <span className="text-[10px] text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -106,7 +207,7 @@ function MessageBubble({
           </span>
           {isAdmin && !isOwn && (
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
               className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 ml-1"
               title="Delete user message"
@@ -116,15 +217,23 @@ function MessageBubble({
           )}
         </div>
 
-        <div
-          className={`
-            px-3 py-2 rounded-2xl text-sm leading-relaxed break-words
-            bg-gray-100 text-gray-900 font-medium
-            ${isOwn ? "rounded-tr-sm" : "rounded-tl-sm"}
-          `}
-        >
-          {message.content}
-        </div>
+        {/* Message content */}
+        {message.content.trim() && (
+          <div
+            className={[
+              "px-3 py-2 rounded-2xl text-sm leading-relaxed break-words",
+              "bg-gray-100 text-gray-900 font-medium",
+              isOwn ? "rounded-tr-sm" : "rounded-tl-sm",
+            ].join(" ")}
+          >
+            {renderContentWithMentions(message.content)}
+          </div>
+        )}
+
+        {/* Attachment */}
+        {message.attachment_url && (
+          <AttachmentDisplay url={message.attachment_url} isOwn={isOwn} />
+        )}
       </div>
 
       {showDeleteConfirm && (
@@ -167,6 +276,116 @@ function MessageBubble({
   );
 }
 
+// ─── Mention Dropdown ─────────────────────────────────────────────────────────
+
+function MentionDropdown({
+  people,
+  query,
+  onSelect,
+}: {
+  people: MentionablePerson[];
+  query: string;
+  onSelect: (person: MentionablePerson) => void;
+}) {
+  const filtered = people.filter((p) =>
+    p.full_name.toLowerCase().includes(query.toLowerCase())
+  );
+
+  if (filtered.length === 0) return null;
+
+  const getRoleColor = (role: string) => {
+    if (role.toLowerCase() === "admin") return "bg-brand-primary text-white";
+    return "bg-emerald-500 text-white";
+  };
+
+  const getRoleLabel = (role: string) => {
+    const r = role.toLowerCase();
+    if (r === "admin") return "Admin";
+    if (r === "instructor") return "Instructor";
+    return "Mentor";
+  };
+
+  return (
+    <div className="absolute bottom-full left-0 mb-2 w-full max-w-xs bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-50 animate-in slide-in-from-bottom-2 fade-in duration-150">
+      <div className="px-3 py-2 border-b border-gray-100">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+          <AtSign size={10} />
+          Mention someone
+        </p>
+      </div>
+      <div className="max-h-48 overflow-y-auto">
+        {filtered.map((person) => (
+          <button
+            key={person.id}
+            onMouseDown={(e) => {
+              e.preventDefault(); // prevent textarea blur
+              onSelect(person);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left"
+          >
+            <UserAvatar name={person.full_name} size={28} textSize="text-[10px]" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">{person.full_name}</p>
+            </div>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shrink-0 ${getRoleColor(person.role)}`}>
+              {getRoleLabel(person.role)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── File preview chip ────────────────────────────────────────────────────────
+
+function FilePreviewChip({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) {
+  const isImage = file.type.startsWith("image/");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isImage) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [file, isImage]);
+
+  return (
+    <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 max-w-xs border border-gray-200">
+      {isImage && previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt="preview"
+          className="w-8 h-8 rounded-lg object-cover shrink-0"
+        />
+      ) : (
+        <FileText size={16} className="text-gray-500 shrink-0" />
+      )}
+      <span className="text-xs text-gray-700 font-medium truncate flex-1 max-w-[140px]">
+        {file.name}
+      </span>
+      <span className="text-[10px] text-gray-400 shrink-0">
+        {(file.size / 1024 / 1024).toFixed(1)}MB
+      </span>
+      <button
+        onClick={onRemove}
+        className="ml-1 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+        type="button"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps) {
@@ -185,6 +404,16 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
   const [lastReadAt, setLastReadAt] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // ── File attachment state ──────────────────────────────────────────────────
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── @Mention state ────────────────────────────────────────────────────────
+  const [mentionablePeople, setMentionablePeople] = useState<MentionablePerson[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
@@ -197,8 +426,6 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
     messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, []);
 
-  // Stable ref so the realtime callback can call scrollToBottom
-  // without it needing to be listed as a useEffect dependency.
   const scrollToBottomRef = useRef(scrollToBottom);
   useEffect(() => {
     scrollToBottomRef.current = scrollToBottom;
@@ -213,7 +440,6 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       }
       const prevScrollHeight = container.scrollHeight;
       await action();
-      // Restore scroll so the user stays at the same visual position
       requestAnimationFrame(() => {
         container.scrollTop =
           container.scrollHeight - prevScrollHeight + container.scrollTop;
@@ -230,29 +456,29 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         if (isMounted) {
-            setError({ type: "ERROR", message: "User not authenticated" });
-            setLoadingInitial(false);
+          setError({ type: "ERROR", message: "User not authenticated" });
+          setLoadingInitial(false);
         }
         return;
       }
-      
+
       const currentUserId = session.user.id;
       let currentUserName = session.user.email?.split("@")[0] || "User";
-      
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
         .eq("id", currentUserId)
         .single();
-        
+
       if (profile?.full_name) {
-          currentUserName = profile.full_name;
+        currentUserName = profile.full_name;
       }
-      
+
       if (isMounted) {
-          setUserId(currentUserId);
-          setUserName(currentUserName);
-          setAccessToken(session.access_token);
+        setUserId(currentUserId);
+        setUserName(currentUserName);
+        setAccessToken(session.access_token);
       }
 
       const { data: readData } = await supabase
@@ -266,12 +492,10 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
         setLastReadAt(readData.last_read_at);
       }
 
-      // Update the read receipt for this course since the user just opened it.
-      // This is done after we grab the old value so we can scroll to the right spot.
       supabase.from("community_reads").upsert({
         user_id: currentUserId,
         course_id: courseId,
-        last_read_at: new Date().toISOString()
+        last_read_at: new Date().toISOString(),
       }).then();
 
       const { messages: initialMessages, isAdmin, error: fetchError } = await fetchInitialMessages(
@@ -296,6 +520,13 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       setHasMore(initialMessages!.length === 50);
       setIsEnrolled(true);
       setLoadingInitial(false);
+
+      // Load mentionable people for @mention
+      getMentionablePeople(courseId, session.access_token).then(({ people }) => {
+        if (isMounted && people.length > 0) {
+          setMentionablePeople(people);
+        }
+      });
     }
 
     loadMessages();
@@ -309,7 +540,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
   useEffect(() => {
     if (!loadingInitial && !isInitialScrollDone.current) {
       isInitialScrollDone.current = true;
-      
+
       if (lastReadAt) {
         const unreadIndex = messages.findIndex(m => new Date(m.created_at) > new Date(lastReadAt));
         if (unreadIndex !== -1) {
@@ -321,7 +552,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
           }
         }
       }
-      
+
       scrollToBottom("instant" as ScrollBehavior);
     }
   }, [loadingInitial, messages, lastReadAt, scrollToBottom]);
@@ -348,6 +579,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             user_id: string;
             content: string;
             created_at: string;
+            attachment_url?: string | null;
           };
 
           setMessages((prev) => {
@@ -355,7 +587,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
 
             supabase
               .from("profiles")
-              .select("full_name")
+              .select("full_name, role")
               .eq("id", newRow.user_id)
               .maybeSingle()
               .then(({ data }) => {
@@ -365,13 +597,15 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
                   user_id: newRow.user_id,
                   content: newRow.content,
                   created_at: newRow.created_at,
+                  attachment_url: newRow.attachment_url ?? null,
                   full_name: data?.full_name ?? null,
+                  role: data?.role ?? null,
                 };
 
                 setMessages((current) => {
                   if (current.some((m) => m.id === newRow.id)) return current;
-                  
-                  const filtered = current.filter(m => 
+
+                  const filtered = current.filter(m =>
                     !(m.id.startsWith("optimistic-") && m.content === incomingMessage.content && m.user_id === incomingMessage.user_id)
                   );
 
@@ -403,7 +637,6 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       channelRef.current = null;
     };
   }, [courseId]);
-
 
   // ─── Infinite scroll ──────────────────────────────────────────────────────
 
@@ -445,13 +678,76 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
     return () => observer.disconnect();
   }, [hasMore, loadingOlder, messages, courseId, userId, preserveScrollPositionFor]);
 
-  // ─── Message actions ──────────────────────────────────────────────────────
+  // ─── @Mention detection in textarea ──────────────────────────────────────
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    setSendError(null);
+
+    const cursor = e.target.selectionStart ?? value.length;
+    const textBeforeCursor = value.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([\w\s]*)$/);
+    if (atMatch) {
+      setMentionQuery(atMatch[1]);
+    } else {
+      setMentionQuery(null);
+    }
+  }, []);
+
+  const handleMentionSelect = useCallback((person: MentionablePerson) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const cursor = textarea.selectionStart ?? inputValue.length;
+    const textBeforeCursor = inputValue.slice(0, cursor);
+    const textAfterCursor = inputValue.slice(cursor);
+
+    const atMatch = textBeforeCursor.match(/@([\w\s]*)$/);
+    if (!atMatch) return;
+
+    const beforeAt = textBeforeCursor.slice(0, textBeforeCursor.length - atMatch[0].length);
+    const newValue = `${beforeAt}@${person.full_name} ${textAfterCursor}`;
+    setInputValue(newValue);
+    setMentionQuery(null);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = beforeAt.length + person.full_name.length + 2;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  }, [inputValue]);
+
+  // ─── File upload helper ───────────────────────────────────────────────────
+
+  const uploadFile = useCallback(async (file: File): Promise<string | null> => {
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `chat/${courseId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(path, file, { cacheControl: "3600", upsert: false });
+
+    if (error) {
+      console.error("[uploadFile] Storage upload error:", error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("chat-attachments")
+      .getPublicUrl(data.path);
+
+    return urlData?.publicUrl ?? null;
+  }, [courseId]);
+
+  // ─── Message send ─────────────────────────────────────────────────────────
 
   const handleSend = useCallback(() => {
     const trimmed = inputValue.trim();
-    if (!trimmed || isPending) return;
+    if ((!trimmed && !pendingFile) || isPending || isUploading) return;
 
     setSendError(null);
+    setMentionQuery(null);
 
     const tempId = `optimistic-${Date.now()}`;
     const optimisticMessage: ChatMessage = {
@@ -461,19 +757,37 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       content: trimmed,
       created_at: new Date().toISOString(),
       full_name: userName || null,
+      attachment_url: pendingFile ? URL.createObjectURL(pendingFile) : null,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
     setInputValue("");
+    const fileToUpload = pendingFile;
+    setPendingFile(null);
 
     setTimeout(() => scrollToBottom(), 50);
 
     startTransition(async () => {
       if (!accessToken) return;
+
+      let attachmentUrl: string | null = null;
+      if (fileToUpload) {
+        setIsUploading(true);
+        attachmentUrl = await uploadFile(fileToUpload);
+        setIsUploading(false);
+        if (!attachmentUrl) {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          setInputValue(trimmed);
+          setSendError("Failed to upload file. Please try again.");
+          return;
+        }
+      }
+
       const { message: confirmed, error: sendErr } = await sendCourseMessage(
         accessToken,
         courseId,
-        trimmed,
+        trimmed || " ",
+        attachmentUrl,
       );
 
       if (sendErr) {
@@ -489,7 +803,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
         );
       }
     });
-  }, [inputValue, isPending, courseId, userId, userName, scrollToBottom]);
+  }, [inputValue, pendingFile, isPending, isUploading, courseId, userId, userName, scrollToBottom, uploadFile, accessToken]);
 
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     if (!accessToken) return;
@@ -499,13 +813,33 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
     } else {
       alert(error || "Failed to delete message.");
     }
-  }, [userId]);
+  }, [accessToken]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery !== null) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionQuery(null);
+      }
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setSendError("File is too large. Maximum size is 10 MB.");
+      return;
+    }
+
+    setPendingFile(file);
+    e.target.value = "";
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -604,7 +938,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
           </div>
         )}
 
-        {/* Load more button (fallback for when IntersectionObserver doesn't trigger) */}
+        {/* Load more button (fallback) */}
         {hasMore && !loadingOlder && messages.length > 0 && (
           <div className="flex justify-center">
             <button
@@ -672,23 +1006,41 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
 
       {/* Input area */}
       <div className="shrink-0 border-t border-gray-100 bg-white p-4 pb-8">
+        {/* File preview chip */}
+        {pendingFile && (
+          <div className="mb-2">
+            <FilePreviewChip
+              file={pendingFile}
+              onRemove={() => setPendingFile(null)}
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <div className="shrink-0 h-12 flex items-center">
             <UserAvatar name={userName} size={32} textSize="text-xs" />
           </div>
 
+          {/* Textarea + mention dropdown wrapper */}
           <div className="flex-1 relative">
+            {/* @Mention dropdown */}
+            {mentionQuery !== null && mentionablePeople.length > 0 && (
+              <MentionDropdown
+                people={mentionablePeople}
+                query={mentionQuery}
+                onSelect={handleMentionSelect}
+              />
+            )}
+
             <textarea
+              ref={textareaRef}
               value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                setSendError(null);
-              }}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Write a message… (Enter to send)"
+              placeholder="Write a message… (@ to mention, Enter to send)"
               rows={1}
               maxLength={2000}
-              disabled={isPending}
+              disabled={isPending || isUploading}
               className="
                 block w-full resize-none rounded-xl border border-gray-200 bg-gray-50
                 px-4 py-3 text-base text-gray-800 placeholder-gray-400
@@ -700,7 +1052,6 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
               "
               style={{ minHeight: "48px" }}
               onInput={(e) => {
-                // Auto-resize textarea
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = "auto";
                 target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
@@ -713,9 +1064,42 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             )}
           </div>
 
+          {/* Paperclip / file attach button */}
+          <div className="shrink-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+              className="hidden"
+              onChange={handleFileSelect}
+              id="chat-file-input"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isPending || isUploading}
+              title="Attach a file or image (max 10 MB)"
+              className="
+                flex items-center justify-center w-12 h-12 rounded-xl
+                border border-gray-200 bg-gray-50
+                text-gray-500 hover:text-brand-heading hover:border-brand-heading hover:bg-white
+                transition-all disabled:opacity-40 disabled:cursor-not-allowed
+              "
+            >
+              {isUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : pendingFile ? (
+                <ImageIcon size={18} className="text-brand-primary" />
+              ) : (
+                <Paperclip size={18} />
+              )}
+            </button>
+          </div>
+
+          {/* Send button */}
           <Button
             onClick={handleSend}
-            disabled={!inputValue.trim() || isPending}
+            disabled={(!inputValue.trim() && !pendingFile) || isPending || isUploading}
             className="
               shrink-0 rounded-xl px-4 h-12
               bg-brand-heading hover:bg-brand-heading-hover
@@ -753,4 +1137,3 @@ function ChatHeader({ messageCount }: { messageCount?: number }) {
     </div>
   );
 }
-

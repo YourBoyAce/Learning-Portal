@@ -13,9 +13,16 @@ export interface ChatMessage {
   user_id: string;
   content: string;
   created_at: string;
+  attachment_url?: string | null;
   // Joined from profiles
   full_name: string | null;
   role?: string | null;
+}
+
+export interface MentionablePerson {
+  id: string;
+  full_name: string;
+  role: string;
 }
 
 export type FetchMessagesError = { type: "NOT_ENROLLED" | "ERROR"; message: string };
@@ -135,6 +142,7 @@ async function hydrateMessagesWithProfiles(
       user_id: m.user_id as string,
       content: m.content as string,
       created_at: m.created_at as string,
+      attachment_url: (m.attachment_url as string | null) ?? null,
       full_name: profile?.full_name ?? null,
       role: profile?.role ?? null,
     };
@@ -197,7 +205,8 @@ export async function fetchInitialMessages(
         course_id,
         user_id,
         content,
-        created_at
+        created_at,
+        attachment_url
         `,
       )
       .eq("course_id", courseId)
@@ -252,7 +261,8 @@ export async function fetchOlderMessages(
         course_id,
         user_id,
         content,
-        created_at
+        created_at,
+        attachment_url
         `,
       )
       .eq("course_id", courseId)
@@ -293,6 +303,7 @@ export async function sendCourseMessage(
   accessToken: string,
   courseId: string,
   content: string,
+  attachmentUrl?: string | null,
 ): Promise<{ message: ChatMessage | null; error: string | null }> {
   // ── Input validation ──────────────────────────────────────────────────────
   const trimmedContent = content.trim();
@@ -333,6 +344,7 @@ export async function sendCourseMessage(
         course_id: courseId,
         user_id: userId,
         content: trimmedContent,
+        ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
       })
       .select(
         `
@@ -340,7 +352,8 @@ export async function sendCourseMessage(
         course_id,
         user_id,
         content,
-        created_at
+        created_at,
+        attachment_url
         `,
       )
       .single();
@@ -475,6 +488,85 @@ export async function getUserCommunities(accessToken: string): Promise<{
   } catch (err) {
     console.error("[getUserCommunities] Unexpected error:", err);
     return { courses: [], error: "Failed to load communities." };
+  }
+}
+
+/**
+ * Fetch mentors, instructors, and admins who are associated with a course.
+ * Used to populate the @mention dropdown in the community chat.
+ */
+export async function getMentionablePeople(
+  courseId: string,
+  accessToken: string,
+): Promise<{ people: MentionablePerson[]; error: string | null }> {
+  try {
+    const userId = await getSecureUserId(accessToken);
+    if (!userId) {
+      return { people: [], error: "Unauthorized: Invalid session" };
+    }
+
+    const supabaseAdmin = createServiceClient();
+
+    // Get all admin profiles
+    const { data: adminProfiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, role")
+      .in("role", ["admin", "instructor", "mentor"])
+      .not("full_name", "is", null);
+
+    // Also get course_members with active status for this course (mentors/instructors)
+    const { data: courseMembers } = await supabaseAdmin
+      .from("course_members")
+      .select("email")
+      .eq("maincourse_id", courseId)
+      .eq("status", "active");
+
+    const courseMemberEmails = new Set(
+      (courseMembers ?? []).map((cm: any) => cm.email?.toLowerCase())
+    );
+
+    // Get profiles for course members who are not already in adminProfiles
+    const adminIds = new Set((adminProfiles ?? []).map((p: any) => p.id));
+    let extraPeople: MentionablePerson[] = [];
+
+    if (courseMemberEmails.size > 0) {
+      const { data: memberProfiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, role, email")
+        .not("full_name", "is", null);
+
+      extraPeople = (memberProfiles ?? [])
+        .filter((p: any) => 
+          courseMemberEmails.has(p.email?.toLowerCase()) && !adminIds.has(p.id)
+        )
+        .map((p: any) => ({
+          id: p.id,
+          full_name: p.full_name ?? "Unknown",
+          role: p.role ?? "mentor",
+        }));
+    }
+
+    const people: MentionablePerson[] = [
+      ...(adminProfiles ?? []).map((p: any) => ({
+        id: p.id,
+        full_name: p.full_name ?? "Unknown",
+        role: p.role ?? "admin",
+      })),
+      ...extraPeople,
+    ];
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const unique = people.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+
+    return { people: unique, error: null };
+  } catch (err) {
+    console.error("[getMentionablePeople] Unexpected error:", err);
+    return { people: [], error: "Failed to load mentionable people." };
   }
 }
 
