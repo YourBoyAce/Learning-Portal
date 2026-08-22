@@ -136,7 +136,7 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     {
-      label: "Attend Sessions",
+      label: "Live Sessions",
       href: "/premium/webinars",
       active: pathname === "/premium/webinars",
       icon: pathname === "/premium/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
@@ -166,9 +166,8 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
         >
           <div className="p-6 flex items-center justify-between">
             <Link href="/premium" className="flex items-center gap-3">
@@ -205,9 +204,8 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-item flex items-center gap-3 px-4 py-3 ${
-                  item.active ? "nav-item-active" : "nav-item-inactive"
-                }`}
+                className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active ? "nav-item-active" : "nav-item-inactive"
+                  }`}
               >
                 <Image
                   src={item.icon}

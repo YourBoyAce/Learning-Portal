@@ -55,6 +55,38 @@ export async function POST(request: Request) {
     );
   }
 
+  if (eventId.startsWith("webinar-")) {
+    const actualWebinarId = eventId.replace("webinar-", "");
+    
+    const { data: globalWebinar, error: gwError } = await supabaseAdmin
+      .from("webinars")
+      .select("*")
+      .eq("id", actualWebinarId)
+      .maybeSingle();
+
+    if (gwError || !globalWebinar) {
+      return NextResponse.json({ error: "Webinar not found." }, { status: 404 });
+    }
+
+    const { error: insertError } = await supabaseAdmin
+      .from("calendar_events")
+      .insert({
+        user_id: currentUser.id,
+        title: globalWebinar.title,
+        description: globalWebinar.description || globalWebinar.subtitle || "",
+        event_date: globalWebinar.event_date || new Date().toISOString().split("T")[0],
+        event_time: "10:00:00",
+        event_type: "webinar",
+        tag: action === "accept" ? "status:accepted|webinar" : "status:declined|webinar",
+      });
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, status: action === "accept" ? "accepted" : "declined" });
+  }
+
   const { data: event, error: fetchError } = await supabaseAdmin
     .from("calendar_events")
     .select("*")

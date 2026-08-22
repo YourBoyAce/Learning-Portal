@@ -267,6 +267,28 @@ export default function CommunityChat({
     ]);
 
     /*************************************************
+     *
+     * PROFILE CACHE
+     * Avoids a DB round-trip per realtime message.
+     * Seeded from already-loaded messages on mount;
+     * grows as new senders appear.
+     *
+     *************************************************/
+
+    const profileCacheRef = useRef<Map<string, { full_name: string | null; role: string | null }>>(new Map());
+
+    useEffect(() => {
+        for (const m of messages) {
+            if (!profileCacheRef.current.has(m.user_id)) {
+                profileCacheRef.current.set(m.user_id, {
+                    full_name: m.full_name ?? null,
+                    role: m.role ?? null,
+                });
+            }
+        }
+    }, [messages]);
+
+    /*************************************************
    *
    * REALTIME SUBSCRIPTION
    *
@@ -296,79 +318,56 @@ export default function CommunityChat({
                         created_at: string;
                     };
 
-                    setMessages((previousMessages) => {
-                        /*
-                            Prevent duplicates
-                        */
+                    const applyMessage = (cachedProfile: { full_name: string | null; role: string | null } | null) => {
+                        const incomingMessage: ChatMessage = {
+                            id: newRow.id,
+                            course_id: newRow.course_id,
+                            user_id: newRow.user_id,
+                            content: newRow.content,
+                            created_at: newRow.created_at,
+                            full_name: cachedProfile?.full_name ?? null,
+                            role: cachedProfile?.role ?? null,
+                        };
 
-                        if (
-                            previousMessages.some(
-                                (m) => m.id === newRow.id
-                            )
-                        ) {
-                            return previousMessages;
+                        setMessages((current) => {
+                            if (current.some((m) => m.id === incomingMessage.id)) {
+                                return current;
+                            }
+                            return [...current, incomingMessage];
+                        });
+
+                        // Auto-scroll only if user is already near bottom
+                        const container = scrollContainerRef.current;
+                        if (!container) return;
+                        const distanceFromBottom =
+                            container.scrollHeight -
+                            container.scrollTop -
+                            container.clientHeight;
+                        if (distanceFromBottom < 120) {
+                            setTimeout(() => { scrollToBottomRef.current(); }, 80);
                         }
+                    };
 
-                        /*
-                            Fetch sender profile
-                        */
-
+                    const cached = profileCacheRef.current.get(newRow.user_id);
+                    if (cached) {
+                        // Profile already known — apply immediately, no extra query
+                        applyMessage(cached);
+                    } else {
+                        // First time we see this sender — fetch once and cache
                         supabase
                             .from("profiles")
-                            .select("full_name")
+                            .select("full_name, role")
                             .eq("id", newRow.user_id)
                             .maybeSingle()
                             .then(({ data }) => {
-                                const incomingMessage: ChatMessage = {
-                                    id: newRow.id,
-                                    course_id: newRow.course_id,
-                                    user_id: newRow.user_id,
-                                    content: newRow.content,
-                                    created_at: newRow.created_at,
-                                    full_name:
-                                        data?.full_name ?? null,
+                                const profile = {
+                                    full_name: data?.full_name ?? null,
+                                    role: data?.role ?? null,
                                 };
-
-                                setMessages((current) => {
-                                    if (
-                                        current.some(
-                                            (m) =>
-                                                m.id === incomingMessage.id
-                                        )
-                                    ) {
-                                        return current;
-                                    }
-
-                                    return [
-                                        ...current,
-                                        incomingMessage,
-                                    ];
-                                });
-
-                                /*
-                                    Auto-scroll only if user
-                                    is already near bottom
-                                */
-
-                                const container =
-                                    scrollContainerRef.current;
-
-                                if (!container) return;
-
-                                const distanceFromBottom =
-                                    container.scrollHeight -
-                                    container.scrollTop -
-                                    container.clientHeight;
-
-                                if (distanceFromBottom < 120) {
-                                    setTimeout(() => {
-                                        scrollToBottomRef.current();
-                                    }, 80);
-                                }
+                                profileCacheRef.current.set(newRow.user_id, profile);
+                                applyMessage(profile);
                             });
-
-                        return previousMessages;
-                    });
+                    }
                 }
             )
             .subscribe();
@@ -377,7 +376,6 @@ export default function CommunityChat({
 
         return () => {
             supabase.removeChannel(channel);
-
             channelRef.current = null;
         };
     }, [course.id]);

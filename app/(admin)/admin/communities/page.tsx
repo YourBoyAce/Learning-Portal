@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import CommunitySidebar from '../communities/CommunitySidebar';
 import CommunityChat from '../communities/CommunityChat';
 
@@ -12,6 +13,8 @@ export interface CommunityCourse {
 }
 
 export default function CommunitiesPage() {
+    const searchParams = useSearchParams();
+    const initialCourseId = searchParams.get("course");
     const [selectedCourse, setSelectedCourse] =
         useState<CommunityCourse | null>(null);
 

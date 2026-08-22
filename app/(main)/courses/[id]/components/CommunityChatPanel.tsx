@@ -18,6 +18,7 @@ import {
   type FetchMessagesError,
   type MentionablePerson,
 } from "@/app/actions/community-chat";
+import { resolveMentionedUserIds } from "@/app/lib/mentions";
 import UserAvatar from "@/app/components/UserAvatar";
 import CommunityChatSkeleton from "@/app/components/chat/CommunityChatSkeleton";
 import { Button } from "@/components/ui/button";
@@ -64,22 +65,42 @@ function formatTimestamp(isoString: string): string {
 
 // ─── Render content with @mention pills ──────────────────────────────────────
 
-function renderContentWithMentions(content: string) {
-  const parts = content.split(/(@\S+(?:\s+\S+)*?(?=\s@|\s*$))/g);
-  return parts.map((part, i) => {
-    if (/^@.+/.test(part)) {
-      return (
-        <span
-          key={i}
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary font-semibold text-[0.8em]"
-        >
-          <AtSign size={10} className="shrink-0" />
-          {part.slice(1)}
-        </span>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
+function renderContentWithMentions(
+  content: string,
+  mentionablePeople: MentionablePerson[] = [],
+) {
+  if (mentionablePeople.length === 0) return <span>{content}</span>;
+
+  // Build an alternation regex from known full names, longest first to avoid
+  // partial matches (e.g. "John" before "John Smith").
+  const sorted = [...mentionablePeople].sort(
+    (a, b) => b.full_name.length - a.full_name.length,
+  );
+  const escaped = sorted.map((p) =>
+    p.full_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  );
+  const pattern = new RegExp(`(@(?:${escaped.join("|")}))`, "g");
+
+  const parts = content.split(pattern);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (pattern.test(part)) {
+          return (
+            <span
+              key={i}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary font-semibold text-[0.8em]"
+            >
+              <AtSign size={10} className="shrink-0" />
+              {part.slice(1)}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 // ─── Attachment preview in message bubble ────────────────────────────────────
@@ -161,11 +182,13 @@ function MessageBubble({
   isOwn,
   isAdmin,
   onDelete,
+  mentionablePeople,
 }: {
   message: ChatMessage;
   isOwn: boolean;
   isAdmin: boolean;
   onDelete: (id: string) => void;
+  mentionablePeople: MentionablePerson[];
 }) {
   const displayName =
     message.full_name?.trim() || `User ${message.user_id.slice(0, 6)}`;
@@ -226,7 +249,7 @@ function MessageBubble({
               isOwn ? "rounded-tr-sm" : "rounded-tl-sm",
             ].join(" ")}
           >
-            {renderContentWithMentions(message.content)}
+            {renderContentWithMentions(message.content, mentionablePeople)}
           </div>
         )}
 
@@ -533,7 +556,10 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
     return () => {
       isMounted = false;
     };
-  }, [courseId, userId]);
+  // userId is derived inside this effect — including it as a dep would cause
+  // a double-load on mount (first with "" then with the real id).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
 
   // ─── Scroll to bottom after initial load ─────────────────────────────────
 
@@ -556,6 +582,22 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
       scrollToBottom("instant" as ScrollBehavior);
     }
   }, [loadingInitial, messages, lastReadAt, scrollToBottom]);
+
+  // ─── Profile cache: avoids a DB round-trip per realtime message ─────────────
+  // Populated from already-loaded messages on mount; grows as new senders appear.
+  const profileCacheRef = useRef<Map<string, { full_name: string | null; role: string | null }>>(new Map());
+
+  // Seed the cache whenever messages change (covers initial load + older loads)
+  useEffect(() => {
+    for (const m of messages) {
+      if (!profileCacheRef.current.has(m.user_id)) {
+        profileCacheRef.current.set(m.user_id, {
+          full_name: m.full_name ?? null,
+          role: m.role ?? null,
+        });
+      }
+    }
+  }, [messages]);
 
   // ─── Realtime subscription ────────────────────────────────────────────────
 
@@ -582,50 +624,59 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             attachment_url?: string | null;
           };
 
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newRow.id)) return prev;
+          const applyMessage = (cachedProfile: { full_name: string | null; role: string | null } | null) => {
+            const incomingMessage: ChatMessage = {
+              id: newRow.id,
+              course_id: newRow.course_id,
+              user_id: newRow.user_id,
+              content: newRow.content,
+              created_at: newRow.created_at,
+              attachment_url: newRow.attachment_url ?? null,
+              full_name: cachedProfile?.full_name ?? null,
+              role: cachedProfile?.role ?? null,
+            };
 
+            setMessages((current) => {
+              if (current.some((m) => m.id === newRow.id)) return current;
+              // Replace any matching optimistic message from this sender
+              const filtered = current.filter(
+                (m) =>
+                  !(
+                    m.id.startsWith("optimistic-") &&
+                    m.content === incomingMessage.content &&
+                    m.user_id === incomingMessage.user_id
+                  ),
+              );
+              return [...filtered, incomingMessage];
+            });
+
+            const container = scrollContainerRef.current;
+            if (container) {
+              const distanceFromBottom =
+                container.scrollHeight - container.scrollTop - container.clientHeight;
+              if (distanceFromBottom < 120) {
+                setTimeout(() => scrollToBottomRef.current(), 50);
+              }
+            }
+          };
+
+          const cached = profileCacheRef.current.get(newRow.user_id);
+          if (cached) {
+            // Profile already known — apply immediately, no extra query
+            applyMessage(cached);
+          } else {
+            // First time we see this sender — fetch once and cache
             supabase
               .from("profiles")
               .select("full_name, role")
               .eq("id", newRow.user_id)
               .maybeSingle()
               .then(({ data }) => {
-                const incomingMessage: ChatMessage = {
-                  id: newRow.id,
-                  course_id: newRow.course_id,
-                  user_id: newRow.user_id,
-                  content: newRow.content,
-                  created_at: newRow.created_at,
-                  attachment_url: newRow.attachment_url ?? null,
-                  full_name: data?.full_name ?? null,
-                  role: data?.role ?? null,
-                };
-
-                setMessages((current) => {
-                  if (current.some((m) => m.id === newRow.id)) return current;
-
-                  const filtered = current.filter(m =>
-                    !(m.id.startsWith("optimistic-") && m.content === incomingMessage.content && m.user_id === incomingMessage.user_id)
-                  );
-
-                  return [...filtered, incomingMessage];
-                });
-
-                const container = scrollContainerRef.current;
-                if (container) {
-                  const distanceFromBottom =
-                    container.scrollHeight -
-                    container.scrollTop -
-                    container.clientHeight;
-                  if (distanceFromBottom < 120) {
-                    setTimeout(() => scrollToBottomRef.current(), 50);
-                  }
-                }
+                const profile = { full_name: data?.full_name ?? null, role: data?.role ?? null };
+                profileCacheRef.current.set(newRow.user_id, profile);
+                applyMessage(profile);
               });
-
-            return prev;
-          });
+          }
         },
       )
       .subscribe();
@@ -783,11 +834,13 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
         }
       }
 
+      const mentionedIds = resolveMentionedUserIds(trimmed, mentionablePeople);
       const { message: confirmed, error: sendErr } = await sendCourseMessage(
         accessToken,
         courseId,
         trimmed || " ",
         attachmentUrl,
+        mentionedIds,
       );
 
       if (sendErr) {
@@ -803,7 +856,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
         );
       }
     });
-  }, [inputValue, pendingFile, isPending, isUploading, courseId, userId, userName, scrollToBottom, uploadFile, accessToken]);
+  }, [inputValue, pendingFile, isPending, isUploading, courseId, userId, userName, scrollToBottom, uploadFile, accessToken, mentionablePeople]);
 
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     if (!accessToken) return;
@@ -989,6 +1042,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
             isOwn={message.user_id === userId}
             isAdmin={isAdminUser}
             onDelete={handleDeleteMessage}
+            mentionablePeople={mentionablePeople}
           />
         ))}
 

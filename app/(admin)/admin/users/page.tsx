@@ -414,25 +414,27 @@ export default function AdminUsers() {
                   </select>
                 </div>
 
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    User Plan
-                  </label>
-                  <select
-                    value={plan}
-                    onChange={(e) => setPlan(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                    style={{
-                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                    }}
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                    <option value="premium">Premium</option>
-                  </select>
-                </div>
+                {role === "user" && (
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      User Plan
+                    </label>
+                    <select
+                      value={plan}
+                      onChange={(e) => setPlan(e.target.value)}
+                      className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                      style={{
+                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                      }}
+                    >
+                      <option value="starter">Starter</option>
+                      <option value="pro">Pro</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </div>
+                )}
 
                 {role === "admin" && (
                   <div className="rounded-xl border border-brand-primary/15 bg-brand-primary/5 p-4 space-y-3">

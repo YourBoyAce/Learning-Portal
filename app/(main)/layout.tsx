@@ -10,6 +10,7 @@ import Image from "next/image";
 import {ICONS} from "@/app/styles/icons";
 import {Button} from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
+import MentionNotificationsBell from "@/app/components/MentionNotificationsBell";
 
 function MainLayoutContent({
   children,
@@ -304,7 +305,7 @@ function MainLayoutContent({
           </div>
         </aside>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0">
           <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between lg:justify-end">
             <div className="flex items-center gap-3 lg:hidden">
               <button
@@ -319,6 +320,9 @@ function MainLayoutContent({
             </div>
 
             <div className="flex items-center gap-3">
+              {isMentor && (
+                <MentionNotificationsBell communitiesPath="/communities" />
+              )}
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-700">
                   {displayName}

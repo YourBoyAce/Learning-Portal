@@ -40,6 +40,7 @@ interface Course {
   category?: string;
   course_type?: string;
   product_id?: number | string | null;
+  whatsapp_community_link?: string | null;
   _source?: "maincourse" | "product"; // sentinel from API
   assigned_mentors?: { full_name: string }[];
 }
@@ -152,6 +153,7 @@ export default function AdminCourses() {
   );
 
   const [startDateField, setStartDateField] = useState("");
+  const [whatsappLink, setWhatsappLink] = useState("");
   // Generated internal title preview
   const generatedTitle = (() => {
     const productTitle =
@@ -246,6 +248,7 @@ export default function AdminCourses() {
     setBatchMonth("");
     setBatchYear(String(new Date().getFullYear()));
     setStartDateField("");
+    setWhatsappLink("");
     setSelectedScholars([]);
     setSelectedMentors([]);
   };
@@ -335,6 +338,7 @@ export default function AdminCourses() {
       }
     }
 
+    setWhatsappLink(course.whatsapp_community_link || "");
     setShowModal(true);
 
     // Load existing modules
@@ -568,6 +572,7 @@ export default function AdminCourses() {
         // Batch fields
         month: batchMonth ? `${batchMonth} ${batchYear}` : "",
         start_date: startDateField || null,
+        whatsapp_community_link: whatsappLink.trim() || null,
         description: courseDescription.trim(),
         ...(finalCourseThumbnailUrl !== undefined && { thumbnail_url: finalCourseThumbnailUrl }),
         modules: modules
@@ -1749,6 +1754,23 @@ export default function AdminCourses() {
                       onChange={(e) => setStartDateField(e.target.value)}
                       className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-semibold outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
                     />
+                  </div>
+
+                  {/* WhatsApp Community Link */}
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      WhatsApp Community Link (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://chat.whatsapp.com/..."
+                      value={whatsappLink}
+                      onChange={(e) => setWhatsappLink(e.target.value)}
+                      className="w-full bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl px-4 py-3 text-sm text-gray-900 font-semibold outline-none focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 transition-all placeholder:font-normal placeholder:text-gray-400"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      Students will see a &ldquo;Join WhatsApp Community&rdquo; button on their course card.
+                    </p>
                   </div>
 
                   {/* Modules */}

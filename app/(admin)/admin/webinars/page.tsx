@@ -42,6 +42,7 @@ interface Product {
 
 export default function AdminWebinarsPage() {
   const [webinars, setWebinars] = useState<Webinar[]>([]);
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -383,11 +384,34 @@ export default function AdminWebinarsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const filteredWebinars = webinars.filter(
+  const now = new Date();
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+  const searchedWebinars = webinars.filter(
     (w) =>
       w.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.subtitle?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
+  const upcomingWebinars = searchedWebinars.filter((w) => {
+    if (!w.event_date) return true;
+    const eventDate = new Date(w.event_date);
+    if (!isNaN(eventDate.getTime())) {
+      return eventDate > twoHoursAgo;
+    }
+    return true;
+  });
+
+  const pastWebinars = searchedWebinars.filter((w) => {
+    if (!w.event_date) return false;
+    const eventDate = new Date(w.event_date);
+    if (!isNaN(eventDate.getTime())) {
+      return eventDate <= twoHoursAgo;
+    }
+    return false;
+  });
+
+  const filteredWebinars = activeTab === "upcoming" ? upcomingWebinars : pastWebinars;
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-8 font-sans">
@@ -448,6 +472,30 @@ export default function AdminWebinarsPage() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={() => setActiveTab("upcoming")}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              activeTab === "upcoming"
+                ? "bg-brand-primary text-white"
+                : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
+            }`}
+          >
+            Upcoming ({upcomingWebinars.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("past")}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              activeTab === "past"
+                ? "bg-brand-primary text-white"
+                : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
+            }`}
+          >
+            Past ({pastWebinars.length})
+          </button>
         </div>
 
         {/* List View */}

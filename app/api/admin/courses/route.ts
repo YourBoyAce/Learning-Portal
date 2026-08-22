@@ -577,6 +577,7 @@ export async function POST(request: Request) {
       thumbnail_url: thumbnailUrl || null,
       course_type: "active",
       ...(productId !== null && { product_id: productId }),
+      whatsapp_community_link: body?.whatsapp_community_link || null,
     })
     .select("id")
     .single();
@@ -781,6 +782,7 @@ export async function PUT(request: Request) {
     ...(titleUpdate && { title: titleUpdate }),
     ...(resolvedThumbnailUrl !== undefined && { thumbnail_url: resolvedThumbnailUrl }),
     ...(body?.product_id !== undefined && body?.product_id !== "" && { product_id: Number(body.product_id) }),
+    ...(body?.whatsapp_community_link !== undefined && { whatsapp_community_link: body.whatsapp_community_link || null }),
   };
 
   const { error: updateError } = await authContext.supabaseAdmin

@@ -42,27 +42,58 @@ export async function getPremiumMentors(accessToken: string) {
       .eq("user_id", targetUserId)
       .eq("status", "active");
 
-    if (!enrollments || enrollments.length === 0) {
-      return { mentors: [], error: null };
-    }
+    // Check user_metadata plan as a fallback (covers admin-created users who have
+    // a plan set in metadata but no phase2 enrollment row yet).
+    const metadataPlan = (
+      user.user_metadata?.plan ??
+      user.app_metadata?.plan ??
+      user.user_metadata?.tier ??
+      user.app_metadata?.tier ??
+      ""
+    ).toString().trim().toLowerCase();
+    const hasMetadataPremiumPlan =
+      metadataPlan === "pro" || metadataPlan === "premium";
 
-    // Filter only Pro/Premium courses
+    // Build premium course IDs from enrollments
     const premiumCourseIds: (string | number)[] = [];
-    for (const enrollment of enrollments) {
-      const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter";
-      const lower = bundleName.toLowerCase();
-      if (lower.includes("premium") || lower.includes("pro")) {
-        if (enrollment.course_id) {
-          premiumCourseIds.push(enrollment.course_id);
+    if (enrollments && enrollments.length > 0) {
+      for (const enrollment of enrollments) {
+        const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter";
+        const lower = bundleName.toLowerCase();
+        if (lower.includes("premium") || lower.includes("pro")) {
+          if (enrollment.course_id) {
+            premiumCourseIds.push(enrollment.course_id);
+          }
         }
       }
     }
 
+    // If no qualifying enrollments from phase2, try the metadata-plan fallback:
+    // look up the courses this user is a member of via their email in course_members.
     if (premiumCourseIds.length === 0) {
-      return { mentors: [], error: null };
+      if (!hasMetadataPremiumPlan) {
+        return { mentors: [], error: null };
+      }
+
+      // Resolve user's email to find which courses they belong to.
+      const userEmail = user.email?.trim().toLowerCase();
+      if (!userEmail) return { mentors: [], error: null };
+
+      const { data: userMemberships } = await supabaseAdmin
+        .from("course_members")
+        .select("maincourse_id")
+        .eq("email", userEmail);
+
+      const userCourseIds = (userMemberships ?? [])
+        .map((m: any) => m.maincourse_id)
+        .filter(Boolean);
+
+      if (userCourseIds.length === 0) return { mentors: [], error: null };
+
+      premiumCourseIds.push(...userCourseIds);
     }
 
-    // 5. Find all mentors assigned to these premium courses
+    // 5. Find mentor emails scoped to the user's enrolled/member courses.
     const { data: siblingCourseMembers, error: siblingError } = await supabaseAdmin
       .from("course_members")
       .select("email")
@@ -74,16 +105,14 @@ export async function getPremiumMentors(accessToken: string) {
       .map((cm: any) => cm.email?.trim().toLowerCase())
       .filter(Boolean);
 
-    if (mentorEmails.length === 0) {
-      return { mentors: [], error: null };
-    }
+    if (mentorEmails.length === 0) return { mentors: [], error: null };
 
-    // 6. Query profiles to get the actual mentors
+    // 6. Query profiles filtered to mentor emails and instructor/admin roles only.
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, email, role, cal_link, mentor_bio, mentor_expertise")
-      .in("email", mentorEmails)
-      .in("role", ["instructor", "admin"]);
+      .in("role", ["instructor", "admin"])
+      .in("email", mentorEmails);
 
     if (error) throw error;
 

@@ -82,7 +82,7 @@ export default function PremiumPage() {
               <div className="pt-4 border-t border-brand-primary/10 mt-auto relative z-10">
                 <Link href="/premium/webinars">
                   <Button className="w-full justify-center group-hover:bg-brand-primary group-hover:text-white transition-colors">
-                    Attend Sessions
+                    Live Sessions
                     <ArrowRight className="w-4 h-4 ml-2 opacity-70 group-hover:translate-x-1 transition-all" />
                   </Button>
                 </Link>

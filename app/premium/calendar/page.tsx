@@ -18,6 +18,7 @@ interface PremiumCalendarEvent {
   description: string;
   event_date: string;
   event_time: string;
+  link_text?: string;
 }
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -54,7 +55,26 @@ export default function PremiumCalendarPage() {
 
         if (error) throw error;
 
-        setEvents((data || []) as PremiumCalendarEvent[]);
+        const fetchedEvents = (data || []) as PremiumCalendarEvent[];
+
+        const { data: globalWebinars } = await supabase
+          .from("webinars")
+          .select("title, link_text");
+
+        if (globalWebinars && globalWebinars.length > 0) {
+          fetchedEvents.forEach((ev) => {
+            const gw = globalWebinars.find(
+              (g: any) =>
+                ev.title.toLowerCase().includes(g.title.toLowerCase()) ||
+                g.title.toLowerCase().includes(ev.title.toLowerCase())
+            );
+            if (gw && gw.link_text) {
+              ev.link_text = gw.link_text;
+            }
+          });
+        }
+
+        setEvents(fetchedEvents);
       } catch (error) {
         console.error("Failed to load premium calendar webinars:", error);
       } finally {
@@ -236,9 +256,12 @@ export default function PremiumCalendarPage() {
 
                     <div className="space-y-1.5">
                       {dayEvents.slice(0, 2).map((event) => (
-                        <div
+                        <a
                           key={event.id}
-                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"
+                          href={event.link_text || "/premium/webinars"}
+                          target={event.link_text ? "_blank" : undefined}
+                          rel={event.link_text ? "noopener noreferrer" : undefined}
+                          className="block rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
                         >
                           <div className="truncate">{event.title}</div>
                           <div className="mt-0.5 flex items-center justify-between gap-1 text-[9px] opacity-90">
@@ -248,7 +271,7 @@ export default function PremiumCalendarPage() {
                             </span>
                             <span>Accepted</span>
                           </div>
-                        </div>
+                        </a>
                       ))}
 
                       {dayEvents.length > 2 && (
@@ -268,54 +291,6 @@ export default function PremiumCalendarPage() {
               </div>
             )}
 
-            {events.length > 0 && (
-              <div className="border-t border-gray-100 bg-gray-50/40 p-5 sm:p-6">
-                <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
-                  <Users className="h-4 w-4 text-brand-primary" />
-                  Webinar schedule
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
-                          Accepted
-                        </span>
-                        <span className="text-[11px] text-gray-500">
-                          {new Date(event.event_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}
-                        </span>
-                      </div>
-
-                      <h3 className="text-sm font-bold text-gray-900">
-                        {event.title}
-                      </h3>
-
-                      {event.description && (
-                        <p className="mt-2 text-xs leading-relaxed text-gray-600 whitespace-pre-wrap">
-                          {event.description}
-                        </p>
-                      )}
-
-                      <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
-                        <Clock3 className="h-3.5 w-3.5" />
-                        {event.event_time.slice(0, 5)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

@@ -51,6 +51,7 @@ interface CurriculumCourse {
   certificate_id?: string | null;
   issued_at?: string | null;
   product_id?: string | number | null;
+  whatsapp_community_link?: string | null;
 }
 
 interface Webinar {
@@ -381,6 +382,7 @@ export default function MyLearningDashboard() {
             category,
             thumbnail_url,
             product_id,
+            whatsapp_community_link,
             coursemodules (*)
           `)
           .in("id", allCourseIds);
@@ -537,6 +539,8 @@ export default function MyLearningDashboard() {
                 : `${completedModules}/${totalModules} Modules`,
 
           product_id: course.product_id ?? null,
+
+          whatsapp_community_link: course.whatsapp_community_link ?? null,
 
         };
       });
@@ -792,6 +796,7 @@ export default function MyLearningDashboard() {
                             }
                             showProgress
                             variant="user"
+                            whatsappLink={course.whatsapp_community_link}
                             onClick={() =>
                               router.push(`/courses/${course.id}`)
                             }
@@ -827,6 +832,7 @@ export default function MyLearningDashboard() {
                       progressPercentage={100}
                       showProgress={true}
                       isCompleted={course.progress === 100}
+                      whatsappLink={course.whatsapp_community_link}
                       onCertificateClick={() => setSelectedCertificateCourse(course)}
                       onClick={() => router.push(`/courses/${course.id}`)}
                     />

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { prepareAdminVerification } from "@/app/actions/admin-2fa";
+import { getUserTier } from "@/app/actions/tier";
 import AdminVerificationModal from "@/app/components/AdminVerificationModal";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
@@ -48,55 +49,35 @@ function LoginPageInner() {
 
   const router = useRouter();
 
-  const routeUserBasedOnRole = async (userId: string) => {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .single();
+  // role and accessToken are already known at call sites — pass them in to avoid
+  // redundant Supabase round-trips.
+  const routeUserBasedOnRole = async (
+    role: string,
+    email: string,
+    accessToken: string,
+  ) => {
+    const normalizedRole = role.toLowerCase();
 
-    if (error) {
-      console.error("Profile fetch error:", error);
-    }
-
-    if (error || !profile) {
-      setError(
-        "Invalid credentials. Please contact an administrator to create your account.",
-      );
-      setLoading(false);
-      return;
-    }
-
-    if (profile.role?.toLowerCase() === "admin") {
+    if (normalizedRole === "admin") {
       router.push("/admin");
       return;
     }
 
-    if (profile.role?.toLowerCase() === "instructor") {
+    if (normalizedRole === "instructor") {
       router.push("/mentor");
       return;
     }
 
-    const signedInEmail =
-      (await supabase.auth.getUser()).data?.user?.email?.trim().toLowerCase() ??
-      "";
-
-    if (DEMO_PREMIUM_EMAILS.includes(signedInEmail)) {
+    if (DEMO_PREMIUM_EMAILS.includes(email.trim().toLowerCase())) {
       router.push("/premium");
       return;
     }
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        const { getUserTier } = await import("@/app/actions/tier");
-        const tier = await getUserTier(session.access_token);
-        if (tier === "Premium") {
-          router.push("/premium");
-          return;
-        }
+      const tier = await getUserTier(accessToken);
+      if (tier === "Premium") {
+        router.push("/premium");
+        return;
       }
     } catch (err) {
       console.error("Failed to fetch user tier during login:", err);
@@ -120,9 +101,21 @@ function LoginPageInner() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (session?.user) {
-        await routeUserBasedOnRole(session.user.id);
-      }
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!profile) return;
+
+      await routeUserBasedOnRole(
+        profile.role ?? "",
+        session.user.email ?? "",
+        session.access_token,
+      );
     };
     void checkExistingSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,7 +169,7 @@ function LoginPageInner() {
         }
 
         // New users from checkout are never admin — skip admin 2FA path
-        await recordLogin(data.user.id);
+        void recordLogin(data.user.id); // fire-and-forget — don't block routing
 
         if (typeof window !== "undefined") {
           // Prompt user to change default password on next visit
@@ -184,7 +177,11 @@ function LoginPageInner() {
         }
 
         router.refresh();
-        await routeUserBasedOnRole(data.user.id);
+        await routeUserBasedOnRole(
+          profile.role ?? "",
+          data.user.email ?? "",
+          data.session?.access_token ?? "",
+        );
       } catch {
         setAutoLoginInProgress(false);
         setToast({
@@ -224,7 +221,11 @@ function LoginPageInner() {
 
     await recordLogin(data.user.id);
     router.refresh();
-    await routeUserBasedOnRole(data.user.id);
+    await routeUserBasedOnRole(
+      "admin",
+      data.user.email ?? email,
+      data.session?.access_token ?? "",
+    );
   };
 
   const handleLogin = async () => {
@@ -268,9 +269,13 @@ function LoginPageInner() {
     }
 
     if (profile.role?.toLowerCase() !== "admin") {
-      await recordLogin(data.user.id);
+      void recordLogin(data.user.id); // fire-and-forget — don't block routing
       router.refresh();
-      await routeUserBasedOnRole(data.user.id);
+      await routeUserBasedOnRole(
+        profile.role ?? "",
+        data.user.email ?? email,
+        data.session?.access_token ?? "",
+      );
       return;
     }
 

@@ -79,7 +79,28 @@ export default function LiveWebinarsPage() {
 
         if (error) throw error;
 
-        const mapped: Webinar[] = (webinarRows || []).map((w: any) => ({
+        const now = new Date();
+        const upcomingWebinars = (webinarRows || []).filter((w: any) => {
+          if (!w.event_date) return true;
+          
+          let eventDateTimeStr = w.event_date;
+          if (w.event_time) {
+            eventDateTimeStr = `${w.event_date}T${w.event_time}`;
+          }
+          
+          const eventDate = new Date(eventDateTimeStr);
+          
+          // Keep if it is in the future or started within the last 2 hours
+          const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+          
+          if (!isNaN(eventDate.getTime())) {
+            return eventDate > twoHoursAgo;
+          }
+          
+          return true;
+        });
+
+        const mapped: Webinar[] = upcomingWebinars.map((w: any) => ({
           id: w.id,
           title: w.title,
           subtitle: "Premium live session",
@@ -93,33 +114,26 @@ export default function LiveWebinarsPage() {
           batchName: undefined,
         }));
 
-        // Include webinars from public webinars table
+        // Include webinars from public webinars table to get links and status
         const { data: globalWebinars } = await supabase
           .from("webinars")
           .select("*")
           .order("created_at", { ascending: false });
 
         if (globalWebinars && globalWebinars.length > 0) {
-          globalWebinars.forEach((gw: any) => {
-            const exists = mapped.some(
-              (m) =>
-                m.title.toLowerCase().includes(gw.title.toLowerCase()) ||
-                gw.title.toLowerCase().includes(m.title.toLowerCase()),
+          mapped.forEach((m) => {
+            const gw = globalWebinars.find(
+              (g: any) =>
+                m.title.toLowerCase().includes(g.title.toLowerCase()) ||
+                g.title.toLowerCase().includes(m.title.toLowerCase())
             );
-            if (!exists) {
-              mapped.push({
-                id: gw.id,
-                title: gw.title,
-                subtitle: gw.subtitle || "Premium live session",
-                description: gw.description || "",
-                event_date: gw.event_date || "",
-                icon: gw.icon || "📋",
-                status: gw.status || "streaming",
-                link_text: gw.link_text || "",
-                attendees_count: gw.attendees_count || 0,
-                batch_id: gw.batch_id || null,
-                batchName: undefined,
-              });
+            if (gw) {
+              m.subtitle = gw.subtitle || m.subtitle;
+              m.icon = gw.icon || m.icon;
+              m.status = gw.status || m.status;
+              m.link_text = gw.link_text || m.link_text;
+              m.attendees_count = gw.attendees_count || m.attendees_count;
+              m.batch_id = gw.batch_id || m.batch_id;
             }
           });
         }

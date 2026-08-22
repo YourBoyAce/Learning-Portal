@@ -1,9 +1,39 @@
 "use server";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import {
+  createMentionNotifications,
+} from "./mention-notifications";
+import { resolveMentionedUserIds } from "@/app/lib/mentions";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// ─── Cached module-level clients (created once per server process) ────────────
+
+let _serviceClient: SupabaseClient | null = null;
+function createServiceClient(): SupabaseClient {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error("Supabase environment variables are not configured.");
+  }
+  if (!_serviceClient) {
+    _serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _serviceClient;
+}
+
+let _anonClient: SupabaseClient | null = null;
+function getAnonClient(): SupabaseClient {
+  if (!_anonClient) {
+    _anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _anonClient;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,36 +55,27 @@ export interface MentionablePerson {
   role: string;
 }
 
-export type FetchMessagesError = { type: "NOT_ENROLLED" | "ERROR"; message: string };
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-function createServiceClient() {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error("Supabase environment variables are not configured.");
-  }
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+export interface CommunitySidebarItem {
+  id: string;
+  title: string;
+  thumbnail_url: string | null;
+  lastMessage: string;
+  lastActivityRaw: string | null;
+  lastActivity: string;
+  unread: number;
 }
+
+export type FetchMessagesError = { type: "NOT_ENROLLED" | "ERROR"; message: string };
 
 /**
  * Derives the securely authenticated user ID from the access token.
  */
 async function getSecureUserId(accessToken: string): Promise<string | null> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data: { user }, error } = await authClient.auth.getUser(accessToken);
+    const { data: { user }, error } = await getAnonClient().auth.getUser(accessToken);
     if (error || !user) return null;
     return user.id;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -62,26 +83,27 @@ async function getSecureUserId(accessToken: string): Promise<string | null> {
 /**
  * Verifies whether a user (by userId) is enrolled in a course via the
  * batch_members → batches relationship.
- * Mirrors the same lookup used in the course page and sendCourseMessage.
+ * Accepts a pre-fetched profile to avoid a redundant DB call when the
+ * caller already has the profile.
  */
 async function checkEnrollment(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any,
   userId: string,
   courseId: string,
+  // Optionally pass already-fetched profile to skip redundant DB call
+  cachedProfile?: { role: string | null; email: string | null } | null,
 ): Promise<boolean> {
-  const { data: userData, error: userError } =
-    await supabaseAdmin.auth.admin.getUserById(userId);
+  const profile = cachedProfile ?? await (async () => {
+    const { data } = await supabaseAdmin
+      .from("profiles")
+      .select("role, email")
+      .eq("id", userId)
+      .single();
+    return data as { role: string | null; email: string | null } | null;
+  })();
 
-  if (userError || !userData?.user) return false;
-
-  // Admin bypass
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role, email")
-    .eq("id", userId)
-    .single();
-
+  // Admin bypass — no enrollment check needed
   if (profile?.role && profile.role.toLowerCase() === "admin") {
     return true;
   }
@@ -116,6 +138,13 @@ async function checkEnrollment(
   return false;
 }
 
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Maps raw DB rows (which may contain a nested profiles object from a join)
+ * into the typed ChatMessage shape. Falls back to a separate profiles query
+ * only if the rows don't already carry profile data.
+ */
 async function hydrateMessagesWithProfiles(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any,
@@ -123,14 +152,29 @@ async function hydrateMessagesWithProfiles(
 ): Promise<ChatMessage[]> {
   if (!messages || messages.length === 0) return [];
 
-  const userIds = Array.from(new Set(messages.map((m) => m.user_id)));
+  // If profiles were already joined, map directly — no extra query needed.
+  if (messages[0]?.profiles !== undefined) {
+    return messages.map((m) => ({
+      id: m.id as string,
+      course_id: m.course_id as string,
+      user_id: m.user_id as string,
+      content: m.content as string,
+      created_at: m.created_at as string,
+      attachment_url: (m.attachment_url as string | null) ?? null,
+      full_name: (m.profiles?.full_name as string | null) ?? null,
+      role: (m.profiles?.role as string | null) ?? null,
+    }));
+  }
 
+  // Fallback: batch-fetch profiles by unique user IDs
+  const userIds = Array.from(new Set(messages.map((m) => m.user_id)));
   const { data: profiles } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, role")
     .in("id", userIds);
 
-  const profileMap = new Map<string, { full_name: string | null, role: string | null }>(
+  const profileMap = new Map<string, { full_name: string | null; role: string | null }>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (profiles ?? []).map((p: any) => [p.id as string, { full_name: p.full_name as string, role: p.role as string }])
   );
 
@@ -173,19 +217,19 @@ export async function fetchInitialMessages(
 
     const supabaseAdmin = createServiceClient();
 
-    // ── Enrollment check ─────────────────────────────────────────────────────
-    let isAdmin = false;
+    // Single profile fetch — reused for isAdmin check AND passed to checkEnrollment
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role")
+      .select("role, email")
       .eq("id", userId)
       .single();
 
-    if (profile?.role && (profile.role.toLowerCase() === "admin" || profile.role.toLowerCase() === "instructor" || profile.role.toLowerCase() === "mentor")) {
-      isAdmin = true;
-    }
+    const isAdmin = !!(
+      profile?.role &&
+      ["admin", "instructor", "mentor"].includes(profile.role.toLowerCase())
+    );
 
-    const enrolled = await checkEnrollment(supabaseAdmin, userId, courseId);
+    const enrolled = await checkEnrollment(supabaseAdmin, userId, courseId, profile);
     if (!enrolled) {
       return {
         messages: [],
@@ -197,17 +241,11 @@ export async function fetchInitialMessages(
       };
     }
 
+    // Fetch messages — profiles are hydrated separately (no FK to profiles table)
     const { data, error } = await supabaseAdmin
       .from("course_messages")
       .select(
-        `
-        id,
-        course_id,
-        user_id,
-        content,
-        created_at,
-        attachment_url
-        `,
+        `id, course_id, user_id, content, created_at, attachment_url`,
       )
       .eq("course_id", courseId)
       .order("created_at", { ascending: false })
@@ -256,14 +294,7 @@ export async function fetchOlderMessages(
     const { data, error } = await supabaseAdmin
       .from("course_messages")
       .select(
-        `
-        id,
-        course_id,
-        user_id,
-        content,
-        created_at,
-        attachment_url
-        `,
+        `id, course_id, user_id, content, created_at, attachment_url`,
       )
       .eq("course_id", courseId)
       .lt("created_at", beforeTimestamp)
@@ -299,11 +330,60 @@ export async function fetchOlderMessages(
  * - The user_id is never trusted from the client — it is passed in from the
  *   server action call after the caller verifies the session.
  */
+async function fetchMentionablePeopleInternal(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  courseId: string,
+): Promise<MentionablePerson[]> {
+  // Fetch all active members assigned to this specific course
+  const { data: courseMembers } = await supabaseAdmin
+    .from("course_members")
+    .select("email")
+    .eq("maincourse_id", courseId)
+    .eq("status", "active");
+
+  const courseMemberEmails = new Set(
+    (courseMembers ?? []).map((cm: { email?: string }) =>
+      cm.email?.toLowerCase(),
+    ),
+  );
+
+  if (courseMemberEmails.size === 0) {
+    return [];
+  }
+
+  // Fetch only staff profiles (admin/instructor/mentor) whose email is
+  // in the course_members list for this course — not all mentors globally.
+  const { data: staffProfiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id, full_name, role, email")
+    .in("role", ["admin", "instructor", "mentor"])
+    .not("full_name", "is", null);
+
+  const people: MentionablePerson[] = (staffProfiles ?? [])
+    .filter((p: { email?: string }) =>
+      courseMemberEmails.has(p.email?.toLowerCase() ?? ""),
+    )
+    .map((p: { id: string; full_name: string | null; role: string | null }) => ({
+      id: p.id,
+      full_name: p.full_name ?? "Unknown",
+      role: p.role ?? "mentor",
+    }));
+
+  const seen = new Set<string>();
+  return people.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+}
+
 export async function sendCourseMessage(
   accessToken: string,
   courseId: string,
   content: string,
   attachmentUrl?: string | null,
+  mentionedUserIds?: string[],
 ): Promise<{ message: ChatMessage | null; error: string | null }> {
   // ── Input validation ──────────────────────────────────────────────────────
   const trimmedContent = content.trim();
@@ -328,8 +408,15 @@ export async function sendCourseMessage(
 
     const supabaseAdmin = createServiceClient();
 
+    // Single profile fetch reused for checkEnrollment
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("role, email, full_name")
+      .eq("id", userId)
+      .single();
+
     // ── Enrollment check (server-side, cannot be bypassed) ────────────────
-    const enrolled = await checkEnrollment(supabaseAdmin, userId, courseId);
+    const enrolled = await checkEnrollment(supabaseAdmin, userId, courseId, profile);
     if (!enrolled) {
       return {
         message: null,
@@ -347,14 +434,7 @@ export async function sendCourseMessage(
         ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}),
       })
       .select(
-        `
-        id,
-        course_id,
-        user_id,
-        content,
-        created_at,
-        attachment_url
-        `,
+        `id, course_id, user_id, content, created_at, attachment_url`,
       )
       .single();
 
@@ -365,6 +445,35 @@ export async function sendCourseMessage(
 
     const messages = await hydrateMessagesWithProfiles(supabaseAdmin, [inserted]);
     const message = messages[0] || null;
+
+    if (message) {
+      // Only fetch mentionable people if there are actual @mentions in the content
+      // and the caller didn't already provide validated IDs.
+      const hasMentions = trimmedContent.includes("@");
+      let validatedIds: string[] = [];
+
+      if (hasMentions) {
+        const mentionablePeople = await fetchMentionablePeopleInternal(supabaseAdmin, courseId);
+        const parsedIds = resolveMentionedUserIds(trimmedContent, mentionablePeople);
+        const mentionableIdSet = new Set(mentionablePeople.map((p) => p.id));
+        validatedIds = Array.from(
+          new Set([
+            ...parsedIds,
+            ...(mentionedUserIds ?? []).filter((id) => mentionableIdSet.has(id)),
+          ]),
+        );
+      }
+
+      if (validatedIds.length > 0) {
+        await createMentionNotifications(supabaseAdmin, {
+          senderUserId: userId,
+          messageId: message.id,
+          courseId,
+          content: trimmedContent,
+          mentionedUserIds: validatedIds,
+        });
+      }
+    }
 
     return { message, error: null };
   } catch (err) {
@@ -492,6 +601,115 @@ export async function getUserCommunities(accessToken: string): Promise<{
 }
 
 /**
+ * Fetches sidebar data for all enrolled courses in a SINGLE batch:
+ * the last message per course AND the unread count per course — all in two
+ * queries regardless of how many courses there are. Replaces the old N×2
+ * per-course waterfall done client-side.
+ */
+export async function getCommunitySidebarData(
+  accessToken: string,
+  userId: string,
+): Promise<{
+  items: CommunitySidebarItem[];
+  error: string | null;
+}> {
+  try {
+    const supabaseAdmin = createServiceClient();
+
+    // Resolve enrolled course IDs
+    const { courses, error: coursesError } = await getUserCommunities(accessToken);
+    if (coursesError) return { items: [], error: coursesError };
+    if (courses.length === 0) return { items: [], error: null };
+
+    const courseIds = courses.map((c) => String(c.id));
+
+    // Batch 1: last message per course — fetch last 1 message per course in a
+    // single query ordered by created_at desc, then deduplicate in JS.
+    const { data: recentMessages } = await supabaseAdmin
+      .from("course_messages")
+      .select("course_id, content, created_at")
+      .in("course_id", courseIds)
+      .order("created_at", { ascending: false });
+
+    // Keep only the first (most recent) message per course
+    const lastMsgMap = new Map<string, { content: string; created_at: string }>();
+    for (const row of recentMessages ?? []) {
+      const cid = String(row.course_id);
+      if (!lastMsgMap.has(cid)) {
+        lastMsgMap.set(cid, { content: row.content, created_at: row.created_at });
+      }
+    }
+
+    // Batch 2: read timestamps for this user across all courses
+    const { data: readData } = await supabaseAdmin
+      .from("community_reads")
+      .select("course_id, last_read_at")
+      .eq("user_id", userId)
+      .in("course_id", courseIds);
+
+    const readMap = new Map<string, string>(
+      (readData ?? []).map((r: any) => [String(r.course_id), r.last_read_at as string])
+    );
+
+    // Batch 3: unread counts — fetch all messages newer than each course's last_read_at.
+    // We do this in a single query and count in JS to avoid N queries.
+    const oldestReadAt = (() => {
+      let oldest = new Date().toISOString();
+      for (const ts of readMap.values()) {
+        if (ts < oldest) oldest = ts;
+      }
+      return oldest;
+    })();
+
+    const { data: unreadMessages } = await supabaseAdmin
+      .from("course_messages")
+      .select("course_id, created_at")
+      .in("course_id", courseIds)
+      .gt("created_at", oldestReadAt);
+
+    // Count unread per course (messages newer than that course's last_read_at)
+    const unreadCountMap = new Map<string, number>();
+    for (const row of unreadMessages ?? []) {
+      const cid = String(row.course_id);
+      const lastRead = readMap.get(cid) ?? "1970-01-01T00:00:00.000Z";
+      if (row.created_at > lastRead) {
+        unreadCountMap.set(cid, (unreadCountMap.get(cid) ?? 0) + 1);
+      }
+    }
+
+    const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+    const items: CommunitySidebarItem[] = courses.map((course) => {
+      const cid = String(course.id);
+      const lastMsg = lastMsgMap.get(cid);
+      return {
+        id: cid,
+        title: course.title,
+        thumbnail_url: course.thumbnail_url,
+        lastMessage: lastMsg?.content ?? "No messages yet",
+        lastActivityRaw: lastMsg?.created_at ?? null,
+        lastActivity: lastMsg?.created_at
+          ? dateFormatter.format(new Date(lastMsg.created_at))
+          : "",
+        unread: unreadCountMap.get(cid) ?? 0,
+      };
+    });
+
+    // Sort by most recent activity
+    items.sort((a, b) => {
+      const dateA = a.lastActivityRaw ? new Date(a.lastActivityRaw).getTime() : 0;
+      const dateB = b.lastActivityRaw ? new Date(b.lastActivityRaw).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return { items, error: null };
+  } catch (err) {
+    console.error("[getCommunitySidebarData] Unexpected error:", err);
+    return { items: [], error: "Failed to load community sidebar data." };
+  }
+}
+
+/**
  * Fetch mentors, instructors, and admins who are associated with a course.
  * Used to populate the @mention dropdown in the community chat.
  */
@@ -506,64 +724,9 @@ export async function getMentionablePeople(
     }
 
     const supabaseAdmin = createServiceClient();
+    const people = await fetchMentionablePeopleInternal(supabaseAdmin, courseId);
 
-    // Get all admin profiles
-    const { data: adminProfiles } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, role")
-      .in("role", ["admin", "instructor", "mentor"])
-      .not("full_name", "is", null);
-
-    // Also get course_members with active status for this course (mentors/instructors)
-    const { data: courseMembers } = await supabaseAdmin
-      .from("course_members")
-      .select("email")
-      .eq("maincourse_id", courseId)
-      .eq("status", "active");
-
-    const courseMemberEmails = new Set(
-      (courseMembers ?? []).map((cm: any) => cm.email?.toLowerCase())
-    );
-
-    // Get profiles for course members who are not already in adminProfiles
-    const adminIds = new Set((adminProfiles ?? []).map((p: any) => p.id));
-    let extraPeople: MentionablePerson[] = [];
-
-    if (courseMemberEmails.size > 0) {
-      const { data: memberProfiles } = await supabaseAdmin
-        .from("profiles")
-        .select("id, full_name, role, email")
-        .not("full_name", "is", null);
-
-      extraPeople = (memberProfiles ?? [])
-        .filter((p: any) => 
-          courseMemberEmails.has(p.email?.toLowerCase()) && !adminIds.has(p.id)
-        )
-        .map((p: any) => ({
-          id: p.id,
-          full_name: p.full_name ?? "Unknown",
-          role: p.role ?? "mentor",
-        }));
-    }
-
-    const people: MentionablePerson[] = [
-      ...(adminProfiles ?? []).map((p: any) => ({
-        id: p.id,
-        full_name: p.full_name ?? "Unknown",
-        role: p.role ?? "admin",
-      })),
-      ...extraPeople,
-    ];
-
-    // Deduplicate by id
-    const seen = new Set<string>();
-    const unique = people.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    });
-
-    return { people: unique, error: null };
+    return { people, error: null };
   } catch (err) {
     console.error("[getMentionablePeople] Unexpected error:", err);
     return { people: [], error: "Failed to load mentionable people." };

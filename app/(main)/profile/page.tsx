@@ -573,9 +573,9 @@ export default function ProfilePage() {
           your instructors and peers within the Academic Atelier ecosystem.
         </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT COLUMN */}
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
+          {/* LEFT COLUMN — sticky so it follows the page scroll */}
+          <div className="space-y-6 lg:sticky lg:top-8">
             {/* PROFILE IDENTITY */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 flex flex-col items-center">
               <h3 className="w-full text-left font-bold text-brand-primary text-[16px] mb-6">

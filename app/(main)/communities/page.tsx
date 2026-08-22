@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import UserCommunitySidebar, { CommunityCourse } from "./UserCommunitySidebar";
 import CommunityChatPanel from "../courses/[id]/components/CommunityChatPanel";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 
 export default function UserCommunitiesPage() {
+    const searchParams = useSearchParams();
+    const initialCourseId = searchParams.get("course");
     const [selectedCourse, setSelectedCourse] = useState<CommunityCourse | null>(null);
     const { isLoading: isTierLoading, canAccess } = useSecurityGatedData();
 
@@ -18,6 +21,7 @@ export default function UserCommunitiesPage() {
                     <UserCommunitySidebar
                         selectedCourse={selectedCourse}
                         onSelectCourse={setSelectedCourse}
+                        initialCourseId={initialCourseId}
                     />
                 </div>
 
