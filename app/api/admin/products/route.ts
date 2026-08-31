@@ -145,7 +145,7 @@ export async function PUT(request: Request) {
   return NextResponse.json({ success: true });
 }
 
-// DELETE /api/admin/products — delete a product (only if no maincourses reference it)
+// DELETE /api/admin/products — delete a product and cascade related data
 export async function DELETE(request: Request) {
   const authContext = await authenticateAdmin(request);
   if ("error" in authContext) return authContext.error;
@@ -161,12 +161,13 @@ export async function DELETE(request: Request) {
 
   const normalizedId = Number.isNaN(Number(id)) ? id : Number(id);
 
+  // Step 1: Find all maincourses linked to this product so we can cascade
+  // through their dependents before the product itself is removed.
   const { data: linkedCourses, error: linkedCoursesError } =
     await authContext.supabaseAdmin
       .from("maincourses")
       .select("id")
-      .eq("product_id", normalizedId)
-      .limit(1);
+      .eq("product_id", normalizedId);
 
   if (linkedCoursesError) {
     return NextResponse.json(
@@ -175,16 +176,25 @@ export async function DELETE(request: Request) {
     );
   }
 
-  if ((linkedCourses ?? []).length > 0) {
-    return NextResponse.json(
-      {
-        error:
-          "This product is currently used by an active course and cannot be deleted.",
-      },
-      { status: 409 },
-    );
+  const linkedCourseIds = (linkedCourses ?? []).map((c) => c.id);
+
+  // Step 2a: Delete course_enrollments by course_id for every linked maincourse.
+  if (linkedCourseIds.length > 0) {
+    const { error: enrollmentsError } = await authContext.supabaseAdmin
+      .from("course_enrollments")
+      .delete()
+      .in("course_id", linkedCourseIds);
+
+    if (enrollmentsError) {
+      return NextResponse.json(
+        { error: enrollmentsError.message },
+        { status: 500 },
+      );
+    }
   }
 
+  // Step 3: Delete the product. Postgres will automatically CASCADE through
+  // maincourses.product_id and batches.product_id via their ON DELETE SET NULL FKs.
   const { error } = await authContext.supabaseAdmin
     .from("products")
     .delete()

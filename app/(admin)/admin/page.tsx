@@ -74,9 +74,10 @@ export default function AdminDashboard() {
           .order("created_at", { ascending: false });
 
         if (profiles) {
-          const students = profiles.filter(
-            (p) => p.role?.toLowerCase() !== "admin",
-          );
+          const students = profiles.filter((p) => {
+            const r = p.role?.toLowerCase();
+            return r !== "admin" && r !== "instructor" && r !== "mentor" && r !== "lead mentor";
+          });
           setTotalStudents(students.length);
           setUsers(students.slice(0, 5));
         }

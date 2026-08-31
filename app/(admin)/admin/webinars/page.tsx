@@ -413,6 +413,24 @@ export default function AdminWebinarsPage() {
 
   const filteredWebinars = activeTab === "upcoming" ? upcomingWebinars : pastWebinars;
 
+  const stats = [
+    {
+      label: "Total Webinars",
+      value: webinars.length.toString(),
+      icon: ICONS.GLOBE,
+    },
+    {
+      label: "Upcoming Webinars",
+      value: upcomingWebinars.length.toString(),
+      icon: ICONS.CLOCK,
+    },
+    {
+      label: "Past Webinars",
+      value: pastWebinars.length.toString(),
+      icon: ICONS.CALENDAR,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -444,33 +462,59 @@ export default function AdminWebinarsPage() {
           </Button>
         </div>
 
-        {/* Search & Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="md:col-span-3 relative">
-            <Search
-              className="absolute left-4 top-5.5 -translate-y-1/2 text-gray-600"
-              size={18}
-            />
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex items-center gap-4"
+            >
+              <div className="flex items-center justify-center shrink-0">
+                <Image
+                  src={stat.icon}
+                  alt={stat.label}
+                  width={30}
+                  height={30}
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <span
+                  className="text-2xl font-bold"
+                  style={{
+                    color: "var(--color-primary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.value}
+                </span>
+
+                <span
+                  className="text-sm"
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontFamily: "var(--font-primary)",
+                  }}
+                >
+                  {stat.label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Webinars Catalog Header & Search */}
+        <div className="flex items-center justify-between flex-wrap gap-4 mt-12 mb-6">
+          <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Webinars Catalog</h2>
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search webinars by title or instructor..."
+              placeholder="Search webinars by title..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all shadow-sm text-gray-500"
+              className="pl-9 pr-4 py-2.5 border text-gray-600 border-gray-200 rounded-xl text-sm bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent w-full sm:w-72 shadow-sm transition-all"
             />
-          </div>
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-12 h-12 rounded-full bg-brand-primary/10 flex items-center justify-center shrink-0">
-              <Video className="text-brand-primary" size={24} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold text-gray-900 leading-none">
-                {webinars.length}
-              </span>
-              <span className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                Total Scheduled
-              </span>
-            </div>
           </div>
         </div>
 
@@ -545,83 +589,129 @@ export default function AdminWebinarsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredWebinars.map((webinar) => (
-                    <tr
-                      key={webinar.id}
-                      className="hover:bg-gray-50/50 transition-colors group"
-                    >
-                      <td className="py-5 px-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            {webinar.icon && webinar.icon.length <= 2 ? (
-                              <span>{webinar.icon}</span>
-                            ) : (
-                              <Image
-                                src={ICONS.GLOBE}
-                                alt="icon"
-                                width={24}
-                                height={24}
+                  filteredWebinars.map((webinar) => {
+                    const isPast = activeTab === "past";
+                    let dateDisplay = webinar.event_date;
+                    let timeDisplay = "";
+                    if (isPast && webinar.event_date) {
+                      const d = new Date(webinar.event_date);
+                      if (!isNaN(d.getTime())) {
+                        dateDisplay = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                        timeDisplay = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                      } else if (webinar.event_date.includes("T")) {
+                        const parts = webinar.event_date.split('T');
+                        dateDisplay = parts[0];
+                        timeDisplay = parts[1] || "";
+                      }
+                    }
+
+                    return (
+                      <tr
+                        key={webinar.id}
+                        className={`transition-colors group ${
+                          isPast
+                            ? "bg-gray-50/60 opacity-80"
+                            : "hover:bg-gray-50/50"
+                        }`}
+                      >
+                        <td className="py-5 px-6">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm border overflow-hidden ${
+                              isPast
+                                ? "bg-gray-100 border-gray-100 grayscale"
+                                : "bg-gray-100 border-gray-100"
+                            }`}>
+                              {webinar.icon && webinar.icon.length <= 2 ? (
+                                <span className={isPast ? "opacity-50" : ""}>{webinar.icon}</span>
+                              ) : (
+                                <Image
+                                  src={ICONS.GLOBE}
+                                  alt="icon"
+                                  width={24}
+                                  height={24}
+                                  className={isPast ? "opacity-40" : ""}
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <h3 className={`text-sm font-medium leading-tight mb-1 ${
+                                isPast ? "text-gray-400" : "text-gray-500"
+                              }`}>
+                                {webinar.title}
+                              </h3>
+                              <p className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                                isPast ? "text-gray-300" : ""
+                              }`}>
+                                {webinar.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 px-6">
+                          <div className="flex flex-col gap-1">
+                            <div className={`flex ${isPast && timeDisplay ? 'flex-col items-start gap-0.5' : 'items-center gap-2'} text-sm font-medium ${
+                              isPast ? "text-gray-400" : "text-gray-500"
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <Calendar
+                                  size={14}
+                                  className={isPast ? "text-gray-300" : "text-brand-primary"}
+                                />
+                                {dateDisplay}
+                              </div>
+                              {isPast && timeDisplay && (
+                                <div className="text-[11px] text-gray-400 pl-5.5">
+                                  {timeDisplay}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                              <Users size={12} />
+                              {webinar.attendees_count} Potential Attendees
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 px-6">
+                          {isPast ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border bg-gray-100 text-gray-400 border-gray-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                              Session Ended
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                  : "bg-blue-50 text-blue-700 border-blue-100"
+                                }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${webinar.status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`}
                               />
-                            )}
+                              {webinar.status}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-5 px-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              onClick={() => handleOpenModal(webinar)}
+                              className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
+                              title="Edit"
+                            >
+                              <Edit size={18} className={isPast ? "text-gray-400" : "text-primary"} />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteClick(webinar)}
+                              className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
+                              title="Delete"
+                            >
+                              <Trash2 size={18} className="text-red-600" />
+                            </Button>
                           </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-gray-500 leading-tight mb-1">
-                              {webinar.title}
-                            </h3>
-                            <p className={TYPOGRAPHY_CLASSES.CAPTION}>
-                              {webinar.subtitle}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-5 px-6">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                            <Calendar
-                              size={14}
-                              className="text-brand-primary"
-                            />
-                            {webinar.event_date}
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                            <Users size={12} />
-                            {webinar.attendees_count} Potential Attendees
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-5 px-6">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${webinar.status === "streaming"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-blue-50 text-blue-700 border-blue-100"
-                            }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${webinar.status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-blue-500"}`}
-                          />
-                          {webinar.status}
-                        </span>
-                      </td>
-                      <td className="py-5 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            onClick={() => handleOpenModal(webinar)}
-                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
-                            title="Edit"
-                          >
-                            <Edit size={18} className="text-primary" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteClick(webinar)}
-                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} className="text-red-600" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
