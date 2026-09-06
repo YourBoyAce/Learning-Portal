@@ -39,13 +39,13 @@ export default function UploadPage() {
   const searchParams = useSearchParams();
   const preselectedCourseId = searchParams.get("courseId") || "";
 
-
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
 
-  const [selectedCurriculum, setSelectedCurriculum] = useState(preselectedCourseId);
+  const [selectedCurriculum, setSelectedCurriculum] =
+    useState(preselectedCourseId);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
@@ -55,7 +55,9 @@ export default function UploadPage() {
 
   const [videoTitle, setVideoTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(null);
+  const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(
+    null,
+  );
   const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState("");
 
   const [isDragging, setIsDragging] = useState(false);
@@ -74,7 +76,10 @@ export default function UploadPage() {
     text: string;
   } | null>(null);
 
-  const fileNameDisplay = useMemo(() => selectedFile?.name || "", [selectedFile]);
+  const fileNameDisplay = useMemo(
+    () => selectedFile?.name || "",
+    [selectedFile],
+  );
 
   // Only show active courses (not upcoming) in curriculum selector
   const activeCourses = useMemo(
@@ -99,10 +104,14 @@ export default function UploadPage() {
 
       const result = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(result?.error || `Request failed (${response.status}).`);
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
       }
 
-      const loadedCourses = Array.isArray(result?.courses) ? result.courses : [];
+      const loadedCourses = Array.isArray(result?.courses)
+        ? result.courses
+        : [];
       setCourses(loadedCourses);
 
       const productsRes = await fetch("/api/admin/products", {
@@ -141,11 +150,12 @@ export default function UploadPage() {
     void init();
   }, []);
 
-
   // Filter courses by selected product
   const filteredCourses = useMemo(() => {
     if (!selectedProductId) return [];
-    return activeCourses.filter((c) => String(c.product_id) === String(selectedProductId));
+    return activeCourses.filter(
+      (c) => String(c.product_id) === String(selectedProductId),
+    );
   }, [activeCourses, selectedProductId]);
 
   // Reset course and module when product changes
@@ -154,7 +164,6 @@ export default function UploadPage() {
     setSelectedModuleId("");
     setModules([]);
   }, [selectedProductId]);
-
 
   // When course changes, load its modules
   useEffect(() => {
@@ -240,7 +249,7 @@ export default function UploadPage() {
         sessionData.session.access_token,
         selectedCurriculum,
         newModuleTitle,
-        newModuleDescription
+        newModuleDescription,
       );
 
       setModules((prev) => [...prev, newModule]);
@@ -331,7 +340,8 @@ export default function UploadPage() {
         const directUploadResult = await directUploadResponse.json();
         if (!directUploadResponse.ok) {
           throw new Error(
-            directUploadResult.error || "Failed to initialize Cloudflare upload.",
+            directUploadResult.error ||
+              "Failed to initialize Cloudflare upload.",
           );
         }
 
@@ -361,12 +371,15 @@ export default function UploadPage() {
                     resolve();
                   } else {
                     reject(
-                      new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`),
+                      new Error(
+                        `Upload failed with status ${xhr.status}: ${xhr.statusText}`,
+                      ),
                     );
                   }
                 };
 
-                xhr.onerror = () => reject(new Error("Network error during upload."));
+                xhr.onerror = () =>
+                  reject(new Error("Network error during upload."));
                 xhr.onabort = () => reject(new Error("Upload was aborted."));
 
                 const formData = new FormData();
@@ -376,7 +389,10 @@ export default function UploadPage() {
               return;
             } catch (err) {
               lastError = err instanceof Error ? err : new Error(String(err));
-              console.warn(`Upload attempt ${attempt + 1} failed:`, lastError.message);
+              console.warn(
+                `Upload attempt ${attempt + 1} failed:`,
+                lastError.message,
+              );
               if (attempt < maxRetries - 1) {
                 const delayMs = Math.pow(2, attempt) * 1000;
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -390,10 +406,9 @@ export default function UploadPage() {
         await uploadChunkWithRetry();
       }
 
-      // Save to DB with course_id + batch_id + module_id
+      // Save the uploaded video against the selected course module.
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
-      payload.append("batchId", selectedProductId);
       payload.append("moduleId", selectedModuleId);
       payload.append("title", videoTitle.trim());
       payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
@@ -406,7 +421,9 @@ export default function UploadPage() {
           .upload(fileName, moduleThumbnailFile);
 
         if (thumbnailUploadError) {
-          throw new Error(`Failed to upload module thumbnail: ${thumbnailUploadError.message}`);
+          throw new Error(
+            `Failed to upload module thumbnail: ${thumbnailUploadError.message}`,
+          );
         }
 
         const { data: thumbnailUrlData } = supabase.storage
@@ -427,7 +444,9 @@ export default function UploadPage() {
 
       const result = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(result?.error || `Request failed (${response.status}).`);
+        throw new Error(
+          result?.error || `Request failed (${response.status}).`,
+        );
       }
 
       setVideoTitle("");
@@ -460,7 +479,9 @@ export default function UploadPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>Video Asset Upload</h1>
+          <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
+            Video Asset Upload
+          </h1>
           <p
             className={
               TYPOGRAPHY.BODY.fontSize +
@@ -479,13 +500,20 @@ export default function UploadPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-              <Image src={ICONS.BOOK} alt="Courses Icon" width={30} height={30} />
+              <Image
+                src={ICONS.BOOK}
+                alt="Courses Icon"
+                width={30}
+                height={30}
+              />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
                 {activeCourses.length}
               </div>
-              <div className="text-xs text-gray-500 font-medium">Total Active Courses</div>
+              <div className="text-xs text-gray-500 font-medium">
+                Total Active Courses
+              </div>
             </div>
           </div>
         </div>
@@ -506,7 +534,9 @@ export default function UploadPage() {
           {/* Left Panel - Upload Form */}
           <div className="lg:col-span-1 space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Upload New Video</h3>
+              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>
+                Upload New Video
+              </h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
                 {/* Select Product */}
@@ -517,8 +547,9 @@ export default function UploadPage() {
                   <select
                     value={selectedProductId}
                     onChange={(e) => setSelectedProductId(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedProductId ? "!text-gray-400" : "!text-gray-900"
-                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedProductId ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -549,8 +580,9 @@ export default function UploadPage() {
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
                     disabled={!selectedProductId}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
-                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -579,7 +611,9 @@ export default function UploadPage() {
                 {/* Select Module */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING + " !mb-0"}>
+                    <label
+                      className={TYPOGRAPHY_CLASSES.INNERHEADING + " !mb-0"}
+                    >
                       Select Module
                     </label>
                     <button
@@ -600,8 +634,9 @@ export default function UploadPage() {
                     value={selectedModuleId}
                     onChange={(e) => setSelectedModuleId(e.target.value)}
                     disabled={!selectedCurriculum || isModulesLoading}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!selectedModuleId ? "!text-gray-400" : "!text-gray-900"
-                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedModuleId ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -630,7 +665,9 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>Video Title</label>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    Video Title
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Intro to Variables"
@@ -655,10 +692,13 @@ export default function UploadPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       setModuleThumbnailFile(file);
-                      setModuleThumbnailPreview(file ? URL.createObjectURL(file) : "");
+                      setModuleThumbnailPreview(
+                        file ? URL.createObjectURL(file) : "",
+                      );
                     }}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${!moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
-                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 cursor-pointer file:!text-gray-900`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -681,10 +721,11 @@ export default function UploadPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${isDragging
-                    ? "border-brand-primary bg-blue-50"
-                    : "border-dashed border-gray-300 hover:border-gray-400"
-                    }`}
+                  className={`border-2 rounded-xl p-4 sm:p-8 text-center cursor-pointer transition-all ${
+                    isDragging
+                      ? "border-brand-primary bg-blue-50"
+                      : "border-dashed border-gray-300 hover:border-gray-400"
+                  }`}
                   onClick={() => document.getElementById("file-input")?.click()}
                 >
                   <input
@@ -722,7 +763,9 @@ export default function UploadPage() {
                 </div>
 
                 <Button type="submit" disabled={isUploading} className="w-full">
-                  {isUploading ? `Uploading... ${uploadProgress}%` : "Upload Video Asset"}
+                  {isUploading
+                    ? `Uploading... ${uploadProgress}%`
+                    : "Upload Video Asset"}
                 </Button>
               </form>
             </div>
@@ -732,17 +775,22 @@ export default function UploadPage() {
           <div className="lg:col-span-2 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>Active Curriculum</h3>
+                <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
+                  Active Curriculum
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {isCoursesLoading && (
-                  <p className="text-sm text-gray-500 col-span-2">Loading courses...</p>
+                  <p className="text-sm text-gray-500 col-span-2">
+                    Loading courses...
+                  </p>
                 )}
 
                 {!isCoursesLoading && activeCourses.length === 0 && (
                   <p className="text-sm text-gray-500 col-span-2">
-                    No active courses yet. Create an active course to get started.
+                    No active courses yet. Create an active course to get
+                    started.
                   </p>
                 )}
 
@@ -781,7 +829,9 @@ export default function UploadPage() {
         panelClassName="max-w-md w-full"
       >
         <div className="p-6">
-          <h2 className="text-xl font-semibold mb-6 text-gray-900">Add New Module</h2>
+          <h2 className="text-xl font-semibold mb-6 text-gray-900">
+            Add New Module
+          </h2>
           <form onSubmit={handleCreateModule} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -817,7 +867,10 @@ export default function UploadPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreatingModule || !newModuleTitle.trim()}>
+              <Button
+                type="submit"
+                disabled={isCreatingModule || !newModuleTitle.trim()}
+              >
                 {isCreatingModule ? "Creating..." : "Create Module"}
               </Button>
             </div>
