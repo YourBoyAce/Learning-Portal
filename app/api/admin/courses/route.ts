@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse, logError } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -157,7 +158,7 @@ export async function GET(request: Request) {
     .select("*");
 
   if (maincoursesError) {
-    return NextResponse.json({ error: maincoursesError.message }, { status: 500 });
+    return apiErrorResponse(maincoursesError, undefined, 500);
   }
 
   // Fetch products (represent "upcoming" planned offerings)
@@ -167,7 +168,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (productsError) {
-    return NextResponse.json({ error: productsError.message }, { status: 500 });
+    return apiErrorResponse(productsError, undefined, 500);
   }
 
   // Products that already have a linked maincourse are "active" — don't show them in upcoming.
@@ -248,7 +249,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (usersError) {
-    return NextResponse.json({ error: usersError.message }, { status: 500 });
+    return apiErrorResponse(usersError, undefined, 500);
   }
 
   // Get auth emails for profiles that lack an email in the profiles table
@@ -337,7 +338,7 @@ export async function GET(request: Request) {
 //     .single();
 
 //   if (insertError) {
-//     return NextResponse.json({ error: insertError.message }, { status: 500 });
+//     return apiErrorResponse(insertError, undefined, 500);
 //   }
 
 //   const modules = Array.isArray(body?.modules) ? body.modules : [];
@@ -402,7 +403,7 @@ export async function GET(request: Request) {
 //     .eq("id", id);
 
 //   if (updateError) {
-//     return NextResponse.json({ error: updateError.message }, { status: 500 });
+//     return apiErrorResponse(updateError, undefined, 500);
 //   }
 
 //   const modules = body?.modules;
@@ -428,7 +429,7 @@ export async function GET(request: Request) {
 
 //     if (fetchError) {
 //       return NextResponse.json(
-//         { error: "Course updated but failed to check existing modules: " + fetchError.message },
+//         { error: logError(fetchError).message },
 //         { status: 500 },
 //       );
 //     }
@@ -444,7 +445,7 @@ export async function GET(request: Request) {
 
 //       if (deleteModulesError) {
 //         return NextResponse.json(
-//           { error: "Course updated but failed to remove modules: " + deleteModulesError.message },
+//           { error: logError(deleteModulesError).message },
 //           { status: 500 },
 //         );
 //       }
@@ -464,7 +465,7 @@ export async function GET(request: Request) {
 
 //       if (modUpdateError) {
 //         return NextResponse.json(
-//           { error: "Course updated but failed to update modules: " + modUpdateError.message },
+//           { error: logError(modUpdateError).message },
 //           { status: 500 },
 //         );
 //       }
@@ -489,7 +490,7 @@ export async function GET(request: Request) {
 
 //       if (insertModulesError) {
 //         return NextResponse.json(
-//           { error: "Course updated but failed to insert new modules: " + insertModulesError.message },
+//           { error: logError(insertModulesError).message },
 //           { status: 500 },
 //         );
 //       }
@@ -519,7 +520,7 @@ export async function POST(request: Request) {
       .from("products")
       .insert({ title, description: description || null, thumbnail_url: thumbnailUrl || null });
 
-    if (productError) return NextResponse.json({ error: productError.message }, { status: 500 });
+    if (productError) return apiErrorResponse(productError, undefined, 500);
     return NextResponse.json({ success: true });
   }
 
@@ -550,7 +551,7 @@ export async function POST(request: Request) {
       .single();
 
     if (productInsertError) {
-      return NextResponse.json({ error: "Failed to create product: " + productInsertError.message }, { status: 500 });
+      return apiErrorResponse(productInsertError, undefined, 500);
     }
     productId = createdProduct.id;
   }
@@ -583,7 +584,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    return apiErrorResponse(insertError, undefined, 500);
   }
 
   // Step 4: Insert modules
@@ -605,7 +606,7 @@ export async function POST(request: Request) {
 
       if (modulesError) {
         return NextResponse.json(
-          { error: "Course created but failed to add modules: " + modulesError.message },
+          { error: logError(modulesError).message },
           { status: 500 },
         );
       }
@@ -747,7 +748,7 @@ export async function PUT(request: Request) {
       .eq("id", productId);
 
     if (productUpdateError) {
-      return NextResponse.json({ error: productUpdateError.message }, { status: 500 });
+      return apiErrorResponse(productUpdateError, undefined, 500);
     }
     return NextResponse.json({ success: true });
   }
@@ -791,7 +792,7 @@ export async function PUT(request: Request) {
     .eq("id", id);
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    return apiErrorResponse(updateError, undefined, 500);
   }
 
   const modules = body?.modules;
@@ -816,7 +817,7 @@ export async function PUT(request: Request) {
 
     if (fetchError) {
       return NextResponse.json(
-        { error: "Course updated but failed to check existing modules: " + fetchError.message },
+        { error: logError(fetchError).message },
         { status: 500 },
       );
     }
@@ -832,7 +833,7 @@ export async function PUT(request: Request) {
 
       if (deleteModulesError) {
         return NextResponse.json(
-          { error: "Course updated but failed to remove modules: " + deleteModulesError.message },
+          { error: logError(deleteModulesError).message },
           { status: 500 },
         );
       }
@@ -851,7 +852,7 @@ export async function PUT(request: Request) {
 
       if (modUpdateError) {
         return NextResponse.json(
-          { error: "Course updated but failed to update modules: " + modUpdateError.message },
+          { error: logError(modUpdateError).message },
           { status: 500 },
         );
       }
@@ -874,7 +875,7 @@ export async function PUT(request: Request) {
 
       if (insertModulesError) {
         return NextResponse.json(
-          { error: "Course updated but failed to insert new modules: " + insertModulesError.message },
+          { error: logError(insertModulesError).message },
           { status: 500 },
         );
       }
@@ -907,7 +908,7 @@ export async function PUT(request: Request) {
       .eq("maincourse_id", id);
 
     if (clearMembersError) {
-      return NextResponse.json({ error: clearMembersError.message }, { status: 500 });
+      return apiErrorResponse(clearMembersError, undefined, 500);
     }
 
     const memberRows = [
@@ -1014,7 +1015,7 @@ export async function DELETE(request: Request) {
       .eq("id", id);
 
     if (productDeleteError) {
-      return NextResponse.json({ error: productDeleteError.message }, { status: 500 });
+      return apiErrorResponse(productDeleteError, undefined, 500);
     }
     return NextResponse.json({ success: true });
   }
@@ -1045,7 +1046,7 @@ export async function DELETE(request: Request) {
     .eq("id", id);
 
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    return apiErrorResponse(deleteError, undefined, 500);
   }
 
   // Delete the linked product so it doesn't reappear as an "upcoming" course

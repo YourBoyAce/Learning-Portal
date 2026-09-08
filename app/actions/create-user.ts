@@ -22,7 +22,7 @@
 
 //     if (authError) {
 //       console.error("Auth Error:", authError.message);
-//       return { success: false, error: authError.message };
+//       return logAndReturnActionError(authError);
 //     }
 
 //     // 2. Create their profile
@@ -65,7 +65,7 @@
 //   } catch (error: unknown) {
 //     return {
 //       success: false,
-//       error: error instanceof Error ? error.message : "Unknown error",
+//       error: logError(error).message, errorId: logError(error).id,
 //     };
 //   }
 // }
@@ -80,7 +80,7 @@
 //   } catch (error: unknown) {
 //     return {
 //       success: false,
-//       error: error instanceof Error ? error.message : "Unknown error",
+//       error: logError(error).message, errorId: logError(error).id,
 //     };
 //   }
 // }
@@ -91,6 +91,8 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { transporter } from "@/app/lib/mailer";
 import { normalizePhoneNumber } from "@/app/lib/phone-verification";
+import { logAndReturnActionError } from "@/app/lib/error-handler";
+import { logError } from "@/app/lib/error-handler";
 
 export async function createUser(formData: FormData) {
   const username = String(formData.get("username") || "").trim();
@@ -139,7 +141,7 @@ export async function createUser(formData: FormData) {
 
     if (authError) {
       console.error("Auth Error:", authError.message);
-      return { success: false, error: authError.message };
+      return logAndReturnActionError(authError);
     }
 
     // 2. Create their profile
@@ -247,7 +249,7 @@ export async function updateUserRole(userId: string, newRole: string) {
   } catch (error: unknown) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: logError(error).message, errorId: logError(error).id,
     };
   }
 }
@@ -321,7 +323,7 @@ export async function deleteUser(userId: string) {
     console.error("[deleteUser] Unexpected error:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: logError(error).message, errorId: logError(error).id,
     };
   }
 }

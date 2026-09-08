@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     .eq("status", "active")
     .eq("users.auth_user_id", auth.userId)
     .order("created_at", { ascending: false });
-  if (enrollmentError) return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+  if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
 
   const accessibleCourseIds = ((enrollments ?? []) as EnrollmentRow[])
     .filter((enrollment) => {
@@ -60,6 +61,6 @@ export async function GET(request: Request) {
     .eq("status", "Active")
     .in("course_id", requestedCourseIds)
     .order("created_at", { ascending: false });
-  if (quizError) return NextResponse.json({ error: quizError.message }, { status: 500 });
+  if (quizError) return apiErrorResponse(quizError, undefined, 500);
   return NextResponse.json({ quizzes: quizzes ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }

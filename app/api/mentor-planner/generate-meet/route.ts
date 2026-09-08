@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createCalcomBooking } from "@/app/lib/calcom";
+import { apiErrorResponse, logError } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     .like("tag", "%status:accepted%");
 
   if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    return apiErrorResponse(fetchError, undefined, 500);
   }
 
   if (!events || events.length === 0) {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
         .eq("id", event.id);
 
       if (updateError) {
-        results.push({ eventId: event.id, success: false, error: updateError.message });
+        results.push({ eventId: event.id, success: false, error: logError(updateError).message });
       } else {
         results.push({ eventId: event.id, success: true, meetingUrl: bookingResult.meetingUrl });
       }

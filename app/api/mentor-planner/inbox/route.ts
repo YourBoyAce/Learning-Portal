@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
       .order("event_time", { ascending: true });
 
     if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      return apiErrorResponse(fetchError, undefined, 500);
     }
 
     // Format events for mentor view
@@ -107,7 +108,7 @@ export async function GET(request: Request) {
       .order("event_time", { ascending: true });
 
     if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      return apiErrorResponse(fetchError, undefined, 500);
     }
 
     // Fetch all mentors profiles in one query

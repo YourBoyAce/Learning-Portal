@@ -2,7 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-export type UserTier = "Starter" | "Pro" | "Premium" | null;
+import { UserTier } from "@/app/lib/tier.constants";
 
 const DEMO_PREMIUM_EMAILS = [
   "premium@gmail.com",

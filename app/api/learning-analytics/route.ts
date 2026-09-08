@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
   const { data: enrollments, error: enrollmentError } = await db.schema("phase2").from("enrollments")
     .select("course_id, users!inner(auth_user_id), bundles!inner(bundle_name)")
     .eq("status", "active").eq("users.auth_user_id", authData.user.id);
-  if (enrollmentError) return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+  if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
   const coursePlans = new Map<string, string>();
   for (const row of enrollments ?? []) {
     const bundle = Array.isArray((row as any).bundles) ? (row as any).bundles[0] : (row as any).bundles;
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     db.from("user_video_progress").select("video_id, course_id, completed, completed_at, updated_at").eq("user_id", authData.user.id).in("course_id", courseIds).eq("completed", true).gte("completed_at", weekStart.toISOString()).lt("completed_at", weekEnd.toISOString()),
   ]);
   const errors = [modulesResult, quizzesResult, artifactsResult, attemptsResult, downloadsResult, progressResult].map((result) => result.error).find(Boolean);
-  if (errors) return NextResponse.json({ error: errors.message }, { status: 500 });
+  if (errors) return apiErrorResponse(errors, undefined, 500);
 
   let available = 0;
   for (const courseId of courseIds) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       .single();
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return apiErrorResponse(updateError, undefined, 500);
     }
 
     return NextResponse.json({ success: true, event: updatedEvent });
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
       .eq("id", eventId);
 
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      return apiErrorResponse(deleteError, undefined, 500);
     }
 
     return NextResponse.json({ success: true, message: "Request declined and deleted." });

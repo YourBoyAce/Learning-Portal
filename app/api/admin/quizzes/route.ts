@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
   const auth = await authenticateAdmin(request);
   if ("error" in auth) return auth.error;
   const { data: quizzes, error } = await auth.supabaseAdmin.schema("phase2").from("quizzes").select("id, course_id, title, questions, passing_score, status, attempts_count, average_score, created_at, updated_at").order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return apiErrorResponse(error, undefined, 500);
   const quizRows = (quizzes ?? []) as QuizRow[];
   const courseIds = [...new Set(quizRows.map((quiz) => quiz.course_id))];
   const { data: courses } = courseIds.length ? await auth.supabaseAdmin.from("maincourses").select("id, title").in("id", courseIds) : { data: [] };
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
   if (!(await courseExists(auth.supabaseAdmin, input.courseId))) return NextResponse.json({ error: "The selected course does not exist." }, { status: 400 });
   const id = `quiz-${crypto.randomUUID()}`;
   const { data, error } = await auth.supabaseAdmin.schema("phase2").from("quizzes").insert({ id, course_id: input.courseId, title: input.title, questions: input.questions, passing_score: input.passingScore, status: input.status }).select("id, course_id, title, questions, passing_score, status, attempts_count, average_score").single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ quiz: data }, { status: 201 });
 }
 
@@ -85,7 +86,7 @@ export async function PUT(request: Request) {
   if (!id || !input) return NextResponse.json({ error: "Invalid quiz data." }, { status: 400 });
   if (!(await courseExists(auth.supabaseAdmin, input.courseId))) return NextResponse.json({ error: "The selected course does not exist." }, { status: 400 });
   const { error } = await auth.supabaseAdmin.schema("phase2").from("quizzes").update({ course_id: input.courseId, title: input.title, questions: input.questions, passing_score: input.passingScore, status: input.status }).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ success: true });
 }
 
@@ -96,6 +97,6 @@ export async function DELETE(request: Request) {
   const id = body && typeof body === "object" && typeof (body as Record<string, unknown>).id === "string" ? ((body as Record<string, unknown>).id as string).trim() : "";
   if (!id) return NextResponse.json({ error: "A quiz id is required." }, { status: 400 });
   const { error } = await auth.supabaseAdmin.schema("phase2").from("quizzes").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ success: true });
 }

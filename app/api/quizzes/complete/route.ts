@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     .select("id, course_id, status, questions")
     .eq("id", quizId)
     .maybeSingle();
-  if (quizError) return NextResponse.json({ error: quizError.message }, { status: 500 });
+  if (quizError) return apiErrorResponse(quizError, undefined, 500);
   if (!quiz || quiz.status !== "Active" || !Array.isArray(quiz.questions) || !quiz.questions.every(isQuizQuestion)) {
     return NextResponse.json({ error: "This quiz is not available." }, { status: 404 });
   }
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (enrollmentError) return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+  if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
 
   const bundleName = String((enrollment as { bundles?: { bundle_name?: string } | null } | null)?.bundles?.bundle_name || "").toLowerCase();
   if (!enrollment || (!bundleName.includes("pro") && !bundleName.includes("premium"))) {
@@ -121,6 +122,6 @@ export async function POST(request: Request) {
   if (insertError?.code === "23505") {
     return NextResponse.json({ success: true, awarded: false, score });
   }
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return apiErrorResponse(insertError, undefined, 500);
   return NextResponse.json({ success: true, awarded: true, score });
 }

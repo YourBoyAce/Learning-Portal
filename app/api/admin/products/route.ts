@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse, logError } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErrorResponse(error, undefined, 500);
   return NextResponse.json(
     { success: true, products: data ?? [] },
     { headers: { "Cache-Control": "no-store" } },
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ success: true, product });
 }
 
@@ -141,7 +142,7 @@ export async function PUT(request: Request) {
     .eq("id", id);
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ success: true });
 }
 
@@ -171,7 +172,7 @@ export async function DELETE(request: Request) {
 
   if (linkedCoursesError) {
     return NextResponse.json(
-      { error: linkedCoursesError.message },
+      { error: logError(linkedCoursesError).message },
       { status: 500 },
     );
   }
@@ -187,7 +188,7 @@ export async function DELETE(request: Request) {
 
     if (enrollmentsError) {
       return NextResponse.json(
-        { error: enrollmentsError.message },
+        { error: logError(enrollmentsError).message },
         { status: 500 },
       );
     }
@@ -201,6 +202,6 @@ export async function DELETE(request: Request) {
     .eq("id", normalizedId);
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErrorResponse(error, undefined, 500);
   return NextResponse.json({ success: true });
 }

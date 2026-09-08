@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
     .limit(6);
 
   if (eventError) {
-    return NextResponse.json({ error: eventError.message }, { status: 500 });
+    return apiErrorResponse(eventError, undefined, 500);
   }
 
   if (!userEmail) {
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
     .eq("email", userEmail);
 
   if (memberError) {
-    return NextResponse.json({ error: memberError.message }, { status: 500 });
+    return apiErrorResponse(memberError, undefined, 500);
   }
 
   const courseIds = ((memberRows ?? []) as any[])
@@ -136,7 +137,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (courseError) {
-    return NextResponse.json({ error: courseError.message }, { status: 500 });
+    return apiErrorResponse(courseError, undefined, 500);
   }
 
   const enrollments = ((courseRows ?? []) as any[]).map((course) => {

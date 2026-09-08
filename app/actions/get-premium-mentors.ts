@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { logError } from "@/app/lib/error-handler";
 
 export async function getPremiumMentors(accessToken: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -132,6 +133,6 @@ export async function getPremiumMentors(accessToken: string) {
     return { mentors: [], error: null };
   } catch (err: any) {
     console.error("Error fetching premium mentors:", err);
-    return { mentors: [], error: err.message || "Failed to fetch mentors" };
+    return { mentors: [], error: logError(err).message };
   }
 }

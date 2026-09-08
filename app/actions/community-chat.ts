@@ -5,6 +5,8 @@ import {
   createMentionNotifications,
 } from "./mention-notifications";
 import { resolveMentionedUserIds } from "@/app/lib/mentions";
+import { logAndReturnActionError } from "@/app/lib/error-handler";
+import { logError } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -303,7 +305,7 @@ export async function fetchOlderMessages(
 
     if (error) {
       console.error("[fetchOlderMessages] Supabase error:", error);
-      return { messages: [], error: error.message };
+      return { messages: [], error: logError(error).message };
     }
 
     const rawMessages = (data ?? []).reverse();
@@ -314,8 +316,7 @@ export async function fetchOlderMessages(
     console.error("[fetchOlderMessages] Unexpected error:", err);
     return {
       messages: [],
-      error:
-        err instanceof Error ? err.message : "Failed to load older messages.",
+      error: logError(err).message,
     };
   }
 }
@@ -480,8 +481,7 @@ export async function sendCourseMessage(
     console.error("[sendCourseMessage] Unexpected error:", err);
     return {
       message: null,
-      error:
-        err instanceof Error ? err.message : "Failed to send message.",
+      error: logError(err).message,
     };
   }
 }
@@ -519,7 +519,7 @@ export async function deleteCourseMessage(
 
     if (error) {
       console.error("[deleteCourseMessage] Supabase error:", error);
-      return { success: false, error: error.message };
+      return logAndReturnActionError(error);
     }
 
     return { success: true, error: null };
@@ -555,7 +555,7 @@ export async function getUserCommunities(accessToken: string): Promise<{
       const { data: courses, error: courseError } = await supabaseAdmin
         .from("maincourses")
         .select("id, title, thumbnail_url");
-      if (courseError) return { courses: [], error: courseError.message };
+      if (courseError) return { courses: [], error: logError(courseError).message };
       return { courses: courses ?? [], error: null };
     }
 
@@ -591,7 +591,7 @@ export async function getUserCommunities(accessToken: string): Promise<{
       .select("id, title, thumbnail_url")
       .in("id", courseIds);
       
-    if (courseError) return { courses: [], error: courseError.message };
+    if (courseError) return { courses: [], error: logError(courseError).message };
 
     return { courses: courses ?? [], error: null };
   } catch (err) {

@@ -3,30 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/app/lib/supabase";
 
-export type UserTier = "Starter" | "Pro" | "Premium" | null;
-
-export type Feature =
-  | "Videos"
-  | "Chat"
-  | "Ratings"
-  | "Labs"
-  | "Quizzes"
-  | "Webinars"
-  | "Mentorship";
-
-const TIER_FEATURES: Record<NonNullable<UserTier>, Feature[]> = {
-  Starter: ["Videos", "Chat", "Ratings"],
-  Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Mentorship"],
-  Premium: [
-    "Videos",
-    "Chat",
-    "Ratings",
-    "Labs",
-    "Quizzes",
-    "Webinars",
-    "Mentorship",
-  ],
-};
+import { UserTier, Feature, TIER_FEATURES } from "@/app/lib/tier.constants";
 
 export function useSecurityGatedData() {
   const [tier, setTier] = useState<UserTier>(null);

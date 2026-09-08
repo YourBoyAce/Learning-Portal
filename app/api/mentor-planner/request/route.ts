@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -85,7 +86,7 @@ Duration: ${duration} minutes`;
 
   if (insertError) {
     console.error("Error inserting booking request:", insertError.message);
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    return apiErrorResponse(insertError, undefined, 500);
   }
 
   return NextResponse.json({ success: true, event });

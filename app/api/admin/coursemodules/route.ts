@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
+import { logError } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -201,7 +203,7 @@ export async function POST(request: Request) {
         .single();
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return apiErrorResponse(dbError, undefined, 500);
   }
 
   // Fetch duration in the background (non-blocking)
@@ -310,7 +312,7 @@ export async function DELETE(request: Request) {
     .maybeSingle();
 
   if (moduleError) {
-    return NextResponse.json({ error: moduleError.message }, { status: 500 });
+    return apiErrorResponse(moduleError, undefined, 500);
   }
 
   if (!moduleRow) {
@@ -337,7 +339,7 @@ export async function DELETE(request: Request) {
 
     if (progressError) {
       return NextResponse.json(
-        { error: "Failed to remove module progress: " + progressError.message },
+        { error: logError(progressError).message },
         { status: 500 },
       );
     }
@@ -350,7 +352,7 @@ export async function DELETE(request: Request) {
     .eq("maincourse_id", courseId);
 
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    return apiErrorResponse(deleteError, undefined, 500);
   }
 
   return NextResponse.json({ success: true, moduleId });

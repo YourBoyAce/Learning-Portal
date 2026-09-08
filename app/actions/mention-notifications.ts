@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { logAndReturnActionError } from "@/app/lib/error-handler";
+import { logError } from "@/app/lib/error-handler";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +145,7 @@ export async function getMentionNotifications(
 
     if (error) {
       console.error("[getMentionNotifications] fetch error:", error);
-      return { notifications: [], unreadCount: 0, error: error.message };
+      return { notifications: [], unreadCount: 0, error: logError(error).message };
     }
 
     const { count: unreadCount } = await supabaseAdmin
@@ -233,7 +235,7 @@ export async function markMentionNotificationRead(
       .is("read_at", null);
 
     if (error) {
-      return { success: false, error: error.message };
+      return logAndReturnActionError(error);
     }
 
     return { success: true, error: null };
@@ -259,7 +261,7 @@ export async function markAllMentionNotificationsRead(
       .is("read_at", null);
 
     if (error) {
-      return { success: false, error: error.message };
+      return logAndReturnActionError(error);
     }
 
     return { success: true, error: null };
