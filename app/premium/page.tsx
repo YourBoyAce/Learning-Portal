@@ -22,7 +22,7 @@ export default function PremiumPage() {
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
-        
+
         {/* Header Section styled exactly like Dashboard Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pt-4">
           <div className="space-y-2 max-w-2xl">
@@ -52,7 +52,7 @@ export default function PremiumPage() {
                 <div className="h-4 bg-gray-100 rounded-md w-full mb-2" />
                 <div className="h-4 bg-gray-100 rounded-md w-5/6" />
                 <div className="mt-8 flex justify-center py-6">
-                   <div className="w-16 h-16 bg-gray-100 rounded-full" />
+                  <div className="w-16 h-16 bg-gray-100 rounded-full" />
                 </div>
               </div>
             ))}
@@ -60,8 +60,8 @@ export default function PremiumPage() {
         ) : (
           /* Feature Grid - Replicating User Dashboard Widget Style */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            {/* Live Webinars */}
+
+            {/* Live Sessions */}
             <div className="bg-surface-accent rounded-2xl p-5 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col group min-h-[320px]">
               <div className="flex items-center justify-between mb-3 relative z-10">
                 <span className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em]">
@@ -69,14 +69,14 @@ export default function PremiumPage() {
                 </span>
               </div>
               <h2 className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-2 relative z-10`}>
-                Live Webinars
+                Live Sessions
               </h2>
               <p className="text-sm text-gray-600 mb-4 relative z-10">
                 Attend exclusive live sessions, interact with instructors in real-time, and catch up on recorded streams.
               </p>
               <div className="flex-1 flex items-center justify-center relative z-10 py-4">
                 <div className="w-16 h-16 bg-surface-subtle rounded-xl flex items-center justify-center border border-brand-primary/10 group-hover:scale-110 transition-transform duration-300 shadow-sm">
-                   <Image src={ICONS.GLOBELIGHT} alt="Webinars" width={28} height={28} className="text-brand-primary opacity-80" />
+                  <Image src={ICONS.GLOBELIGHT} alt="Webinars" width={28} height={28} className="text-brand-primary opacity-80" />
                 </div>
               </div>
               <div className="pt-4 border-t border-brand-primary/10 mt-auto relative z-10">
@@ -104,7 +104,7 @@ export default function PremiumPage() {
               </p>
               <div className="flex-1 flex items-center justify-center relative z-10 py-4">
                 <div className="w-16 h-16 bg-surface-subtle rounded-xl flex items-center justify-center border border-brand-primary/10 group-hover:scale-110 transition-transform duration-300 shadow-sm">
-                   <Image src={ICONS.BATCHLIGHT} alt="Inbox" width={28} height={28} className="text-brand-primary opacity-80" />
+                  <Image src={ICONS.BATCHLIGHT} alt="Inbox" width={28} height={28} className="text-brand-primary opacity-80" />
                 </div>
               </div>
               <div className="pt-4 border-t border-brand-primary/10 mt-auto relative z-10">
@@ -132,7 +132,7 @@ export default function PremiumPage() {
               </p>
               <div className="flex-1 flex items-center justify-center relative z-10 py-4">
                 <div className="w-16 h-16 bg-surface-subtle rounded-xl flex items-center justify-center border border-brand-primary/10 group-hover:scale-110 transition-transform duration-300 shadow-sm">
-                   <Image src={ICONS.CALENDAR} alt="Calendar" width={28} height={28} className="text-brand-primary opacity-80" />
+                  <Image src={ICONS.CALENDAR} alt="Calendar" width={28} height={28} className="text-brand-primary opacity-80" />
                 </div>
               </div>
               <div className="pt-4 border-t border-brand-primary/10 mt-auto relative z-10">

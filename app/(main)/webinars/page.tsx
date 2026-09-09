@@ -62,11 +62,10 @@ function WebinarCardSkeleton() {
 function WebinarCard({ webinar, past }: { webinar: Webinar; past: boolean }) {
   return (
     <div
-      className={`relative rounded-3xl p-6 flex flex-col justify-between transition-all min-h-[220px] ${
-        past
+      className={`relative rounded-3xl p-6 flex flex-col justify-between transition-all min-h-[220px] ${past
           ? "bg-gray-50 border border-gray-100 shadow-none opacity-75"
           : "bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 group"
-      }`}
+        }`}
     >
       {/* Ended overlay badge */}
       {past && (
@@ -82,11 +81,10 @@ function WebinarCard({ webinar, past }: { webinar: Webinar; past: boolean }) {
         {/* Icon row + batch badge */}
         <div className="flex items-start justify-between gap-2">
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
-              past
+            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${past
                 ? "bg-gray-100"
                 : "bg-blue-50 group-hover:bg-brand-primary"
-            }`}
+              }`}
           >
             <Video
               size={18}
@@ -114,11 +112,10 @@ function WebinarCard({ webinar, past }: { webinar: Webinar; past: boolean }) {
         {/* Title & subtitle */}
         <div>
           <h3
-            className={`font-bold leading-snug text-base line-clamp-1 ${
-              past
+            className={`font-bold leading-snug text-base line-clamp-1 ${past
                 ? "text-gray-400"
                 : "text-gray-900 group-hover:text-brand-primary transition-colors"
-            }`}
+              }`}
           >
             {webinar.title}
           </h3>
@@ -132,11 +129,10 @@ function WebinarCard({ webinar, past }: { webinar: Webinar; past: boolean }) {
         {/* Description */}
         {webinar.description && (
           <p
-            className={`text-xs leading-relaxed line-clamp-2 p-3 rounded-2xl border ${
-              past
+            className={`text-xs leading-relaxed line-clamp-2 p-3 rounded-2xl border ${past
                 ? "text-gray-400 bg-gray-100/50 border-gray-100"
                 : "text-gray-500 bg-gray-50 border-gray-50"
-            }`}
+              }`}
           >
             {webinar.description}
           </p>
@@ -144,9 +140,8 @@ function WebinarCard({ webinar, past }: { webinar: Webinar; past: boolean }) {
 
         {/* Meta row */}
         <div
-          className={`flex flex-wrap items-center gap-3 text-xs font-bold uppercase tracking-wider ${
-            past ? "text-gray-300" : "text-gray-400"
-          }`}
+          className={`flex flex-wrap items-center gap-3 text-xs font-bold uppercase tracking-wider ${past ? "text-gray-300" : "text-gray-400"
+            }`}
         >
           {webinar.event_date && (
             <span className="flex items-center gap-1">
@@ -264,7 +259,7 @@ export default function LiveWebinarsPage() {
           <div>
             <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2`}>
               <Image src={ICONS.GLOBE} alt="Webinars" width={28} height={28} />
-              Live Webinars
+              Live Sessions
             </h1>
             <p className="text-sm text-gray-500 mt-1">
               Exclusive live knowledge sessions curated for your learning cohort.

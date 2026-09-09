@@ -82,21 +82,21 @@ export default function LiveWebinarsPage() {
         const now = new Date();
         const upcomingWebinars = (webinarRows || []).filter((w: any) => {
           if (!w.event_date) return true;
-          
+
           let eventDateTimeStr = w.event_date;
           if (w.event_time) {
             eventDateTimeStr = `${w.event_date}T${w.event_time}`;
           }
-          
+
           const eventDate = new Date(eventDateTimeStr);
-          
+
           // Keep if it is in the future or started within the last 2 hours
           const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-          
+
           if (!isNaN(eventDate.getTime())) {
             return eventDate > twoHoursAgo;
           }
-          
+
           return true;
         });
 
@@ -159,7 +159,7 @@ export default function LiveWebinarsPage() {
               className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2`}
             >
               <Image src={ICONS.GLOBE} alt="Webinars" width={28} height={28} />
-              Live Webinars
+              Live Sessions
             </h1>
             <p className="text-sm text-gray-500 mt-1">
               Your accepted premium webinar invitations are listed here as live

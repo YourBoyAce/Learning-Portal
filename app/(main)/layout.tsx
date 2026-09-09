@@ -7,8 +7,8 @@ import { supabase } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
 import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
-import {ICONS} from "@/app/styles/icons";
-import {Button} from "@/components/ui/button";
+import { ICONS } from "@/app/styles/icons";
+import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import MentionNotificationsBell from "@/app/components/MentionNotificationsBell";
 
@@ -21,7 +21,7 @@ function MainLayoutContent({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab");
-  
+
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
@@ -50,7 +50,7 @@ function MainLayoutContent({
 
       if (cancelled) return;
       setUserEmail(user.email ?? null);
-      
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name, role")
@@ -59,7 +59,7 @@ function MainLayoutContent({
 
       setFullName(profile?.full_name?.trim() || null);
       setRole(profile?.role || null);
-      
+
       setLoading(false);
     };
 
@@ -177,7 +177,7 @@ function MainLayoutContent({
           : ICONS.MATERIAL,
       },
       {
-        label: "Live Webinars",
+        label: "Live Sessions",
         href: "/webinars",
         active: pathname === "/webinars",
         icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
@@ -242,7 +242,7 @@ function MainLayoutContent({
   return (
     <div className="flex flex-col h-screen bg-surface-subtle">
       <div className="flex flex-1 overflow-hidden relative">
-        
+
         {isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
@@ -251,9 +251,8 @@ function MainLayoutContent({
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-surface-subtle border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
         >
           <div className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -271,25 +270,24 @@ function MainLayoutContent({
 
           <nav className="flex-1 px-4 py-2 text-gray-500 flex flex-col gap-2">
             {navItems.map((item) => (
-  <Link
-  key={item.href}
-  href={item.href}
-  className={`nav-item flex items-center gap-3 px-4 py-3 ${
-    item.active
-      ? "nav-item-active"
-      : "nav-item-inactive"
-  }`}
->
-  <Image
-    src={item.icon}
-    alt={item.label}
-    width={20}
-    height={20}
-  />
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active
+                    ? "nav-item-active"
+                    : "nav-item-inactive"
+                  }`}
+              >
+                <Image
+                  src={item.icon}
+                  alt={item.label}
+                  width={20}
+                  height={20}
+                />
 
-  <span>{item.label}</span>
-</Link>
-))}
+                <span>{item.label}</span>
+              </Link>
+            ))}
           </nav>
 
           <div className="p-6 space-y-4">
