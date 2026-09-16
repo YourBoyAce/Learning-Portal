@@ -782,7 +782,7 @@ export async function PUT(request: Request) {
     course_type: "active",
     ...(titleUpdate && { title: titleUpdate }),
     ...(resolvedThumbnailUrl !== undefined && { thumbnail_url: resolvedThumbnailUrl }),
-    ...(body?.product_id !== undefined && body?.product_id !== "" && { product_id: Number(body.product_id) }),
+    ...(body?.product_id !== undefined && body?.product_id !== "" && { product_id: body.product_id }),
     ...(body?.whatsapp_community_link !== undefined && { whatsapp_community_link: body.whatsapp_community_link || null }),
   };
 
