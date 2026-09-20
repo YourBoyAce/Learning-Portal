@@ -26,6 +26,10 @@ function LoginPageInner() {
   const urlMessage = searchParams.get("message");
   // ?newUser=true is set by the checkout flow for first-time buyers (triggers auto-login)
   const isNewUserFromCheckout = searchParams.get("newUser") === "true";
+  // ?next= is an optional deep-link path to redirect to after successful login
+  // (e.g. /dashboard, /courses/<id>). Only same-origin paths are honoured.
+  const rawNext = searchParams.get("next") ?? "";
+  const nextPath = rawNext.startsWith("/") ? rawNext : "";
 
   const [email, setEmail] = useState(urlEmail ?? "");
   const [password, setPassword] = useState("");
@@ -51,10 +55,13 @@ function LoginPageInner() {
 
   // role and accessToken are already known at call sites — pass them in to avoid
   // redundant Supabase round-trips.
+  // nextPath: optional same-origin path to redirect to after login (e.g. /courses/<id>).
+  // Only used for non-admin/instructor roles; admins always land on /admin.
   const routeUserBasedOnRole = async (
     role: string,
     email: string,
     accessToken: string,
+    nextPath?: string,
   ) => {
     const normalizedRole = role.toLowerCase();
 
@@ -70,6 +77,12 @@ function LoginPageInner() {
 
     if (DEMO_PREMIUM_EMAILS.includes(email.trim().toLowerCase())) {
       router.push("/premium");
+      return;
+    }
+
+    // Honour a ?next= deep-link for regular students
+    if (nextPath) {
+      router.push(nextPath);
       return;
     }
 
@@ -95,7 +108,7 @@ function LoginPageInner() {
     });
   };
 
-  // Redirect already-logged-in users to their home route
+  // Redirect already-logged-in users to their home route (or ?next= deep-link)
   useEffect(() => {
     const checkExistingSession = async () => {
       const {
@@ -115,6 +128,7 @@ function LoginPageInner() {
         profile.role ?? "",
         session.user.email ?? "",
         session.access_token,
+        nextPath,
       );
     };
     void checkExistingSession();
@@ -181,6 +195,7 @@ function LoginPageInner() {
           profile.role ?? "",
           data.user.email ?? "",
           data.session?.access_token ?? "",
+          nextPath,
         );
       } catch {
         setAutoLoginInProgress(false);
@@ -275,6 +290,7 @@ function LoginPageInner() {
         profile.role ?? "",
         data.user.email ?? email,
         data.session?.access_token ?? "",
+        nextPath,
       );
       return;
     }
