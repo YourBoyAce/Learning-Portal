@@ -587,9 +587,64 @@ export async function POST(request: Request) {
     return apiErrorResponse(insertError, undefined, 500);
   }
 
-  // Step 4: Insert modules
+  // Step 4: Insert sections and modules
+  const sections = Array.isArray(body?.sections) ? body.sections : [];
+  if (sections.length > 0) {
+    // New format: sections with nested modules
+    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const sectionTitle = typeof sec.title === "string" ? sec.title.trim() : "";
+      if (!sectionTitle) continue;
+
+      const { data: newSection, error: sectionError } = await authContext.supabaseAdmin
+        .from("course_sections")
+        .insert({
+          maincourse_id: newCourse.id,
+          title: sectionTitle,
+          description: typeof sec.description === "string" ? sec.description.trim() : "",
+          order_index: sIdx + 1,
+        })
+        .select("id")
+        .single();
+
+      if (sectionError) {
+        return NextResponse.json(
+          { error: logError(sectionError).message },
+          { status: 500 },
+        );
+      }
+
+      const sectionModules = Array.isArray(sec.modules) ? sec.modules : [];
+      if (sectionModules.length > 0 && newSection) {
+        const modulesToInsert = sectionModules
+          .map((m: any, mIdx: number) => ({
+            maincourse_id: newCourse.id,
+            section_id: newSection.id,
+            title: typeof m.title === "string" ? m.title.trim() : "",
+            description: typeof m.description === "string" ? m.description.trim() : "",
+            order_index: mIdx + 1,
+          }))
+          .filter((m: any) => m.title !== "");
+
+        if (modulesToInsert.length > 0) {
+          const { error: modulesError } = await authContext.supabaseAdmin
+            .from("coursemodules")
+            .insert(modulesToInsert);
+
+          if (modulesError) {
+            return NextResponse.json(
+              { error: logError(modulesError).message },
+              { status: 500 },
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // Legacy/fallback: flat modules array (without sections)
   const modules = Array.isArray(body?.modules) ? body.modules : [];
-  if (modules.length > 0) {
+  if (modules.length > 0 && sections.length === 0) {
     const modulesToInsert = modules
       .map((m: any, index: number) => ({
         maincourse_id: newCourse.id,
@@ -795,6 +850,152 @@ export async function PUT(request: Request) {
     return apiErrorResponse(updateError, undefined, 500);
   }
 
+  // ── Step: Handle sections ──────────────────────────────────────────────────
+  const sections = body?.sections;
+  if (Array.isArray(sections)) {
+    const validSections = sections.filter(
+      (s: any) => s && typeof s.title === "string" && s.title.trim() !== ""
+    );
+
+    const sectionsToUpdate = validSections.filter((s: any) => s.id);
+    const sectionsToInsert = validSections.filter((s: any) => !s.id);
+    const keepSectionIds = sectionsToUpdate.map((s: any) => s.id);
+
+    // Fetch current sections for this course
+    const { data: currentSections, error: fetchSectionsError } = await authContext.supabaseAdmin
+      .from("course_sections")
+      .select("id")
+      .eq("maincourse_id", id);
+
+    if (fetchSectionsError) {
+      return NextResponse.json(
+        { error: logError(fetchSectionsError).message },
+        { status: 500 },
+      );
+    }
+
+    const currentSectionIds = currentSections?.map((s: any) => s.id) ?? [];
+    const deleteSectionIds = currentSectionIds.filter((sid: string) => !keepSectionIds.includes(sid));
+
+    // Delete removed sections (modules become ungrouped via ON DELETE SET NULL)
+    if (deleteSectionIds.length > 0) {
+      const { error: deleteSectionsError } = await authContext.supabaseAdmin
+        .from("course_sections")
+        .delete()
+        .in("id", deleteSectionIds);
+
+      if (deleteSectionsError) {
+        return NextResponse.json(
+          { error: logError(deleteSectionsError).message },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Update existing sections
+    for (let sIdx = 0; sIdx < sectionsToUpdate.length; sIdx++) {
+      const sec = sectionsToUpdate[sIdx];
+      const sectionOrderIndex = validSections.findIndex((s: any) => s.id === sec.id) + 1;
+      const { error: secUpdateError } = await authContext.supabaseAdmin
+        .from("course_sections")
+        .update({
+          title: sec.title.trim(),
+          description: (sec.description || "").trim(),
+          order_index: sectionOrderIndex > 0 ? sectionOrderIndex : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sec.id)
+        .eq("maincourse_id", id);
+
+      if (secUpdateError) {
+        return NextResponse.json(
+          { error: logError(secUpdateError).message },
+          { status: 500 },
+        );
+      }
+
+      // Handle modules within this section
+      if (Array.isArray(sec.modules)) {
+        const sectionModules = sec.modules.filter(
+          (m: any) => m && typeof m.title === "string" && m.title.trim() !== ""
+        );
+        const modsToUpdate = sectionModules.filter((m: any) => m.id);
+        const modsToInsert = sectionModules.filter((m: any) => !m.id);
+
+        for (let mIdx = 0; mIdx < modsToUpdate.length; mIdx++) {
+          const mod = modsToUpdate[mIdx];
+          await authContext.supabaseAdmin
+            .from("coursemodules")
+            .update({
+              title: mod.title.trim(),
+              description: (mod.description || "").trim(),
+              section_id: sec.id,
+              order_index: sectionModules.findIndex((m: any) => m.id === mod.id) + 1,
+            })
+            .eq("id", mod.id)
+            .eq("maincourse_id", id);
+        }
+
+        if (modsToInsert.length > 0) {
+          const insertData = modsToInsert.map((mod: any, mIdx: number) => ({
+            maincourse_id: id,
+            section_id: sec.id,
+            title: mod.title.trim(),
+            description: (mod.description || "").trim(),
+            order_index: sectionModules.length - modsToInsert.length + mIdx + 1,
+          }));
+
+          await authContext.supabaseAdmin
+            .from("coursemodules")
+            .insert(insertData);
+        }
+      }
+    }
+
+    // Insert new sections with their modules
+    for (let sIdx = 0; sIdx < sectionsToInsert.length; sIdx++) {
+      const sec = sectionsToInsert[sIdx];
+      const sectionOrderIndex = validSections.findIndex((s: any) => s === sec) + 1;
+
+      const { data: newSection, error: secInsertError } = await authContext.supabaseAdmin
+        .from("course_sections")
+        .insert({
+          maincourse_id: id,
+          title: sec.title.trim(),
+          description: (sec.description || "").trim(),
+          order_index: sectionOrderIndex > 0 ? sectionOrderIndex : null,
+        })
+        .select("id")
+        .single();
+
+      if (secInsertError) {
+        return NextResponse.json(
+          { error: logError(secInsertError).message },
+          { status: 500 },
+        );
+      }
+
+      if (Array.isArray(sec.modules) && newSection) {
+        const sectionModules = sec.modules
+          .filter((m: any) => m && typeof m.title === "string" && m.title.trim() !== "")
+          .map((m: any, mIdx: number) => ({
+            maincourse_id: id,
+            section_id: newSection.id,
+            title: m.title.trim(),
+            description: (m.description || "").trim(),
+            order_index: mIdx + 1,
+          }));
+
+        if (sectionModules.length > 0) {
+          await authContext.supabaseAdmin
+            .from("coursemodules")
+            .insert(sectionModules);
+        }
+      }
+    }
+  }
+
+  // ── Step: Handle flat modules (legacy / ungrouped) ────────────────────────
   const modules = body?.modules;
   if (Array.isArray(modules)) {
     const validModules = modules.filter(
@@ -846,6 +1047,7 @@ export async function PUT(request: Request) {
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
           order_index: moduleOrderMap.get(mod.id) ?? null,
+          ...(mod.section_id !== undefined ? { section_id: mod.section_id || null } : {}),
         })
         .eq("id", mod.id)
         .eq("maincourse_id", id);
@@ -866,6 +1068,7 @@ export async function PUT(request: Request) {
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
           order_index: orderIndex > 0 ? orderIndex : null,
+          ...(mod.section_id ? { section_id: mod.section_id } : {}),
         };
       });
 

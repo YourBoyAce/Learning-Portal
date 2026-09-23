@@ -64,6 +64,14 @@ interface Module {
   created_at?: string | null;
   duration: string;
   order_index: number;
+  section_id?: string | number | null;
+}
+
+interface CourseSection {
+  id: string | number;
+  title: string;
+  description?: string;
+  order_index?: number;
 }
 
 
@@ -195,6 +203,10 @@ export default function CoursePlayerPage() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<Module | null>(null);
   const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
+
+  // Section state for accordion grouping
+  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   // --- QUIZZES, ARTIFACTS & COMMUNITY INTEGRATION STATE ---
   const [activeTab, setActiveTab] = useState<
@@ -503,7 +515,7 @@ export default function CoursePlayerPage() {
       // Fetch modules purely based on the course
       const { data: courseModules, error: modulesError } = await supabase
         .from("coursemodules")
-        .select("*")
+        .select("*, section_id")
         .eq("maincourse_id", id)
         .order("order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
@@ -513,6 +525,22 @@ export default function CoursePlayerPage() {
       
       const orderedModules = courseModules ?? [];
       setModules(orderedModules);
+
+      // Fetch sections for this course
+      try {
+        const { data: sectionData } = await supabase
+          .from("course_sections")
+          .select("id, title, description, order_index")
+          .eq("maincourse_id", id)
+          .order("order_index", { ascending: true })
+          .order("created_at", { ascending: true });
+
+        if (sectionData && sectionData.length > 0) {
+          setCourseSections(sectionData);
+        }
+      } catch {
+        // Sections are optional, continue without them
+      }
 
       let { data: progressData, error: progressError }: {
         data: any[] | null;
@@ -1246,7 +1274,248 @@ export default function CoursePlayerPage() {
               </h3>
               <p className="text-gray-500 text-sm">Modules will appear here once they are added to the course.</p>
             </div>
+          ) : courseSections.length > 0 ? (
+            // Section-grouped accordion view
+            <>
+              {/* Expand/Collapse All */}
+              <div className="flex justify-end mb-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allCollapsed = courseSections.every(
+                      (sec) => collapsedSections[String(sec.id)]
+                    );
+                    const next: Record<string, boolean> = {};
+                    courseSections.forEach((sec) => {
+                      next[String(sec.id)] = !allCollapsed;
+                    });
+                    setCollapsedSections(next);
+                  }}
+                  className="text-[11px] font-semibold text-brand-primary hover:text-brand-heading transition-colors"
+                >
+                  {courseSections.every((sec) => collapsedSections[String(sec.id)])
+                    ? "Expand All"
+                    : "Collapse All"}
+                </button>
+              </div>
+
+              {courseSections.map((section) => {
+                const sectionId = String(section.id);
+                const sectionModules = modules.filter(
+                  (m) => String(m.section_id) === sectionId
+                );
+                const completedInSection = sectionModules.filter(
+                  (m) => !!userProgress[getModuleKey(m)]
+                ).length;
+                const isCollapsed = !!collapsedSections[sectionId];
+
+                return (
+                  <div key={sectionId} className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
+                    {/* Section Header */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollapsedSections((prev) => ({
+                          ...prev,
+                          [sectionId]: !prev[sectionId],
+                        }))
+                      }
+                      className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-7 h-7 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
+                          <Layers size={14} className="text-brand-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-gray-900 truncate">
+                            {section.title}
+                          </h4>
+                          <span className="text-[10px] font-semibold text-gray-400">
+                            {completedInSection}/{sectionModules.length} completed
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className={`text-gray-400 transition-transform duration-200 shrink-0 ${isCollapsed ? "-rotate-90" : ""}`}
+                      />
+                    </button>
+
+                    {/* Section Modules */}
+                    {!isCollapsed && (
+                      <div className="flex flex-col">
+                        {sectionModules.length === 0 ? (
+                          <p className="px-5 py-4 text-xs text-gray-400 italic">
+                            No modules in this section yet.
+                          </p>
+                        ) : (
+                          sectionModules.map((mod, idx) => {
+                            const moduleKey = getModuleKey(mod);
+                            const isActive = moduleKey === activeModuleId;
+                            const isCompleted = !!userProgress[moduleKey];
+                            // Calculate global index for numbering
+                            const globalIndex = modules.indexOf(mod);
+
+                            return (
+                              <div
+                                key={mod.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => selectModule(moduleKey)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    selectModule(moduleKey);
+                                  }
+                                }}
+                                className={`relative w-full cursor-pointer text-left px-5 py-3 transition-all flex items-start gap-4 group border-b border-gray-50 last:border-b-0 ${
+                                  isActive
+                                    ? "bg-blue-50/50"
+                                    : "hover:bg-gray-50"
+                                }`}
+                              >
+                                <div
+                                  className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                                    isCompleted
+                                      ? "bg-emerald-500 border-emerald-500 text-white"
+                                      : isActive
+                                      ? "bg-brand-heading border-brand-heading text-white"
+                                      : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
+                                  }`}
+                                >
+                                  {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <h4
+                                    className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
+                                      isActive
+                                        ? "text-brand-heading"
+                                        : "text-gray-900 group-hover:text-brand-heading"
+                                    }`}
+                                  >
+                                    {mod.title}
+                                  </h4>
+                                  {mod.description && (
+                                    <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1">
+                                      {mod.description}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {isAdminCoursePage && (
+                                  <div className="shrink-0 relative">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenModuleMenuId(
+                                          openModuleMenuId === moduleKey ? null : moduleKey
+                                        );
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-gray-900 transition-colors rounded-full hover:bg-gray-200"
+                                      aria-label="Module options"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </button>
+
+                                    {openModuleMenuId === moduleKey && (
+                                      <div
+                                        className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteModule(mod)}
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                          disabled={deletingModuleId === String(mod.id)}
+                                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          <Trash2 size={14} />
+                                          {deletingModuleId === String(mod.id)
+                                            ? "Deleting..."
+                                            : "Delete"}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Ungrouped modules (those without a section_id) */}
+              {(() => {
+                const ungrouped = modules.filter(
+                  (m) => !m.section_id || !courseSections.some((s) => String(s.id) === String(m.section_id))
+                );
+                if (ungrouped.length === 0) return null;
+                return (
+                  <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
+                    <div className="px-5 py-3 bg-gray-50/80">
+                      <h4 className="text-sm font-bold text-gray-600">General</h4>
+                      <span className="text-[10px] font-semibold text-gray-400">
+                        {ungrouped.filter((m) => !!userProgress[getModuleKey(m)]).length}/{ungrouped.length} completed
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      {ungrouped.map((mod, idx) => {
+                        const moduleKey = getModuleKey(mod);
+                        const isActive = moduleKey === activeModuleId;
+                        const isCompleted = !!userProgress[moduleKey];
+
+                        return (
+                          <div
+                            key={mod.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => selectModule(moduleKey)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                selectModule(moduleKey);
+                              }
+                            }}
+                            className={`relative w-full cursor-pointer text-left px-5 py-3 transition-all flex items-start gap-4 group border-b border-gray-50 last:border-b-0 ${
+                              isActive
+                                ? "bg-blue-50/50"
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <div
+                              className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                                isCompleted
+                                  ? "bg-emerald-500 border-emerald-500 text-white"
+                                  : isActive
+                                  ? "bg-brand-heading border-brand-heading text-white"
+                                  : "bg-white border-gray-200 text-gray-400"
+                              }`}
+                            >
+                              {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
+                                isActive ? "text-brand-heading" : "text-gray-900 group-hover:text-brand-heading"
+                              }`}>
+                                {mod.title}
+                              </h4>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
           ) : (
+            // Flat module list (no sections — legacy view)
             modules.map((mod, globalIndex) => {
               const moduleKey = getModuleKey(mod);
               const isActive = moduleKey === activeModuleId;

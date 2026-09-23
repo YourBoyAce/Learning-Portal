@@ -115,11 +115,48 @@ export async function deleteAdminCourse(
 }
 
 
+export async function createCourseSection(
+  accessToken: string,
+  courseId: string | number,
+  title: string,
+  description: string,
+) {
+  const supabaseAdmin = await getAdminClient(accessToken);
+
+  // Determine the next order_index
+  const { data: existingSections } = await supabaseAdmin
+    .from("course_sections")
+    .select("order_index")
+    .eq("maincourse_id", normalizeId(courseId))
+    .order("order_index", { ascending: false })
+    .limit(1);
+
+  const nextOrderIndex =
+    existingSections && existingSections.length > 0
+      ? (existingSections[0].order_index ?? 0) + 1
+      : 1;
+
+  const { data, error } = await supabaseAdmin
+    .from("course_sections")
+    .insert({
+      maincourse_id: normalizeId(courseId),
+      title: title.trim(),
+      description: description.trim(),
+      order_index: nextOrderIndex,
+    })
+    .select("id, title, description, order_index, created_at")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function createCourseModule(
   accessToken: string,
   courseId: string | number,
   title: string,
   description: string,
+  sectionId?: string | number | null,
 ) {
   const supabaseAdmin = await getAdminClient(accessToken);
   const { data, error } = await supabaseAdmin
@@ -128,8 +165,9 @@ export async function createCourseModule(
       maincourse_id: normalizeId(courseId),
       title: title.trim(),
       description: description.trim(),
+      ...(sectionId ? { section_id: normalizeId(sectionId) } : {}),
     })
-    .select("id, title, created_at")
+    .select("id, title, created_at, section_id")
     .single();
 
   if (error) throw new Error(error.message);

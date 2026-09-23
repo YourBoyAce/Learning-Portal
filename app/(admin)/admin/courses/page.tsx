@@ -118,8 +118,17 @@ export default function AdminCourses() {
   const [courseTitle, setCourseTitle] = useState(""); // used for upcoming (product title) and legacy
   const [courseDescription, setCourseDescription] = useState("");
   const [modules, setModules] = useState<
-    Array<{ id?: string | number; title: string; description: string }>
+    Array<{ id?: string | number; title: string; description: string; section_id?: string | number | null }>
   >([]);
+
+  // ── Section state ──────────────────────────────────────────────────────────
+  interface SectionState {
+    id?: string | number;
+    title: string;
+    description: string;
+    modules: Array<{ id?: string | number; title: string; description: string }>;
+  }
+  const [courseSections, setCourseSections] = useState<SectionState[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -260,6 +269,7 @@ export default function AdminCourses() {
     setCourseTitle("");
     setCourseDescription("");
     setModules([]);
+    setCourseSections([]);
     setThumbnailFile(null);
     setThumbnailPreview("");
     setModalMessage(null);
@@ -295,6 +305,7 @@ export default function AdminCourses() {
     setCourseTitle(course.title);
     setCourseDescription(course.description || "");
     setModules([]);
+    setCourseSections([]);
     setThumbnailFile(null);
     setThumbnailPreview(course.thumbnail_url || "");
     setModalMessage(null);
@@ -356,11 +367,53 @@ export default function AdminCourses() {
             id: m.id,
             title: m.title,
             description: m.description || "",
+            section_id: m.section_id || null,
           })),
         );
       }
     } catch (err) {
       console.error("Failed to fetch modules:", err);
+    }
+
+    // Also load sections
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) return;
+
+      const res = await fetch(
+        `/api/admin/sections?courseId=${encodeURIComponent(String(course.id))}`,
+        {
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        },
+      );
+      const result = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(result?.sections)) {
+        // Fetch modules to group into sections
+        const { data: allModules } = await supabase
+          .from("coursemodules")
+          .select("id, title, description, section_id")
+          .eq("maincourse_id", course.id)
+          .order("order_index", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true });
+
+        const sectionStates: SectionState[] = result.sections.map((sec: any) => ({
+          id: sec.id,
+          title: sec.title,
+          description: sec.description || "",
+          modules: (allModules || []).filter(
+            (m: any) => String(m.section_id) === String(sec.id)
+          ).map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description || "",
+          })),
+        }));
+        setCourseSections(sectionStates);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sections:", err);
     }
 
     // Fetch member/mentor assignments for this course
@@ -411,6 +464,54 @@ export default function AdminCourses() {
 
   const handleRemoveModule = (index: number) =>
     setModules(modules.filter((_, i) => i !== index));
+
+  // ── Section handlers ─────────────────────────────────────────────────────
+  const handleAddSection = () =>
+    setCourseSections([...courseSections, { title: "", description: "", modules: [] }]);
+
+  const handleSectionChange = (
+    sIdx: number,
+    field: "title" | "description",
+    value: string,
+  ) => {
+    const next = [...courseSections];
+    next[sIdx] = { ...next[sIdx], [field]: value };
+    setCourseSections(next);
+  };
+
+  const handleRemoveSection = (sIdx: number) =>
+    setCourseSections(courseSections.filter((_, i) => i !== sIdx));
+
+  const handleAddModuleToSection = (sIdx: number) => {
+    const next = [...courseSections];
+    next[sIdx] = {
+      ...next[sIdx],
+      modules: [...next[sIdx].modules, { title: "", description: "" }],
+    };
+    setCourseSections(next);
+  };
+
+  const handleSectionModuleChange = (
+    sIdx: number,
+    mIdx: number,
+    field: "title" | "description",
+    value: string,
+  ) => {
+    const next = [...courseSections];
+    const mods = [...next[sIdx].modules];
+    mods[mIdx] = { ...mods[mIdx], [field]: value };
+    next[sIdx] = { ...next[sIdx], modules: mods };
+    setCourseSections(next);
+  };
+
+  const handleRemoveSectionModule = (sIdx: number, mIdx: number) => {
+    const next = [...courseSections];
+    next[sIdx] = {
+      ...next[sIdx],
+      modules: next[sIdx].modules.filter((_, i) => i !== mIdx),
+    };
+    setCourseSections(next);
+  };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -575,13 +676,33 @@ export default function AdminCourses() {
         whatsapp_community_link: whatsappLink.trim() || null,
         description: courseDescription.trim(),
         ...(finalCourseThumbnailUrl !== undefined && { thumbnail_url: finalCourseThumbnailUrl }),
-        modules: modules
-          .filter((m) => m.title.trim())
-          .map((m) => ({
-            ...(m.id && { id: m.id }),
-            title: m.title.trim(),
-            description: m.description.trim(),
-          })),
+        // Send sections with nested modules if sections exist
+        ...(courseSections.length > 0
+          ? {
+              sections: courseSections
+                .filter((s) => s.title.trim())
+                .map((s) => ({
+                  ...(s.id && { id: s.id }),
+                  title: s.title.trim(),
+                  description: s.description.trim(),
+                  modules: s.modules
+                    .filter((m) => m.title.trim())
+                    .map((m) => ({
+                      ...(m.id && { id: m.id }),
+                      title: m.title.trim(),
+                      description: m.description.trim(),
+                    })),
+                })),
+            }
+          : {
+              modules: modules
+                .filter((m) => m.title.trim())
+                .map((m) => ({
+                  ...(m.id && { id: m.id }),
+                  title: m.title.trim(),
+                  description: m.description.trim(),
+                })),
+            }),
         // Members & Mentors
         assigned_scholars: selectedScholars.map((u) => u.value),
         assigned_mentors: selectedMentors.map((u) => u.value),
@@ -604,6 +725,7 @@ export default function AdminCourses() {
       setCourseTitle("");
       setCourseDescription("");
       setModules([]);
+      setCourseSections([]);
       setThumbnailFile(null);
       setThumbnailPreview("");
       resetActiveFields();
@@ -1773,26 +1895,148 @@ export default function AdminCourses() {
                     </p>
                   </div>
 
-                  {/* Modules */}
+                  {/* Sections & Modules */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                        Modules (Optional)
+                        Sections & Modules
                       </label>
-                      <button
-                        type="button"
-                        onClick={handleAddModule}
-                        className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-                      >
-                        <Plus className="w-3 h-3" /> Add Module
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAddSection}
+                          className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Add Section
+                        </button>
+                        {courseSections.length === 0 && (
+                          <button
+                            type="button"
+                            onClick={handleAddModule}
+                            className="text-gray-500 hover:bg-gray-100 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" /> Add Module
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {modules.map((module, index) => (
+
+                    {/* Sections */}
+                    {courseSections.map((section, sIdx) => (
+                      <div
+                        key={sIdx}
+                        className="border border-brand-primary/20 rounded-xl p-4 space-y-3 bg-brand-primary/5"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-bold text-brand-primary">
+                              {sIdx + 1}
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder={`Section ${sIdx + 1} Title (e.g. Introduction)`}
+                            value={section.title}
+                            onChange={(e) =>
+                              handleSectionChange(sIdx, "title", e.target.value)
+                            }
+                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSection(sIdx)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                            title="Remove section"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <textarea
+                          placeholder="Section description (optional)"
+                          value={section.description}
+                          onChange={(e) =>
+                            handleSectionChange(sIdx, "description", e.target.value)
+                          }
+                          rows={2}
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                        />
+
+                        {/* Modules within section */}
+                        <div className="pl-4 border-l-2 border-brand-primary/20 space-y-2">
+                          {section.modules.map((mod, mIdx) => (
+                            <div
+                              key={mIdx}
+                              className="border border-gray-100 rounded-lg p-2.5 space-y-1.5 bg-white"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0 border border-brand-primary/20">
+                                  <span className="text-[10px] font-bold text-brand-primary">
+                                    {mIdx + 1}
+                                  </span>
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder={`Module ${mIdx + 1} Title`}
+                                  value={mod.title}
+                                  onChange={(e) =>
+                                    handleSectionModuleChange(
+                                      sIdx,
+                                      mIdx,
+                                      "title",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleRemoveSectionModule(sIdx, mIdx)
+                                  }
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <textarea
+                                placeholder="Module description (optional)"
+                                value={mod.description}
+                                onChange={(e) =>
+                                  handleSectionModuleChange(
+                                    sIdx,
+                                    mIdx,
+                                    "description",
+                                    e.target.value,
+                                  )
+                                }
+                                rows={1}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                              />
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => handleAddModuleToSection(sIdx)}
+                            className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" /> Add Module
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Ungrouped modules (when no sections, or legacy) */}
+                    {courseSections.length === 0 && modules.map((module, index) => (
                       <div
                         key={index}
                         className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50"
                       >
                         <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0 border border-brand-primary/20">
+                            <span className="text-[10px] font-bold text-brand-primary">
+                              {index + 1}
+                            </span>
+                          </div>
                           <input
                             type="text"
                             placeholder={`Module ${index + 1} Title`}
@@ -1800,7 +2044,7 @@ export default function AdminCourses() {
                             onChange={(e) =>
                               handleModuleChange(index, "title", e.target.value)
                             }
-                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white"
+                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
                           />
                           <button
                             type="button"
@@ -1825,9 +2069,9 @@ export default function AdminCourses() {
                         />
                       </div>
                     ))}
-                    {modules.length === 0 && (
+                    {courseSections.length === 0 && modules.length === 0 && (
                       <p className="text-xs text-gray-400 italic">
-                        No modules yet.
+                        No sections or modules yet. Add a section to organize your content.
                       </p>
                     )}
                   </div>

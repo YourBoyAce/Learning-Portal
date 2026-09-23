@@ -9,7 +9,7 @@ import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import { Modal } from "@/components/ui/modal";
-import { createCourseModule } from "@/app/actions/admin-courses";
+import { createCourseModule, createCourseSection } from "@/app/actions/admin-courses";
 
 type Course = {
   id: string | number;
@@ -32,6 +32,15 @@ type Module = {
   title: string;
   thumbnail_url?: string | null;
   created_at?: string | null;
+  section_id?: string | number | null;
+};
+
+type Section = {
+  id: string | number;
+  title: string;
+  description?: string;
+  order_index?: number;
+  created_at?: string | null;
 };
 
 export default function UploadPage() {
@@ -53,7 +62,15 @@ export default function UploadPage() {
   const [newModuleDescription, setNewModuleDescription] = useState("");
   const [isCreatingModule, setIsCreatingModule] = useState(false);
 
-  const [videoTitle, setVideoTitle] = useState("");
+  // Section state
+  const [sections, setSections] = useState<Section[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [isSectionsLoading, setIsSectionsLoading] = useState(false);
+  const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [newSectionDescription, setNewSectionDescription] = useState("");
+  const [isCreatingSection, setIsCreatingSection] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [moduleThumbnailFile, setModuleThumbnailFile] = useState<File | null>(
     null,
@@ -158,27 +175,59 @@ export default function UploadPage() {
     );
   }, [activeCourses, selectedProductId]);
 
-  // Reset course and module when product changes
+  // Reset course, section, and module when product changes
   useEffect(() => {
     setSelectedCurriculum("");
     setSelectedModuleId("");
+    setSelectedSectionId("");
     setModules([]);
+    setSections([]);
   }, [selectedProductId]);
 
-  // When course changes, load its modules
+  // When course changes, load its sections and modules
   useEffect(() => {
     if (!selectedCurriculum) {
       setModules([]);
+      setSections([]);
       setSelectedModuleId("");
+      setSelectedSectionId("");
       return;
     }
+
+    const fetchSections = async () => {
+      setIsSectionsLoading(true);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session?.access_token) return;
+
+        const res = await fetch(
+          `/api/admin/sections?courseId=${encodeURIComponent(selectedCurriculum)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${sessionData.session.access_token}`,
+            },
+          },
+        );
+        const result = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(result?.sections)) {
+          setSections(result.sections);
+        }
+      } catch (err) {
+        console.error("Failed to fetch sections", err);
+        setSections([]);
+      } finally {
+        setIsSectionsLoading(false);
+      }
+    };
+
+    void fetchSections();
 
     const fetchModules = async () => {
       setIsModulesLoading(true);
       try {
         const { data, error } = await supabase
           .from("coursemodules")
-          .select("id, title, created_at")
+          .select("id, title, created_at, section_id")
           .eq("maincourse_id", selectedCurriculum)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
@@ -198,8 +247,16 @@ export default function UploadPage() {
       }
     };
 
-    fetchModules();
+    void fetchModules();
   }, [selectedCurriculum]);
+
+  // Filter modules by selected section
+  const filteredModules = useMemo(() => {
+    if (!selectedSectionId) return modules;
+    return modules.filter(
+      (m) => String(m.section_id) === String(selectedSectionId),
+    );
+  }, [modules, selectedSectionId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -250,6 +307,7 @@ export default function UploadPage() {
         selectedCurriculum,
         newModuleTitle,
         newModuleDescription,
+        selectedSectionId || null,
       );
 
       setModules((prev) => [...prev, newModule]);
@@ -267,6 +325,42 @@ export default function UploadPage() {
     }
   };
 
+  const handleCreateSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSectionTitle.trim()) {
+      setError("Please provide a section title.");
+      return;
+    }
+
+    try {
+      setIsCreatingSection(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const newSection = await createCourseSection(
+        sessionData.session.access_token,
+        selectedCurriculum,
+        newSectionTitle,
+        newSectionDescription,
+      );
+
+      setSections((prev) => [...prev, newSection]);
+      setSelectedSectionId(String(newSection.id));
+      setIsAddSectionModalOpen(false);
+      setSuccess("Section created successfully!");
+
+      // Clear form
+      setNewSectionTitle("");
+      setNewSectionDescription("");
+    } catch (err: any) {
+      setError(err.message || "Failed to create section");
+    } finally {
+      setIsCreatingSection(false);
+    }
+  };
+
   const handleUploadVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -274,15 +368,20 @@ export default function UploadPage() {
     setUploadProgress(0);
     setUploadStatus("");
 
+    const selectedModule = modules.find(
+      (m) => String(m.id) === String(selectedModuleId),
+    );
+    const effectiveVideoTitle = selectedModule?.title || "";
+
     if (
       !selectedCurriculum ||
       !selectedProductId ||
       !selectedModuleId ||
-      !videoTitle.trim() ||
+      !effectiveVideoTitle ||
       !selectedFile
     ) {
       setError(
-        "Please select a course, a batch, a module, add a video title, and choose a file.",
+        "Please select a course, a batch, a module, and choose a video file.",
       );
       return;
     }
@@ -328,8 +427,8 @@ export default function UploadPage() {
             body: JSON.stringify({
               title:
                 numChunks > 1
-                  ? `${videoTitle.trim()} (Part ${chunkIndex + 1}/${numChunks})`
-                  : videoTitle.trim(),
+                  ? `${effectiveVideoTitle} (Part ${chunkIndex + 1}/${numChunks})`
+                  : effectiveVideoTitle,
               courseId: selectedCurriculum,
 
               moduleId: selectedModuleId,
@@ -410,8 +509,11 @@ export default function UploadPage() {
       const payload = new FormData();
       payload.append("maincourseId", selectedCurriculum);
       payload.append("moduleId", selectedModuleId);
-      payload.append("title", videoTitle.trim());
+      payload.append("title", effectiveVideoTitle);
       payload.append("cloudflareUids", JSON.stringify(uploadedUIDs));
+      if (selectedSectionId) {
+        payload.append("sectionId", selectedSectionId);
+      }
 
       if (moduleThumbnailFile) {
         const fileExt = moduleThumbnailFile.name.split(".").pop();
@@ -449,7 +551,6 @@ export default function UploadPage() {
         );
       }
 
-      setVideoTitle("");
       setSelectedFile(null);
       setModuleThumbnailFile(null);
       setModuleThumbnailPreview("");
@@ -608,6 +709,65 @@ export default function UploadPage() {
                   </select>
                 </div>
 
+                {/* Select Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label
+                      className={TYPOGRAPHY_CLASSES.INNERHEADING + " !mb-0"}
+                    >
+                      Select Section
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!selectedCurriculum}
+                      onClick={() => {
+                        setNewSectionTitle("");
+                        setNewSectionDescription("");
+                        setIsAddSectionModalOpen(true);
+                      }}
+                      className="text-xs font-semibold text-brand-primary hover:text-brand-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      + Add Section
+                    </button>
+                  </div>
+
+                  <select
+                    value={selectedSectionId}
+                    onChange={(e) => {
+                      setSelectedSectionId(e.target.value);
+                      setSelectedModuleId("");
+                    }}
+                    disabled={!selectedCurriculum || isSectionsLoading}
+                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                      !selectedSectionId ? "!text-gray-400" : "!text-gray-900"
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    style={{
+                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                    }}
+                  >
+                    <option value="" className="text-gray-400">
+                      {isSectionsLoading
+                        ? "Loading sections..."
+                        : !selectedCurriculum
+                          ? "Select a course first..."
+                          : sections.length === 0
+                            ? "No sections — modules will be ungrouped"
+                            : "All sections (optional filter)"}
+                    </option>
+                    {sections.map((section, sIdx) => (
+                      <option
+                        key={section.id}
+                        value={String(section.id)}
+                        className="text-gray-900"
+                      >
+                        Section {sIdx + 1}: {section.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Select Module */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -652,34 +812,16 @@ export default function UploadPage() {
                             ? "No modules found for this course"
                             : "Select module..."}
                     </option>
-                    {modules.map((module) => (
+                    {filteredModules.map((module, mIdx) => (
                       <option
                         key={module.id}
                         value={String(module.id)}
                         className="text-gray-900"
                       >
-                        {module.title}
+                        Module {mIdx + 1}: {module.title}
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Video Title
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Intro to Variables"
-                    value={videoTitle}
-                    onChange={(e) => setVideoTitle(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                    style={{
-                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                    }}
-                  />
                 </div>
 
                 <div>
@@ -872,6 +1014,61 @@ export default function UploadPage() {
                 disabled={isCreatingModule || !newModuleTitle.trim()}
               >
                 {isCreatingModule ? "Creating..." : "Create Module"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+      {/* Create Section Modal */}
+      <Modal
+        open={isAddSectionModalOpen}
+        onClose={() => setIsAddSectionModalOpen(false)}
+        panelClassName="max-w-md w-full"
+      >
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-6 text-gray-900">
+            Add New Section
+          </h2>
+          <form onSubmit={handleCreateSection} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Section Name
+              </label>
+              <input
+                type="text"
+                value={newSectionTitle}
+                onChange={(e) => setNewSectionTitle(e.target.value)}
+                placeholder="e.g. Introduction"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description (Optional)
+              </label>
+              <textarea
+                value={newSectionDescription}
+                onChange={(e) => setNewSectionDescription(e.target.value)}
+                placeholder="What topics are covered in this section?"
+                rows={3}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              />
+            </div>
+            <div className="pt-2 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddSectionModalOpen(false)}
+                disabled={isCreatingSection}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isCreatingSection || !newSectionTitle.trim()}
+              >
+                {isCreatingSection ? "Creating..." : "Create Section"}
               </Button>
             </div>
           </form>

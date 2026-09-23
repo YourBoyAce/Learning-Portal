@@ -177,6 +177,10 @@ export async function POST(request: Request) {
     typeof formData.get("thumbnail_url") === "string"
       ? String(formData.get("thumbnail_url")).trim()
       : "";
+  const sectionId =
+    typeof formData.get("sectionId") === "string"
+      ? String(formData.get("sectionId")).trim()
+      : "";
 
   // Create or update module WITHOUT waiting for duration (background process)
   const { data: moduleResult, error: dbError } = moduleId
@@ -186,6 +190,7 @@ export async function POST(request: Request) {
           video_cf_id: uid,
           ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
           ...(batchId && { batch_id: batchId }),
+          ...(sectionId && { section_id: sectionId }),
         })
         .eq("id", moduleId)
         .select("*")
@@ -198,6 +203,7 @@ export async function POST(request: Request) {
           video_cf_id: uid,
           ...(thumbnailUrl && { thumbnail_url: thumbnailUrl }),
           ...(batchId && { batch_id: batchId }),
+          ...(sectionId && { section_id: sectionId }),
         })
         .select("*")
         .single();
