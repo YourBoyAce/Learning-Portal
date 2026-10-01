@@ -13,6 +13,7 @@ import {
   PlayCircle,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   Clock,
   BookOpen,
@@ -64,6 +65,8 @@ interface Module {
   created_at?: string | null;
   duration: string;
   order_index: number;
+  module_type?: "video" | "quiz";
+  questions?: any;
   section_id?: string | number | null;
 }
 
@@ -200,6 +203,12 @@ export default function CoursePlayerPage() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSaved, setReviewSaved] = useState(false);
   const [reviewError, setReviewError] = useState("");
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<Module | null>(null);
   const [autoPlayModuleId, setAutoPlayModuleId] = useState<string | null>(null);
@@ -243,11 +252,26 @@ export default function CoursePlayerPage() {
     "intro",
   );
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | string | null>(null);
   const [quizScore, setQuizScore] = useState(0);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
-  const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<number, number | string>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
+
+  // In-Module Quiz Player state
+  const [modQuizQIdx, setModQuizQIdx] = useState(0);
+  const [modQuizSelectedAnswer, setModQuizSelectedAnswer] = useState<number | string | null>(null);
+  const [modQuizIsSubmitted, setModQuizIsSubmitted] = useState(false);
+  const [modQuizScore, setModQuizScore] = useState(0);
+  const [modQuizFinished, setModQuizFinished] = useState(false);
+
+  useEffect(() => {
+    setModQuizQIdx(0);
+    setModQuizSelectedAnswer(null);
+    setModQuizIsSubmitted(false);
+    setModQuizScore(0);
+    setModQuizFinished(false);
+  }, [activeModuleId]);
   const getProgressStorageKey = (uid: string, courseId: string) =>
     `course_progress_${uid}_${courseId}`;
 
@@ -416,10 +440,19 @@ export default function CoursePlayerPage() {
   };
 
   const handleVerifyAnswer = () => {
-    if (selectedAnswer === null || isAnswerSubmitted) return;
+    if (selectedAnswer === null || selectedAnswer === "" || isAnswerSubmitted) return;
 
     const currentQuestion = activeQuiz.questions[currentQuestionIndex];
-    const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+    const isTextType = currentQuestion.questionType === "text" || !currentQuestion.options || currentQuestion.options.length === 0;
+
+    let isCorrect = false;
+    if (isTextType) {
+      const userTyped = String(selectedAnswer).trim().toLowerCase();
+      const targetAnswer = String(currentQuestion.correctAnswer || "").trim().toLowerCase();
+      isCorrect = userTyped === targetAnswer && userTyped.length > 0;
+    } else {
+      isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+    }
 
     if (isCorrect) {
       setQuizScore((prev) => prev + 1);
@@ -1025,6 +1058,60 @@ export default function CoursePlayerPage() {
     }
   };
 
+  const handleSubmitFeedback = async () => {
+    if (feedbackRating < 1) {
+      setFeedbackError("Please select a rating from 1 to 5 stars.");
+      return;
+    }
+
+    if (!feedbackText.trim()) {
+      setFeedbackError("Please share a short description of your experience.");
+      return;
+    }
+
+    const resolvedCourseId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : null;
+
+    if (!userId || !resolvedCourseId) {
+      setFeedbackError("Please sign in again to send your feedback.");
+      return;
+    }
+
+    try {
+      setFeedbackSubmitting(true);
+      setFeedbackError("");
+
+      const { error } = await supabase
+        .from("course_ratings")
+        .upsert(
+          {
+            user_id: userId,
+            course_id: resolvedCourseId,
+            rating: feedbackRating,
+            review: feedbackText.trim() || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,course_id" },
+        );
+
+      if (error) throw error;
+
+      // Keep end-course review state in sync with saved review
+      setReviewRating(feedbackRating);
+      setReviewText(feedbackText.trim());
+      setReviewSaved(true);
+
+      setFeedbackSaved(true);
+      setTimeout(() => {
+        setFeedbackSaved(false);
+      }, 3000);
+    } catch (err) {
+      console.error("Error submitting course review:", err);
+      setFeedbackError("We could not save your review right now. Please try again.");
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
+
   const handleOpenCertificateModal = () => {
     if (!reviewSaved || !reviewText.trim() || reviewRating < 1) {
       setReviewError("Please complete and save your review before downloading your certificate.");
@@ -1063,25 +1150,27 @@ export default function CoursePlayerPage() {
               <div className="flex flex-col items-end gap-2">
                 <Button
                   onClick={() => handleMarkAsCompleted(activeModuleId)}
-                  disabled={isMarkingCompleted || !activeModule?.video_cf_id}
-                  className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${!activeModule?.video_cf_id
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : isCurrentModuleComplete
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : !isMarkingCompleted
-                        ? "bg-brand-heading hover:bg-brand-heading-hover text-white"
-                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    }`}
+                  disabled={
+                    isMarkingCompleted ||
+                    (activeModule?.module_type !== "quiz" && !activeModule?.video_cf_id)
+                  }
+                  className={`rounded-full px-6 py-5 text-xs font-bold tracking-wide transition ${
+                    activeModule?.module_type !== "quiz" && !activeModule?.video_cf_id
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : isCurrentModuleComplete
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                        : !isMarkingCompleted
+                          ? "bg-brand-heading hover:bg-brand-heading-hover text-white cursor-pointer"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  }`}
                 >
                   {isMarkingCompleted
                     ? "Saving..."
                     : isCurrentModuleComplete
                       ? "Mark as Incomplete"
-                      : isCurrentModuleAcknowledged
-                        ? "Mark as Complete"
-                        : "Mark as Complete"}
+                      : "Mark as Complete"}
                 </Button>
-                {!activeModule?.video_cf_id && (
+                {activeModule?.module_type !== "quiz" && !activeModule?.video_cf_id && (
                   <span className="text-[10px] font-semibold text-red-600 bg-red-50 px-2 py-1 rounded whitespace-nowrap">
                     No video uploaded
                   </span>
@@ -1240,18 +1329,36 @@ export default function CoursePlayerPage() {
     return (
       <>
         {/* Header */}
-        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-            Curriculum Outline
-          </h3>
-          <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
-            <span className="flex items-center gap-1.5">
-              <BookOpen size={14} /> {totalModuleCount} Modules
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Clock size={14} /> {totalDuration || "—"}
-            </span>
+        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+              Curriculum Outline
+            </h3>
+            <div className="flex items-center gap-4 text-xs text-gray-400 font-bold">
+              <span className="flex items-center gap-1.5">
+                <BookOpen size={14} /> {totalModuleCount} Modules
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Clock size={14} /> {totalDuration || "—"}
+              </span>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFeedbackError("");
+              if (feedbackRating === 0 && reviewRating > 0) {
+                setFeedbackRating(reviewRating);
+                setFeedbackText(reviewText);
+              }
+              setShowFeedbackModal(true);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-xs font-bold flex items-center gap-2 transition-all shadow-sm shrink-0 cursor-pointer hover:shadow-md"
+            title="Leave feedback for this course"
+          >
+            <MessageSquare size={14} className="text-amber-600" />
+            <span>Feedback</span>
+          </button>
         </div>
 
         {isAdminCoursePage && moduleDeleteError && (
@@ -1310,7 +1417,7 @@ export default function CoursePlayerPage() {
                 const isCollapsed = !!collapsedSections[sectionId];
 
                 return (
-                  <div key={sectionId} className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
+                  <div key={sectionId} className="rounded-2xl border border-gray-100 bg-white">
                     {/* Section Header */}
                     <button
                       type="button"
@@ -1320,7 +1427,9 @@ export default function CoursePlayerPage() {
                           [sectionId]: !prev[sectionId],
                         }))
                       }
-                      className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left"
+                      className={`w-full flex items-center justify-between px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left rounded-t-2xl ${
+                        isCollapsed ? "rounded-b-2xl" : ""
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-7 h-7 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
@@ -1355,6 +1464,7 @@ export default function CoursePlayerPage() {
                             const isCompleted = !!userProgress[moduleKey];
                             // Calculate global index for numbering
                             const globalIndex = modules.indexOf(mod);
+                            const isLastInSection = idx >= sectionModules.length - 1;
 
                             return (
                               <div
@@ -1369,6 +1479,8 @@ export default function CoursePlayerPage() {
                                   }
                                 }}
                                 className={`relative w-full cursor-pointer text-left px-5 py-3 transition-all flex items-start gap-4 group border-b border-gray-50 last:border-b-0 ${
+                                  idx === sectionModules.length - 1 ? "rounded-b-2xl" : ""
+                                } ${
                                   isActive
                                     ? "bg-blue-50/50"
                                     : "hover:bg-gray-50"
@@ -1387,15 +1499,26 @@ export default function CoursePlayerPage() {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  <h4
-                                    className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
-                                      isActive
-                                        ? "text-brand-heading"
-                                        : "text-gray-900 group-hover:text-brand-heading"
-                                    }`}
-                                  >
-                                    {mod.title}
-                                  </h4>
+                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <h4
+                                      className={`text-sm font-bold leading-snug transition-colors ${
+                                        isActive
+                                          ? "text-brand-heading"
+                                          : "text-gray-900 group-hover:text-brand-heading"
+                                      }`}
+                                    >
+                                      {mod.title}
+                                    </h4>
+                                    {mod.module_type === "quiz" ? (
+                                      <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <HelpCircle size={10} /> Quiz
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <PlayCircle size={10} /> Video
+                                      </span>
+                                    )}
+                                  </div>
                                   {mod.description && (
                                     <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2 mb-1">
                                       {mod.description}
@@ -1421,7 +1544,9 @@ export default function CoursePlayerPage() {
 
                                     {openModuleMenuId === moduleKey && (
                                       <div
-                                        className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
+                                        className={`absolute right-0 z-30 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-xl ${
+                                          isLastInSection ? "bottom-full mb-1" : "top-8"
+                                        }`}
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <button
@@ -1586,7 +1711,9 @@ export default function CoursePlayerPage() {
 
                       {openModuleMenuId === moduleKey && (
                         <div
-                          className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
+                          className={`absolute right-0 z-30 w-36 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-xl ${
+                            globalIndex >= modules.length - 1 ? "bottom-full mb-1" : "top-8"
+                          }`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
@@ -1862,6 +1989,268 @@ export default function CoursePlayerPage() {
                       Upgrade to Unlock
                     </a>
                   </Button>
+                </div>
+              ) : activeModule && activeModule.module_type === "quiz" ? (
+                <div className="w-full h-full min-h-[440px] bg-gradient-to-br from-brand-heading via-[#0F1E3B] to-[#162B50] text-white rounded-2xl sm:rounded-[2rem] p-6 sm:p-10 flex flex-col justify-between relative overflow-hidden shadow-2xl border border-white/10">
+                  <div className="absolute -top-24 -right-24 w-96 h-96 bg-brand-primary/20 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+
+                  {(() => {
+                    const qList = Array.isArray(activeModule.questions)
+                      ? activeModule.questions
+                      : typeof activeModule.questions === "string"
+                      ? (JSON.parse(activeModule.questions) || [])
+                      : [];
+
+                    if (qList.length === 0) {
+                      return (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center py-12 relative z-10">
+                          <div className="w-16 h-16 bg-white/10 border border-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md">
+                            <HelpCircle size={32} className="text-blue-300" />
+                          </div>
+                          <h3 className="text-xl font-bold text-white mb-2">{activeModule.title}</h3>
+                          <p className="text-blue-200/70 text-sm max-w-md">
+                            No questions have been added to this quiz module yet.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const currentQ = qList[modQuizQIdx] || {};
+                    const isTextType = currentQ.questionType === "text" || !currentQ.options || currentQ.options.length === 0;
+
+                    const handleVerifyModAnswer = () => {
+                      if (modQuizSelectedAnswer === null || modQuizSelectedAnswer === "" || modQuizIsSubmitted) return;
+                      let isCorrect = false;
+                      if (isTextType) {
+                        const userTyped = String(modQuizSelectedAnswer).trim().toLowerCase();
+                        const targetAnswer = String(currentQ.correctAnswer || "").trim().toLowerCase();
+                        isCorrect = userTyped === targetAnswer && userTyped.length > 0;
+                      } else {
+                        isCorrect = modQuizSelectedAnswer === currentQ.correctAnswer;
+                      }
+                      if (isCorrect) {
+                        setModQuizScore((prev) => prev + 1);
+                      }
+                      setModQuizIsSubmitted(true);
+                    };
+
+                    const handleNextModQuestion = () => {
+                      if (modQuizQIdx < qList.length - 1) {
+                        setModQuizQIdx((prev) => prev + 1);
+                        setModQuizSelectedAnswer(null);
+                        setModQuizIsSubmitted(false);
+                      } else {
+                        setModQuizFinished(true);
+                        if (activeModuleId) {
+                          applyAutoCompletionState(String(activeModuleId));
+                        }
+                      }
+                    };
+
+                    if (modQuizFinished) {
+                      const scorePct = Math.round((modQuizScore / qList.length) * 100);
+                      return (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center py-8 relative z-10 space-y-6">
+                          <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Check size={40} className="text-emerald-400" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-widest text-blue-300 block mb-1">
+                              Quiz Complete
+                            </span>
+                            <h3 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                              {activeModule.title}
+                            </h3>
+                            <p className="text-blue-100/90 text-sm">
+                              You scored <strong className="text-emerald-400 font-bold">{modQuizScore}</strong> out of <strong className="text-white font-bold">{qList.length}</strong> ({scorePct}%)
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModQuizQIdx(0);
+                                setModQuizSelectedAnswer(null);
+                                setModQuizIsSubmitted(false);
+                                setModQuizScore(0);
+                                setModQuizFinished(false);
+                              }}
+                              className="px-5 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors backdrop-blur-md cursor-pointer"
+                            >
+                              Retake Quiz
+                            </button>
+                            {(() => {
+                              const currentIndex = modules.findIndex((m) => String(m.id) === String(activeModule.id));
+                              const nextMod = currentIndex >= 0 ? modules[currentIndex + 1] : null;
+                              if (!nextMod) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveModuleId(String(nextMod.id));
+                                    if (typeof window !== "undefined") {
+                                      window.scrollTo({ top: 0, behavior: "smooth" });
+                                    }
+                                  }}
+                                  className="px-6 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-brand-primary/30 cursor-pointer"
+                                >
+                                  Next Module <ChevronRight size={14} />
+                                </button>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex-1 flex flex-col justify-between relative z-10 space-y-6">
+                        {/* Header Progress */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold text-blue-300 uppercase tracking-widest flex items-center gap-1.5">
+                              <HelpCircle size={15} /> Question {modQuizQIdx + 1} of {qList.length}
+                            </span>
+                            <span className="text-[11px] font-semibold text-blue-100 bg-white/10 border border-white/15 px-3 py-1 rounded-full backdrop-blur-md">
+                              {isTextType ? "Fill in the Blank" : "Multiple Choice"}
+                            </span>
+                          </div>
+                          <div className="w-full bg-black/30 h-2 rounded-full overflow-hidden border border-white/5">
+                            <div
+                              className="bg-brand-primary h-full transition-all duration-300"
+                              style={{ width: `${((modQuizQIdx + 1) / qList.length) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Question Text & Input / Options */}
+                        <div className="space-y-6">
+                          <h3 className="text-xl sm:text-2xl font-bold text-white leading-snug">
+                            {currentQ.text}
+                          </h3>
+
+                          {isTextType ? (
+                            <div className="space-y-3">
+                              <label className="text-xs font-semibold text-blue-200/80 uppercase tracking-wider block">
+                                Your Answer
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Type your answer here..."
+                                value={String(modQuizSelectedAnswer ?? "")}
+                                onChange={(e) => setModQuizSelectedAnswer(e.target.value)}
+                                disabled={modQuizIsSubmitted}
+                                className={`w-full p-4 sm:p-5 rounded-2xl border-2 text-base font-medium focus:outline-none transition-all ${
+                                  modQuizIsSubmitted
+                                    ? String(modQuizSelectedAnswer || "").trim().toLowerCase() === String(currentQ.correctAnswer || "").trim().toLowerCase()
+                                      ? "border-emerald-500 bg-emerald-950/60 text-emerald-200 font-semibold"
+                                      : "border-red-500 bg-red-950/60 text-red-200 font-semibold"
+                                    : "border-white/20 bg-white/10 text-white focus:border-brand-primary focus:bg-white/15 placeholder-white/40"
+                                }`}
+                              />
+                              {modQuizIsSubmitted && (
+                                <div className="text-xs font-medium pt-1">
+                                  {String(modQuizSelectedAnswer || "").trim().toLowerCase() === String(currentQ.correctAnswer || "").trim().toLowerCase() ? (
+                                    <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                                      <Check size={14} /> Correct answer!
+                                    </span>
+                                  ) : (
+                                    <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-800/60 text-red-200">
+                                      <span className="font-bold">Incorrect.</span> Correct answer:{" "}
+                                      <strong className="text-white underline font-bold">{String(currentQ.correctAnswer)}</strong>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              {(currentQ.options || []).map((opt: string, oIdx: number) => {
+                                const isSelected = modQuizSelectedAnswer === oIdx;
+                                const isCorrect = currentQ.correctAnswer === oIdx;
+
+                                let optClass = "border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white";
+
+                                if (modQuizIsSubmitted) {
+                                  if (isCorrect) {
+                                    optClass = "border-emerald-500 bg-emerald-950/70 text-emerald-200 font-semibold";
+                                  } else if (isSelected && !isCorrect) {
+                                    optClass = "border-red-500 bg-red-950/70 text-red-200 font-semibold";
+                                  } else {
+                                    optClass = "border-white/10 bg-white/5 text-white/40 opacity-40";
+                                  }
+                                } else if (isSelected) {
+                                  optClass = "border-brand-primary bg-brand-primary/20 text-white ring-2 ring-brand-primary font-semibold";
+                                }
+
+                                return (
+                                  <button
+                                    key={oIdx}
+                                    type="button"
+                                    onClick={() => !modQuizIsSubmitted && setModQuizSelectedAnswer(oIdx)}
+                                    disabled={modQuizIsSubmitted}
+                                    className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 ${optClass}`}
+                                  >
+                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                      modQuizIsSubmitted && isCorrect
+                                        ? "bg-emerald-500 border-emerald-500 text-slate-950"
+                                        : modQuizIsSubmitted && isSelected && !isCorrect
+                                        ? "bg-red-500 border-red-500 text-white"
+                                        : isSelected
+                                        ? "border-brand-primary bg-brand-primary text-white"
+                                        : "border-white/30 bg-white/5"
+                                    }`}>
+                                      {modQuizIsSubmitted && isCorrect ? (
+                                        <Check size={12} strokeWidth={3} />
+                                      ) : isSelected ? (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                      ) : null}
+                                    </div>
+                                    <span className="text-sm font-medium flex-1 leading-snug">{opt}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom Right Action Button Bar */}
+                        <div className="flex items-center justify-between pt-5 border-t border-white/10">
+                          <span className="text-xs text-blue-200/60 font-medium">
+                            {modQuizIsSubmitted ? "Answer verified" : "Select or type an answer"}
+                          </span>
+
+                          {!modQuizIsSubmitted ? (
+                            <button
+                              type="button"
+                              onClick={handleVerifyModAnswer}
+                              disabled={modQuizSelectedAnswer === null || modQuizSelectedAnswer === ""}
+                              className="px-7 py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-40 disabled:hover:bg-brand-primary text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-brand-primary/20 cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              Submit Answer
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleNextModQuestion}
+                              className="px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                            >
+                              {modQuizQIdx < qList.length - 1 ? (
+                                <>
+                                  Next Question <ChevronRight size={15} />
+                                </>
+                              ) : (
+                                <>
+                                  Finish Quiz <Check size={15} />
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
@@ -2150,8 +2539,9 @@ export default function CoursePlayerPage() {
                         {activeQuiz.questions.length}
                       </span>
                       <span className="px-3 py-1 rounded-full bg-blue-50 text-brand-heading text-[10px] font-bold">
-                        {activeQuiz.questions[currentQuestionIndex].type ||
-                          "Multiple Choice"}
+                        {activeQuiz.questions[currentQuestionIndex].questionType === "text"
+                          ? "Fill in the Blank"
+                          : activeQuiz.questions[currentQuestionIndex].type || "Multiple Choice"}
                       </span>
                     </div>
 
@@ -2159,69 +2549,112 @@ export default function CoursePlayerPage() {
                       {activeQuiz.questions[currentQuestionIndex].text}
                     </h3>
 
-                    <div className="space-y-3">
-                      {activeQuiz.questions[currentQuestionIndex].options.map(
-                        (option: string, idx: number) => {
-                          const isSelected = selectedAnswer === idx;
-                          const isCorrectAnswer =
-                            activeQuiz.questions[currentQuestionIndex]
-                              .correctAnswer === idx;
-
-                          let optionClass =
-                            "border-gray-200 hover:border-brand-heading hover:bg-blue-50/50";
-
-                          if (isAnswerSubmitted) {
-                            if (isCorrectAnswer) {
-                              optionClass =
-                                "border-emerald-500 bg-emerald-50 text-emerald-900";
-                            } else if (isSelected && !isCorrectAnswer) {
-                              optionClass =
-                                "border-red-500 bg-red-50 text-red-900";
-                            } else {
-                              optionClass = "border-gray-200 opacity-50";
-                            }
-                          } else if (isSelected) {
-                            optionClass =
-                              "border-brand-heading bg-blue-50 ring-1 ring-brand-heading";
-                          }
-
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => handleAnswerSelect(idx)}
-                              disabled={isAnswerSubmitted}
-                              className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
-                            >
-                              <div
-                                className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${isAnswerSubmitted && isCorrectAnswer
-                                  ? "bg-emerald-500 border-emerald-500 text-white"
-                                  : isAnswerSubmitted &&
-                                    isSelected &&
-                                    !isCorrectAnswer
-                                    ? "bg-red-500 border-red-500 text-white"
-                                    : isSelected
-                                      ? "border-brand-heading bg-brand-heading text-white"
-                                      : "border-gray-300"
-                                  }`}
-                              >
-                                {isAnswerSubmitted && isCorrectAnswer ? (
-                                  <Check size={14} />
-                                ) : isAnswerSubmitted &&
-                                  isSelected &&
-                                  !isCorrectAnswer ? (
-                                  <XIcon size={14} />
-                                ) : isSelected ? (
-                                  <div className="w-2 h-2 rounded-full bg-white" />
-                                ) : null}
-                              </div>
-                              <span className="font-medium flex-1 text-sm sm:text-base">
-                                {option}
+                    {activeQuiz.questions[currentQuestionIndex].questionType === "text" ||
+                    !activeQuiz.questions[currentQuestionIndex].options ||
+                    activeQuiz.questions[currentQuestionIndex].options.length === 0 ? (
+                      <div className="space-y-3">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">
+                          Your Answer (Short Text)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Type your answer here..."
+                          value={String(selectedAnswer ?? "")}
+                          onChange={(e) => setSelectedAnswer(e.target.value)}
+                          disabled={isAnswerSubmitted}
+                          className={`w-full p-4 sm:p-5 rounded-2xl border-2 text-base font-medium focus:outline-none transition-all ${
+                            isAnswerSubmitted
+                              ? String(selectedAnswer || "").trim().toLowerCase() ===
+                                String(activeQuiz.questions[currentQuestionIndex].correctAnswer || "").trim().toLowerCase()
+                                ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-semibold"
+                                : "border-red-500 bg-red-50 text-red-900 font-semibold"
+                              : "border-gray-200 focus:border-brand-heading focus:bg-blue-50/30 text-gray-900"
+                          }`}
+                        />
+                        {isAnswerSubmitted && (
+                          <div className="text-xs font-semibold mt-2">
+                            {String(selectedAnswer || "").trim().toLowerCase() ===
+                            String(activeQuiz.questions[currentQuestionIndex].correctAnswer || "").trim().toLowerCase() ? (
+                              <span className="text-emerald-700 flex items-center gap-1 font-bold">
+                                <Check size={14} /> Correct answer!
                               </span>
-                            </button>
-                          );
-                        },
-                      )}
-                    </div>
+                            ) : (
+                              <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800">
+                                <span className="font-bold">Incorrect.</span> Correct answer:{" "}
+                                <strong className="text-gray-900 underline font-bold">
+                                  {String(activeQuiz.questions[currentQuestionIndex].correctAnswer)}
+                                </strong>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {activeQuiz.questions[currentQuestionIndex].options.map(
+                          (option: string, idx: number) => {
+                            const isSelected = selectedAnswer === idx;
+                            const isCorrectAnswer =
+                              activeQuiz.questions[currentQuestionIndex]
+                                .correctAnswer === idx;
+
+                            let optionClass =
+                              "border-gray-200 hover:border-brand-heading hover:bg-blue-50/50";
+
+                            if (isAnswerSubmitted) {
+                              if (isCorrectAnswer) {
+                                optionClass =
+                                  "border-emerald-500 bg-emerald-50 text-emerald-900";
+                              } else if (isSelected && !isCorrectAnswer) {
+                                optionClass =
+                                  "border-red-500 bg-red-50 text-red-900";
+                              } else {
+                                optionClass = "border-gray-200 opacity-50";
+                              }
+                            } else if (isSelected) {
+                              optionClass =
+                                "border-brand-heading bg-blue-50 ring-1 ring-brand-heading";
+                            }
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => handleAnswerSelect(idx)}
+                                disabled={isAnswerSubmitted}
+                                className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
+                              >
+                                <div
+                                  className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+                                    isAnswerSubmitted && isCorrectAnswer
+                                      ? "bg-emerald-500 border-emerald-500 text-white"
+                                      : isAnswerSubmitted &&
+                                        isSelected &&
+                                        !isCorrectAnswer
+                                        ? "bg-red-500 border-red-500 text-white"
+                                        : isSelected
+                                          ? "border-brand-heading bg-brand-heading text-white"
+                                          : "border-gray-300"
+                                  }`}
+                                >
+                                  {isAnswerSubmitted && isCorrectAnswer ? (
+                                    <Check size={14} />
+                                  ) : isAnswerSubmitted &&
+                                    isSelected &&
+                                    !isCorrectAnswer ? (
+                                    <XIcon size={14} />
+                                  ) : isSelected ? (
+                                    <div className="w-2 h-2 rounded-full bg-white" />
+                                  ) : null}
+                                </div>
+                                <span className="font-medium flex-1 text-sm sm:text-base">
+                                  {option}
+                                </span>
+                              </button>
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
 
                     {isAnswerSubmitted &&
                       activeQuiz.questions[currentQuestionIndex]
@@ -2517,6 +2950,44 @@ export default function CoursePlayerPage() {
           </div>
 
         </div>
+      </Modal>
+
+      <Modal
+        open={showFeedbackModal}
+        onClose={() => {
+          setShowFeedbackModal(false);
+          setFeedbackSaved(false);
+          setFeedbackError("");
+        }}
+        panelClassName="max-w-lg w-full p-6 bg-white border border-gray-100 shadow-2xl rounded-3xl"
+      >
+        <div className="mb-4 pr-6">
+          <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <MessageSquare size={20} className="text-amber-500" />
+            Course Feedback
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">
+            You can send feedback as many times as you like during your learning journey!
+          </p>
+        </div>
+        <ReviewForm
+          reviewRating={feedbackRating}
+          reviewText={feedbackText}
+          error={feedbackError}
+          saved={feedbackSaved}
+          submitting={feedbackSubmitting}
+          onRatingChange={(rating) => {
+            setFeedbackRating(rating);
+            setFeedbackError("");
+            if (feedbackSaved) setFeedbackSaved(false);
+          }}
+          onReviewTextChange={(value) => {
+            setFeedbackText(value);
+            if (feedbackError) setFeedbackError("");
+            if (feedbackSaved) setFeedbackSaved(false);
+          }}
+          onSubmit={() => handleSubmitFeedback()}
+        />
       </Modal>
 
     </div>

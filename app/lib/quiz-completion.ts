@@ -26,7 +26,7 @@ export async function fetchLearnerQuizzes(courseId?: string) {
 export async function recordQuizCompletion(
   quizId: string,
   questions: QuizQuestionReference[],
-  answersByIndex: Record<number, number>,
+  answersByIndex: Record<number, number | string>,
 ) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Please log in again to record quiz completion.");

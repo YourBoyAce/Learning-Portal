@@ -28,6 +28,9 @@ import {
   Users,
   Pencil,
   Check,
+  HelpCircle,
+  Eye,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CueCard from "@/app/components/course/CueCard";
@@ -117,8 +120,15 @@ export default function AdminCourses() {
   >(null);
   const [courseTitle, setCourseTitle] = useState(""); // used for upcoming (product title) and legacy
   const [courseDescription, setCourseDescription] = useState("");
+  interface ModuleQuestion {
+    questionType?: "mc" | "text";
+    text: string;
+    options: string[];
+    correctAnswer: number | string;
+  }
+
   const [modules, setModules] = useState<
-    Array<{ id?: string | number; title: string; description: string; section_id?: string | number | null }>
+    Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz"; questions?: ModuleQuestion[]; section_id?: string | number | null }>
   >([]);
 
   // ── Section state ──────────────────────────────────────────────────────────
@@ -126,7 +136,7 @@ export default function AdminCourses() {
     id?: string | number;
     title: string;
     description: string;
-    modules: Array<{ id?: string | number; title: string; description: string }>;
+    modules: Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz"; questions?: ModuleQuestion[] }>;
   }
   const [courseSections, setCourseSections] = useState<SectionState[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -136,6 +146,29 @@ export default function AdminCourses() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Quiz Preview Modal State
+  const [previewQuizData, setPreviewQuizData] = useState<{
+    title: string;
+    questions: ModuleQuestion[];
+  } | null>(null);
+  const [previewQIdx, setPreviewQIdx] = useState(0);
+  const [previewSelectedAnswer, setPreviewSelectedAnswer] = useState<number | string | null>(null);
+  const [previewIsSubmitted, setPreviewIsSubmitted] = useState(false);
+  const [previewScore, setPreviewScore] = useState(0);
+  const [previewFinished, setPreviewFinished] = useState(false);
+
+  const handleOpenQuizPreview = (title: string, questions?: ModuleQuestion[]) => {
+    setPreviewQuizData({
+      title: title.trim() || "Quiz Preview",
+      questions: questions || [],
+    });
+    setPreviewQIdx(0);
+    setPreviewSelectedAnswer(null);
+    setPreviewIsSubmitted(false);
+    setPreviewScore(0);
+    setPreviewFinished(false);
+  };
 
   // ── Product-layer state (Active workflow) ──────────────────────────────────
   interface Product {
@@ -356,17 +389,23 @@ export default function AdminCourses() {
     try {
       const { data, error } = await supabase
         .from("coursemodules")
-        .select("id, title, description")
+        .select("id, title, description, module_type, questions")
         .eq("maincourse_id", course.id)
         .order("order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true });
       if (!error && data && data.length > 0) {
         setModules(
-          data.map((m) => ({
+          data.map((m: any) => ({
             id: m.id,
             title: m.title,
             description: m.description || "",
+            module_type: m.module_type || "video",
+            questions: Array.isArray(m.questions)
+              ? m.questions
+              : typeof m.questions === "string"
+              ? JSON.parse(m.questions)
+              : [],
             section_id: m.section_id || null,
           })),
         );
@@ -393,7 +432,7 @@ export default function AdminCourses() {
         // Fetch modules to group into sections
         const { data: allModules } = await supabase
           .from("coursemodules")
-          .select("id, title, description, section_id")
+          .select("id, title, description, module_type, questions, section_id")
           .eq("maincourse_id", course.id)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true });
@@ -402,13 +441,19 @@ export default function AdminCourses() {
           id: sec.id,
           title: sec.title,
           description: sec.description || "",
-          modules: (allModules || []).filter(
-            (m: any) => String(m.section_id) === String(sec.id)
-          ).map((m: any) => ({
-            id: m.id,
-            title: m.title,
-            description: m.description || "",
-          })),
+          modules: (allModules || [])
+            .filter((m: any) => String(m.section_id) === String(sec.id))
+            .map((m: any) => ({
+              id: m.id,
+              title: m.title,
+              description: m.description || "",
+              module_type: m.module_type || "video",
+              questions: Array.isArray(m.questions)
+                ? m.questions
+                : typeof m.questions === "string"
+                ? JSON.parse(m.questions)
+                : [],
+            })),
         }));
         setCourseSections(sectionStates);
       }
@@ -450,11 +495,11 @@ export default function AdminCourses() {
   }, []);
 
   const handleAddModule = () =>
-    setModules([...modules, { title: "", description: "" }]);
+    setModules([...modules, { title: "", description: "", module_type: "video", questions: [] }]);
 
   const handleModuleChange = (
     index: number,
-    field: "title" | "description",
+    field: "title" | "description" | "module_type",
     value: string,
   ) => {
     const next = [...modules];
@@ -465,9 +510,78 @@ export default function AdminCourses() {
   const handleRemoveModule = (index: number) =>
     setModules(modules.filter((_, i) => i !== index));
 
+  const handleAddQuestionToFlatModule = (mIdx: number) => {
+    const next = [...modules];
+    const currentQuestions = next[mIdx].questions || [];
+    next[mIdx] = {
+      ...next[mIdx],
+      questions: [
+        ...currentQuestions,
+        { questionType: "mc", text: "", options: ["", "", "", ""], correctAnswer: 0 },
+      ],
+    };
+    setModules(next);
+  };
+
+  const handleRemoveQuestionFromFlatModule = (mIdx: number, qIdx: number) => {
+    const next = [...modules];
+    const currentQuestions = next[mIdx].questions || [];
+    next[mIdx] = {
+      ...next[mIdx],
+      questions: currentQuestions.filter((_, i) => i !== qIdx),
+    };
+    setModules(next);
+  };
+
+  const handleFlatQuestionChange = (
+    mIdx: number,
+    qIdx: number,
+    field: "text" | "correctAnswer" | "questionType",
+    value: string | number,
+  ) => {
+    const next = [...modules];
+    const questions = [...(next[mIdx].questions || [])];
+    if (questions[qIdx]) {
+      let updated = { ...questions[qIdx], [field]: value };
+      if (field === "questionType" && value === "text" && typeof updated.correctAnswer === "number") {
+        updated.correctAnswer = "";
+      } else if (field === "questionType" && value === "mc" && typeof updated.correctAnswer === "string") {
+        updated.correctAnswer = 0;
+      }
+      questions[qIdx] = updated;
+      next[mIdx] = { ...next[mIdx], questions };
+      setModules(next);
+    }
+  };
+
+  const handleFlatOptionChange = (
+    mIdx: number,
+    qIdx: number,
+    oIdx: number,
+    value: string,
+  ) => {
+    const next = [...modules];
+    const questions = [...(next[mIdx].questions || [])];
+    if (questions[qIdx]) {
+      const options = [...questions[qIdx].options];
+      options[oIdx] = value;
+      questions[qIdx] = { ...questions[qIdx], options };
+      next[mIdx] = { ...next[mIdx], questions };
+      setModules(next);
+    }
+  };
+
   // ── Section handlers ─────────────────────────────────────────────────────
-  const handleAddSection = () =>
-    setCourseSections([...courseSections, { title: "", description: "", modules: [] }]);
+  const handleAddSection = (afterIndex?: number) => {
+    const newSection: SectionState = { title: "", description: "", modules: [] };
+    if (typeof afterIndex === "number" && afterIndex >= 0 && afterIndex < courseSections.length) {
+      const next = [...courseSections];
+      next.splice(afterIndex + 1, 0, newSection);
+      setCourseSections(next);
+    } else {
+      setCourseSections([...courseSections, newSection]);
+    }
+  };
 
   const handleSectionChange = (
     sIdx: number,
@@ -486,7 +600,7 @@ export default function AdminCourses() {
     const next = [...courseSections];
     next[sIdx] = {
       ...next[sIdx],
-      modules: [...next[sIdx].modules, { title: "", description: "" }],
+      modules: [...next[sIdx].modules, { title: "", description: "", module_type: "video", questions: [] }],
     };
     setCourseSections(next);
   };
@@ -494,7 +608,7 @@ export default function AdminCourses() {
   const handleSectionModuleChange = (
     sIdx: number,
     mIdx: number,
-    field: "title" | "description",
+    field: "title" | "description" | "module_type",
     value: string,
   ) => {
     const next = [...courseSections];
@@ -502,6 +616,77 @@ export default function AdminCourses() {
     mods[mIdx] = { ...mods[mIdx], [field]: value };
     next[sIdx] = { ...next[sIdx], modules: mods };
     setCourseSections(next);
+  };
+
+  const handleAddQuestionToModule = (sIdx: number, mIdx: number) => {
+    const next = [...courseSections];
+    const mods = [...next[sIdx].modules];
+    const currentQuestions = mods[mIdx].questions || [];
+    mods[mIdx] = {
+      ...mods[mIdx],
+      questions: [
+        ...currentQuestions,
+        { questionType: "mc", text: "", options: ["", "", "", ""], correctAnswer: 0 },
+      ],
+    };
+    next[sIdx] = { ...next[sIdx], modules: mods };
+    setCourseSections(next);
+  };
+
+  const handleRemoveQuestionFromModule = (sIdx: number, mIdx: number, qIdx: number) => {
+    const next = [...courseSections];
+    const mods = [...next[sIdx].modules];
+    const currentQuestions = mods[mIdx].questions || [];
+    mods[mIdx] = {
+      ...mods[mIdx],
+      questions: currentQuestions.filter((_, i) => i !== qIdx),
+    };
+    next[sIdx] = { ...next[sIdx], modules: mods };
+    setCourseSections(next);
+  };
+
+  const handleQuestionChange = (
+    sIdx: number,
+    mIdx: number,
+    qIdx: number,
+    field: "text" | "correctAnswer" | "questionType",
+    value: string | number,
+  ) => {
+    const next = [...courseSections];
+    const mods = [...next[sIdx].modules];
+    const questions = [...(mods[mIdx].questions || [])];
+    if (questions[qIdx]) {
+      let updated = { ...questions[qIdx], [field]: value };
+      if (field === "questionType" && value === "text" && typeof updated.correctAnswer === "number") {
+        updated.correctAnswer = "";
+      } else if (field === "questionType" && value === "mc" && typeof updated.correctAnswer === "string") {
+        updated.correctAnswer = 0;
+      }
+      questions[qIdx] = updated;
+      mods[mIdx] = { ...mods[mIdx], questions };
+      next[sIdx] = { ...next[sIdx], modules: mods };
+      setCourseSections(next);
+    }
+  };
+
+  const handleOptionChange = (
+    sIdx: number,
+    mIdx: number,
+    qIdx: number,
+    oIdx: number,
+    value: string,
+  ) => {
+    const next = [...courseSections];
+    const mods = [...next[sIdx].modules];
+    const questions = [...(mods[mIdx].questions || [])];
+    if (questions[qIdx]) {
+      const options = [...(questions[qIdx].options || ["", "", "", ""])];
+      options[oIdx] = value;
+      questions[qIdx] = { ...questions[qIdx], options };
+      mods[mIdx] = { ...mods[mIdx], questions };
+      next[sIdx] = { ...next[sIdx], modules: mods };
+      setCourseSections(next);
+    }
   };
 
   const handleRemoveSectionModule = (sIdx: number, mIdx: number) => {
@@ -679,30 +864,34 @@ export default function AdminCourses() {
         // Send sections with nested modules if sections exist
         ...(courseSections.length > 0
           ? {
-              sections: courseSections
-                .filter((s) => s.title.trim())
-                .map((s) => ({
-                  ...(s.id && { id: s.id }),
-                  title: s.title.trim(),
-                  description: s.description.trim(),
-                  modules: s.modules
-                    .filter((m) => m.title.trim())
-                    .map((m) => ({
-                      ...(m.id && { id: m.id }),
-                      title: m.title.trim(),
-                      description: m.description.trim(),
-                    })),
-                })),
-            }
+            sections: courseSections
+              .filter((s) => s.title.trim())
+              .map((s) => ({
+                ...(s.id && { id: s.id }),
+                title: s.title.trim(),
+                description: s.description.trim(),
+                modules: s.modules
+                  .filter((m) => m.title.trim())
+                  .map((m) => ({
+                    ...(m.id && { id: m.id }),
+                    title: m.title.trim(),
+                    description: m.description.trim(),
+                    module_type: m.module_type || "video",
+                    questions: Array.isArray(m.questions) ? m.questions : [],
+                  })),
+              })),
+          }
           : {
-              modules: modules
-                .filter((m) => m.title.trim())
-                .map((m) => ({
-                  ...(m.id && { id: m.id }),
-                  title: m.title.trim(),
-                  description: m.description.trim(),
-                })),
-            }),
+            modules: modules
+              .filter((m) => m.title.trim())
+              .map((m) => ({
+                ...(m.id && { id: m.id }),
+                title: m.title.trim(),
+                description: m.description.trim(),
+                module_type: m.module_type || "video",
+                questions: Array.isArray(m.questions) ? m.questions : [],
+              })),
+          }),
         // Members & Mentors
         assigned_scholars: selectedScholars.map((u) => u.value),
         assigned_mentors: selectedMentors.map((u) => u.value),
@@ -1384,235 +1573,235 @@ export default function AdminCourses() {
                         </div>
 
                         {productMode === "existing" && (
-                      <div className="relative">
-                        {/* Custom dropdown trigger */}
-                        <button
-                          type="button"
-                          onClick={() => setProductDropdownOpen(!productDropdownOpen)}
-                          className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${productDropdownOpen
-                            ? "border-brand-primary ring-2 ring-brand-primary/20"
-                            : "border-gray-200 hover:border-gray-300"
-                            } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
-                        >
-                          <span className="truncate">
-                            {selectedProductId
-                              ? products.find((p) => String(p.id) === selectedProductId)?.title ?? "Select product..."
-                              : "Select product..."}
-                          </span>
-                          <svg
-                            className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform duration-200 ${productDropdownOpen ? "rotate-180" : ""}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-
-                        {/* Custom dropdown menu */}
-                        {productDropdownOpen && (
-                          <>
-                            {/* Invisible backdrop to close dropdown on outside click */}
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setProductDropdownOpen(false)}
-                            />
-                            <div className="absolute z-20 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                              {products.length === 0 ? (
-                                <div className="px-4 py-6 text-center">
-                                  <p className="text-sm text-gray-400 font-medium">
-                                    No products yet.
-                                  </p>
-                                  <p className="text-xs text-gray-300 mt-1">
-                                    Create one using the &quot;Create New&quot; option.
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="max-h-52 overflow-y-auto py-1">
-                                  {products.map((product) => {
-                                    const isSelected = selectedProductId === String(product.id);
-                                    const isEditing = editingProductId === String(product.id);
-                                    return (
-                                      <div
-                                        key={product.id}
-                                        onClick={(e) => {
-                                          if (isEditing) {
-                                            e.stopPropagation();
-                                            return;
-                                          }
-                                          setSelectedProductId(String(product.id));
-                                          setProductDropdownOpen(false);
-                                        }}
-                                        className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${isSelected && !isEditing
-                                          ? "bg-brand-primary/5"
-                                          : "hover:bg-gray-50"
-                                          }`}
-                                      >
-                                        {/* Product label */}
-                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                          {/* Selection indicator */}
-                                          <span
-                                            className={`w-2 h-2 rounded-full shrink-0 transition-colors ${isSelected
-                                              ? "bg-brand-primary"
-                                              : "bg-transparent group-hover:bg-gray-300"
-                                              }`}
-                                          />
-                                          {isEditing ? (
-                                            <input
-                                              type="text"
-                                              value={editingProductTitle}
-                                              onChange={(e) => setEditingProductTitle(e.target.value)}
-                                              onClick={(e) => e.stopPropagation()}
-                                              onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  void handleSaveProductEdit(product.id);
-                                                } else if (e.key === "Escape") {
-                                                  e.stopPropagation();
-                                                  setEditingProductId(null);
-                                                }
-                                              }}
-                                              className="w-full text-[14px] px-2 py-1 border border-brand-primary rounded focus:outline-none bg-white text-gray-900"
-                                              autoFocus
-                                            />
-                                          ) : (
-                                            <span
-                                              className={`text-[14px] truncate transition-colors ${isSelected
-                                                ? "font-semibold text-brand-primary"
-                                                : "font-medium text-gray-700 group-hover:text-gray-900"
-                                                }`}
-                                            >
-                                              {product.title}
-                                            </span>
-                                          )}
-                                        </div>
-                                        {/* Actions inside dropdown */}
-                                        <div className="flex items-center">
-                                          {isEditing ? (
-                                            <>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  void handleSaveProductEdit(product.id);
-                                                }}
-                                                disabled={isSavingProduct}
-                                                className="rounded-md p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
-                                              >
-                                                {isSavingProduct ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setEditingProductId(null);
-                                                }}
-                                                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                                              >
-                                                <X className="h-3.5 w-3.5" />
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setEditingProductId(String(product.id));
-                                                  setEditingProductTitle(product.title);
-                                                }}
-                                                className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-50 hover:text-blue-500 mr-1"
-                                                title={`Edit ${product.title}`}
-                                              >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setProductDropdownOpen(false);
-                                                  void handleDeleteProduct(product);
-                                                }}
-                                                disabled={isDeletingProduct}
-                                                className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                                title={`Delete ${product.title}`}
-                                              >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                              </button>
-                                            </>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                              {/* Products count footer */}
-                              <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60">
-                                <p className="text-[11px] text-gray-400 font-medium">
-                                  {products.length} product{products.length !== 1 ? "s" : ""} available
-                                </p>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {productMode === "new" && (
-                      <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50/50">
-                        <input
-                          type="text"
-                          placeholder="New product title (e.g. Playwright)"
-                          value={newProductTitle}
-                          onChange={(e) => setNewProductTitle(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-                        />
-                        <textarea
-                          placeholder="Product description (optional)"
-                          value={newProductDescription}
-                          onChange={(e) =>
-                            setNewProductDescription(e.target.value)
-                          }
-                          rows={2}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
-                        />
-                        {newProductThumbnailPreview ? (
-                          <div className="relative w-full h-28 rounded-lg overflow-hidden border border-gray-200 group">
-                            <Image
-                              src={newProductThumbnailPreview}
-                              alt="Product thumbnail"
-                              fill
-                              className="object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNewProductThumbnailFile(null);
-                                  setNewProductThumbnailPreview("");
-                                }}
-                                className="bg-white text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold"
+                          <div className="relative">
+                            {/* Custom dropdown trigger */}
+                            <button
+                              type="button"
+                              onClick={() => setProductDropdownOpen(!productDropdownOpen)}
+                              className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${productDropdownOpen
+                                ? "border-brand-primary ring-2 ring-brand-primary/20"
+                                : "border-gray-200 hover:border-gray-300"
+                                } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
+                            >
+                              <span className="truncate">
+                                {selectedProductId
+                                  ? products.find((p) => String(p.id) === selectedProductId)?.title ?? "Select product..."
+                                  : "Select product..."}
+                              </span>
+                              <svg
+                                className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform duration-200 ${productDropdownOpen ? "rotate-180" : ""}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                               >
-                                Remove
-                              </button>
-                            </div>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+
+                            {/* Custom dropdown menu */}
+                            {productDropdownOpen && (
+                              <>
+                                {/* Invisible backdrop to close dropdown on outside click */}
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={() => setProductDropdownOpen(false)}
+                                />
+                                <div className="absolute z-20 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                  {products.length === 0 ? (
+                                    <div className="px-4 py-6 text-center">
+                                      <p className="text-sm text-gray-400 font-medium">
+                                        No products yet.
+                                      </p>
+                                      <p className="text-xs text-gray-300 mt-1">
+                                        Create one using the &quot;Create New&quot; option.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div className="max-h-52 overflow-y-auto py-1">
+                                      {products.map((product) => {
+                                        const isSelected = selectedProductId === String(product.id);
+                                        const isEditing = editingProductId === String(product.id);
+                                        return (
+                                          <div
+                                            key={product.id}
+                                            onClick={(e) => {
+                                              if (isEditing) {
+                                                e.stopPropagation();
+                                                return;
+                                              }
+                                              setSelectedProductId(String(product.id));
+                                              setProductDropdownOpen(false);
+                                            }}
+                                            className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${isSelected && !isEditing
+                                              ? "bg-brand-primary/5"
+                                              : "hover:bg-gray-50"
+                                              }`}
+                                          >
+                                            {/* Product label */}
+                                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                              {/* Selection indicator */}
+                                              <span
+                                                className={`w-2 h-2 rounded-full shrink-0 transition-colors ${isSelected
+                                                  ? "bg-brand-primary"
+                                                  : "bg-transparent group-hover:bg-gray-300"
+                                                  }`}
+                                              />
+                                              {isEditing ? (
+                                                <input
+                                                  type="text"
+                                                  value={editingProductTitle}
+                                                  onChange={(e) => setEditingProductTitle(e.target.value)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      void handleSaveProductEdit(product.id);
+                                                    } else if (e.key === "Escape") {
+                                                      e.stopPropagation();
+                                                      setEditingProductId(null);
+                                                    }
+                                                  }}
+                                                  className="w-full text-[14px] px-2 py-1 border border-brand-primary rounded focus:outline-none bg-white text-gray-900"
+                                                  autoFocus
+                                                />
+                                              ) : (
+                                                <span
+                                                  className={`text-[14px] truncate transition-colors ${isSelected
+                                                    ? "font-semibold text-brand-primary"
+                                                    : "font-medium text-gray-700 group-hover:text-gray-900"
+                                                    }`}
+                                                >
+                                                  {product.title}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {/* Actions inside dropdown */}
+                                            <div className="flex items-center">
+                                              {isEditing ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      void handleSaveProductEdit(product.id);
+                                                    }}
+                                                    disabled={isSavingProduct}
+                                                    className="rounded-md p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
+                                                  >
+                                                    {isSavingProduct ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setEditingProductId(null);
+                                                    }}
+                                                    className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                                  >
+                                                    <X className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setEditingProductId(String(product.id));
+                                                      setEditingProductTitle(product.title);
+                                                    }}
+                                                    className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-50 hover:text-blue-500 mr-1"
+                                                    title={`Edit ${product.title}`}
+                                                  >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setProductDropdownOpen(false);
+                                                      void handleDeleteProduct(product);
+                                                    }}
+                                                    disabled={isDeletingProduct}
+                                                    className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    title={`Delete ${product.title}`}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                  {/* Products count footer */}
+                                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60">
+                                    <p className="text-[11px] text-gray-400 font-medium">
+                                      {products.length} product{products.length !== 1 ? "s" : ""} available
+                                    </p>
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
-                        ) : (
-                          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-brand-primary transition-colors">
-                            <Upload className="w-4 h-4" />
-                            <span>Upload product thumbnail (optional)</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleNewProductThumbnailChange}
-                              className="hidden"
-                            />
-                          </label>
                         )}
-                      </div>
-                    )}
+
+                        {productMode === "new" && (
+                          <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+                            <input
+                              type="text"
+                              placeholder="New product title (e.g. Playwright)"
+                              value={newProductTitle}
+                              onChange={(e) => setNewProductTitle(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                            />
+                            <textarea
+                              placeholder="Product description (optional)"
+                              value={newProductDescription}
+                              onChange={(e) =>
+                                setNewProductDescription(e.target.value)
+                              }
+                              rows={2}
+                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
+                            />
+                            {newProductThumbnailPreview ? (
+                              <div className="relative w-full h-28 rounded-lg overflow-hidden border border-gray-200 group">
+                                <Image
+                                  src={newProductThumbnailPreview}
+                                  alt="Product thumbnail"
+                                  fill
+                                  className="object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewProductThumbnailFile(null);
+                                      setNewProductThumbnailPreview("");
+                                    }}
+                                    className="bg-white text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-brand-primary transition-colors">
+                                <Upload className="w-4 h-4" />
+                                <span>Upload product thumbnail (optional)</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleNewProductThumbnailChange}
+                                  className="hidden"
+                                />
+                              </label>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1904,7 +2093,7 @@ export default function AdminCourses() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={handleAddSection}
+                          onClick={() => handleAddSection()}
                           className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
                         >
                           <Plus className="w-3 h-3" /> Add Section
@@ -1925,13 +2114,11 @@ export default function AdminCourses() {
                     {courseSections.map((section, sIdx) => (
                       <div
                         key={sIdx}
-                        className="border border-brand-primary/20 rounded-xl p-4 space-y-3 bg-brand-primary/5"
+                        className="border-2 border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 bg-slate-50/90 shadow-sm border-l-4 border-l-brand-primary transition-all"
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0">
-                            <span className="text-[10px] font-bold text-brand-primary">
-                              {sIdx + 1}
-                            </span>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 bg-brand-primary text-white rounded-lg flex items-center justify-center shrink-0 font-extrabold text-xs shadow-2xs">
+                            {sIdx + 1}
                           </div>
                           <input
                             type="text"
@@ -1940,12 +2127,12 @@ export default function AdminCourses() {
                             onChange={(e) =>
                               handleSectionChange(sIdx, "title", e.target.value)
                             }
-                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
+                            className="flex-1 px-4 py-2 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white shadow-2xs"
                           />
                           <button
                             type="button"
                             onClick={() => handleRemoveSection(sIdx)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0 cursor-pointer"
                             title="Remove section"
                           >
                             <X className="w-4 h-4" />
@@ -1958,21 +2145,19 @@ export default function AdminCourses() {
                             handleSectionChange(sIdx, "description", e.target.value)
                           }
                           rows={2}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                          className="w-full px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
                         />
 
                         {/* Modules within section */}
-                        <div className="pl-4 border-l-2 border-brand-primary/20 space-y-2">
+                        <div className="pl-3 sm:pl-4 border-l-2 border-slate-300 space-y-3">
                           {section.modules.map((mod, mIdx) => (
                             <div
                               key={mIdx}
-                              className="border border-gray-100 rounded-lg p-2.5 space-y-1.5 bg-white"
+                              className="border-2 border-gray-200/90 rounded-xl p-3.5 space-y-2.5 bg-white shadow-xs hover:shadow-md hover:border-gray-300 transition-all"
                             >
                               <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0 border border-brand-primary/20">
-                                  <span className="text-[10px] font-bold text-brand-primary">
-                                    {mIdx + 1}
-                                  </span>
+                                <div className="w-6 h-6 bg-slate-100 text-slate-900 rounded-md flex items-center justify-center shrink-0 border border-slate-300 font-bold text-[11px]">
+                                  {mIdx + 1}
                                 </div>
                                 <input
                                   type="text"
@@ -1986,41 +2171,191 @@ export default function AdminCourses() {
                                       e.target.value,
                                     )
                                   }
-                                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
+                                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-gray-50/40 focus:bg-white"
                                 />
+
+                                {/* Module Type Selector (Top Right of Module Section) */}
+                                <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1 border transition-colors ${
+                                  mod.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                                }`}>
+                                  <select
+                                    value={mod.module_type || "video"}
+                                    onChange={(e) =>
+                                      handleSectionModuleChange(
+                                        sIdx,
+                                        mIdx,
+                                        "module_type",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="text-[11px] font-bold bg-transparent focus:outline-none cursor-pointer"
+                                    title="Module Type"
+                                  >
+                                    <option value="video">Video</option>
+                                    <option value="quiz">Quiz</option>
+                                  </select>
+                                </div>
+
                                 <button
                                   type="button"
                                   onClick={() =>
                                     handleRemoveSectionModule(sIdx, mIdx)
                                   }
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0 cursor-pointer"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              <textarea
-                                placeholder="Module description (optional)"
-                                value={mod.description}
-                                onChange={(e) =>
-                                  handleSectionModuleChange(
-                                    sIdx,
-                                    mIdx,
-                                    "description",
-                                    e.target.value,
-                                  )
-                                }
-                                rows={1}
-                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
-                              />
+                              {mod.module_type === "quiz" ? (
+                                <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-3.5 -mb-3.5">
+                                  <div className="flex items-center justify-between pb-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-900 flex items-center gap-1">
+                                      <HelpCircle size={12} className="text-gray-700" /> Quiz Questions & Answers ({mod.questions?.length || 0})
+                                    </span>
+                                  </div>
+
+                                  {(!mod.questions || mod.questions.length === 0) ? (
+                                    <div className="text-center py-3 px-2 border border-dashed border-gray-300 rounded-lg bg-white">
+                                      <p className="text-xs text-gray-800 font-semibold">No questions added yet.</p>
+                                      <p className="text-[10px] text-gray-400 mt-0.5">Click &quot;Add Question&quot; to add questions for this quiz module.</p>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {mod.questions.map((q, qIdx) => (
+                                      <div key={qIdx} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                              Question {qIdx + 1}
+                                            </span>
+                                            <select
+                                              value={q.questionType || "mc"}
+                                              onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "questionType", e.target.value)}
+                                              className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                                            >
+                                              <option value="mc">Multiple Choice</option>
+                                              <option value="text">Fill in the Blank (Text)</option>
+                                            </select>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveQuestionFromModule(sIdx, mIdx, qIdx)}
+                                            className="text-gray-400 hover:text-red-600 text-xs p-1 rounded hover:bg-red-50 transition-colors"
+                                            title="Delete Question"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </div>
+
+                                        <input
+                                          type="text"
+                                          placeholder={`Question ${qIdx + 1} text...`}
+                                          value={q.text}
+                                          onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "text", e.target.value)}
+                                          className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
+                                        />
+
+                                        {q.questionType === "text" ? (
+                                          <div className="space-y-1 pt-1">
+                                            <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
+                                              Correct Text Answer (Fill in the Blank)
+                                            </label>
+                                            <input
+                                              type="text"
+                                              placeholder="Type the exact correct text answer (e.g. Paris)..."
+                                              value={String(q.correctAnswer ?? "")}
+                                              onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "correctAnswer", e.target.value)}
+                                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-1.5 pt-1">
+                                            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
+                                              Options (Select radio for correct answer)
+                                            </label>
+                                            <div className="space-y-2">
+                                              {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
+                                                <div key={oIdx} className="flex items-center gap-2 w-full">
+                                                  <input
+                                                    type="radio"
+                                                    name={`correct_${sIdx}_${mIdx}_${qIdx}`}
+                                                    checked={q.correctAnswer === oIdx}
+                                                    onChange={() => handleQuestionChange(sIdx, mIdx, qIdx, "correctAnswer", oIdx)}
+                                                    className="accent-black cursor-pointer shrink-0 w-4 h-4"
+                                                    title="Mark as correct answer"
+                                                  />
+                                                  <input
+                                                    type="text"
+                                                    placeholder={`Option ${oIdx + 1}`}
+                                                    value={opt}
+                                                    onChange={(e) => handleOptionChange(sIdx, mIdx, qIdx, oIdx, e.target.value)}
+                                                    className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
+                                                      q.correctAnswer === oIdx
+                                                        ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
+                                                        : "border-gray-200 text-gray-800 bg-white"
+                                                    }`}
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200 mt-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddQuestionToModule(sIdx, mIdx)}
+                                        className="text-gray-900 hover:bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
+                                      >
+                                        <Plus size={11} /> Add Question
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenQuizPreview(mod.title || `Module ${mIdx + 1}`, mod.questions)}
+                                        className="text-gray-900 hover:bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
+                                      >
+                                        <Eye size={11} /> Preview Quiz
+                                      </button>
+                                    </div>
+                                  </>
+                                  )}
+                                </div>
+                              ) : (
+                                <textarea
+                                  placeholder="Module description (optional)"
+                                  value={mod.description}
+                                  onChange={(e) =>
+                                    handleSectionModuleChange(
+                                      sIdx,
+                                      mIdx,
+                                      "description",
+                                      e.target.value,
+                                    )
+                                  }
+                                  rows={1}
+                                  className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[11px] text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                                />
+                              )}
                             </div>
                           ))}
-                          <button
-                            type="button"
-                            onClick={() => handleAddModuleToSection(sIdx)}
-                            className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" /> Add Module
-                          </button>
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAddModuleToSection(sIdx)}
+                              className="text-brand-primary hover:bg-brand-primary/10 px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" /> Add Module
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAddSection(sIdx)}
+                              className="text-brand-primary hover:bg-brand-primary/10 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors bg-white border border-brand-primary/20 shadow-xs hover:border-brand-primary/40 cursor-pointer"
+                              title={`Add new section after Section ${sIdx + 1}`}
+                            >
+                              <Plus className="w-3 h-3 text-brand-primary" /> Add Section
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -2029,13 +2364,11 @@ export default function AdminCourses() {
                     {courseSections.length === 0 && modules.map((module, index) => (
                       <div
                         key={index}
-                        className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50"
+                        className="border-2 border-slate-300 rounded-xl p-4 space-y-3 bg-white shadow-sm hover:shadow-md transition-all border-l-4 border-l-brand-primary"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-brand-primary/10 rounded-full flex items-center justify-center shrink-0 border border-brand-primary/20">
-                            <span className="text-[10px] font-bold text-brand-primary">
-                              {index + 1}
-                            </span>
+                          <div className="w-6 h-6 bg-slate-100 text-slate-900 rounded-md flex items-center justify-center shrink-0 border border-slate-300 font-bold text-[11px]">
+                            {index + 1}
                           </div>
                           <input
                             type="text"
@@ -2044,29 +2377,172 @@ export default function AdminCourses() {
                             onChange={(e) =>
                               handleModuleChange(index, "title", e.target.value)
                             }
-                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-white font-medium"
+                            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-gray-50/40 focus:bg-white font-semibold"
                           />
+
+                          {/* Module Type Selector */}
+                          <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs border transition-colors ${
+                            module.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                          }`}>
+                            <select
+                              value={module.module_type || "video"}
+                              onChange={(e) =>
+                                handleModuleChange(index, "module_type", e.target.value)
+                              }
+                              className="text-xs font-bold bg-transparent focus:outline-none cursor-pointer"
+                            >
+                              <option value="video">Video</option>
+                              <option value="quiz">Quiz</option>
+                            </select>
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => handleRemoveModule(index)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0 cursor-pointer"
                           >
                             <X className="w-4 h-4" />
                           </button>
                         </div>
-                        <textarea
-                          placeholder={`Description for Module ${index + 1} (optional)`}
-                          value={module.description}
-                          onChange={(e) =>
-                            handleModuleChange(
-                              index,
-                              "description",
-                              e.target.value,
-                            )
-                          }
-                          rows={2}
-                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
-                        />
+                        {module.module_type === "quiz" ? (
+                          <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-4 -mb-4">
+                            <div className="flex items-center justify-between pb-1">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-900 flex items-center gap-1">
+                                <HelpCircle size={12} className="text-gray-700" /> Quiz Questions & Answers ({module.questions?.length || 0})
+                              </span>
+                            </div>
+
+                            {(!module.questions || module.questions.length === 0) ? (
+                              <div className="text-center py-4 px-3 border border-dashed border-gray-300 rounded-lg bg-white">
+                                <p className="text-xs text-gray-800 font-semibold">No questions added yet.</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5 mb-3">Click &quot;Add Question&quot; to start adding questions for this quiz module.</p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddQuestionToFlatModule(index)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-900 border border-gray-300 bg-white hover:bg-gray-100 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <Plus size={13} /> Add Question
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {module.questions.map((q, qIdx) => (
+                                  <div key={qIdx} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                          Question {qIdx + 1}
+                                        </span>
+                                        <select
+                                          value={q.questionType || "mc"}
+                                          onChange={(e) => handleFlatQuestionChange(index, qIdx, "questionType", e.target.value)}
+                                          className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                                        >
+                                          <option value="mc">Multiple Choice</option>
+                                          <option value="text">Fill in the Blank (Text)</option>
+                                        </select>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveQuestionFromFlatModule(index, qIdx)}
+                                        className="text-gray-400 hover:text-red-600 text-xs p-1 rounded hover:bg-red-50 transition-colors"
+                                        title="Delete Question"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+
+                                    <input
+                                      type="text"
+                                      placeholder={`Question ${qIdx + 1} text...`}
+                                      value={q.text}
+                                      onChange={(e) => handleFlatQuestionChange(index, qIdx, "text", e.target.value)}
+                                      className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
+                                    />
+
+                                    {q.questionType === "text" ? (
+                                      <div className="space-y-1 pt-1">
+                                        <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
+                                          Correct Text Answer (Fill in the Blank)
+                                        </label>
+                                        <input
+                                          type="text"
+                                          placeholder="Type the exact correct text answer (e.g. Paris)..."
+                                          value={String(q.correctAnswer ?? "")}
+                                          onChange={(e) => handleFlatQuestionChange(index, qIdx, "correctAnswer", e.target.value)}
+                                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-1.5 pt-1">
+                                        <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
+                                          Options (Select radio for correct answer)
+                                        </label>
+                                        <div className="space-y-2">
+                                          {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
+                                            <div key={oIdx} className="flex items-center gap-2 w-full">
+                                              <input
+                                                type="radio"
+                                                name={`correct_flat_${index}_${qIdx}`}
+                                                checked={q.correctAnswer === oIdx}
+                                                onChange={() => handleFlatQuestionChange(index, qIdx, "correctAnswer", oIdx)}
+                                                className="accent-black cursor-pointer shrink-0 w-4 h-4"
+                                                title="Mark as correct answer"
+                                              />
+                                              <input
+                                                type="text"
+                                                placeholder={`Option ${oIdx + 1}`}
+                                                value={opt}
+                                                onChange={(e) => handleFlatOptionChange(index, qIdx, oIdx, e.target.value)}
+                                                className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
+                                                  q.correctAnswer === oIdx
+                                                    ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
+                                                    : "border-gray-200 text-gray-800 bg-white"
+                                                }`}
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+
+                                {/* Bottom Actions Bar at end of last question */}
+                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddQuestionToFlatModule(index)}
+                                    className="text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
+                                  >
+                                    <Plus size={13} /> Add Question
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenQuizPreview(module.title || `Module ${index + 1}`, module.questions)}
+                                    className="text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
+                                  >
+                                    <Eye size={13} /> Preview Quiz
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <textarea
+                            placeholder={`Description for Module ${index + 1} (optional)`}
+                            value={module.description}
+                            onChange={(e) =>
+                              handleModuleChange(
+                                index,
+                                "description",
+                                e.target.value,
+                              )
+                            }
+                            rows={2}
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none bg-white"
+                          />
+                        )}
                       </div>
                     ))}
                     {courseSections.length === 0 && modules.length === 0 && (
@@ -2202,6 +2678,229 @@ export default function AdminCourses() {
               >
                 {isDeletingProduct && <Loader2 className="w-4 h-4 animate-spin" />}
                 {isDeletingProduct ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── QUIZ PREVIEW MODAL POPUP (ENLARGED & PROMINENT) ─── */}
+      {previewQuizData && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[70] p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden border border-gray-100">
+            {/* Modal Header */}
+            <div className="px-8 py-5 bg-[#0B1527] text-white flex items-center justify-between border-b border-gray-800 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="p-2.5 bg-brand-primary/20 rounded-xl text-brand-primary border border-brand-primary/30">
+                  <HelpCircle size={22} />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-brand-primary tracking-widest uppercase block mb-0.5">Quiz Live Preview</span>
+                  <h3 className="text-xl font-bold leading-tight text-white">{previewQuizData.title}</h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewQuizData(null)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                title="Close Preview"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8 overflow-y-auto flex-1 bg-gray-50/60">
+              {previewQuizData.questions.length === 0 ? (
+                <div className="text-center py-16 px-6 border-2 border-dashed border-gray-300 rounded-2xl bg-white">
+                  <p className="text-base font-semibold text-gray-700">No questions added yet.</p>
+                  <p className="text-sm text-gray-400 mt-1">Add questions to this quiz module to preview them here.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden max-w-4xl mx-auto">
+                  {/* Card Header matching exact course quiz card theme */}
+                  <div className="p-8 sm:p-10 bg-gradient-to-br from-[#0F1E3B] via-[#0F1E3B] to-[#162B50] text-white">
+                    <div className="flex items-center justify-between mb-5">
+                      <span className="text-sm font-semibold px-4 py-1.5 bg-brand-primary/20 text-brand-primary border border-brand-primary/30 rounded-full">
+                        Question {previewQIdx + 1} of {previewQuizData.questions.length}
+                      </span>
+                      <span className="text-xs sm:text-sm text-gray-300 font-medium bg-white/10 px-3 py-1 rounded-full">Interactive Preview Mode</span>
+                    </div>
+                    <h4 className="text-xl sm:text-2xl font-bold leading-relaxed text-white tracking-tight">
+                      {previewQuizData.questions[previewQIdx]?.text || "Untitled Question"}
+                    </h4>
+                  </div>
+
+                  {/* Questions area */}
+                  <div className="p-8 sm:p-10 space-y-6 bg-white">
+                    {previewQuizData.questions[previewQIdx]?.questionType === "text" ? (
+                      <div className="space-y-3">
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Type your answer:
+                        </label>
+                        <input
+                          type="text"
+                          value={String(previewSelectedAnswer ?? "")}
+                          onChange={(e) => {
+                            if (!previewIsSubmitted) {
+                              setPreviewSelectedAnswer(e.target.value);
+                            }
+                          }}
+                          disabled={previewIsSubmitted}
+                          placeholder="Enter your answer..."
+                          className="w-full px-5 py-4 border-2 border-gray-300 rounded-2xl text-base font-semibold text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white disabled:bg-gray-50 transition-all"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3.5">
+                        {(previewQuizData.questions[previewQIdx]?.options || []).map((opt, oIdx) => {
+                          if (!opt && previewQuizData.questions[previewQIdx]?.options?.every(o => !o)) return null;
+                          const isSelected = previewSelectedAnswer === oIdx;
+                          return (
+                            <button
+                              key={oIdx}
+                              type="button"
+                              onClick={() => {
+                                if (!previewIsSubmitted) {
+                                  setPreviewSelectedAnswer(oIdx);
+                                }
+                              }}
+                              disabled={previewIsSubmitted}
+                              className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 text-base sm:text-lg transition-all flex items-center gap-4 cursor-pointer ${
+                                isSelected
+                                  ? "border-brand-primary bg-brand-primary/5 text-brand-primary font-bold shadow-sm"
+                                  : "border-gray-200 hover:border-gray-300 text-gray-800 bg-white hover:bg-gray-50/80"
+                              }`}
+                            >
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                isSelected ? "border-brand-primary bg-brand-primary text-white" : "border-gray-300"
+                              }`}>
+                                {isSelected && <Check size={14} className="stroke-[3]" />}
+                              </div>
+                              <span className="font-semibold">{opt || `Option ${oIdx + 1}`}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Feedback box if submitted */}
+                    {previewIsSubmitted && (
+                      <div className={`p-5 rounded-2xl text-sm sm:text-base font-semibold border-2 animate-in fade-in duration-150 ${
+                        (() => {
+                          const q = previewQuizData.questions[previewQIdx];
+                          let isCorrect = false;
+                          if (q?.questionType === "text") {
+                            isCorrect = String(previewSelectedAnswer || "").trim().toLowerCase() === String(q.correctAnswer || "").trim().toLowerCase();
+                          } else {
+                            isCorrect = Number(previewSelectedAnswer) === Number(q.correctAnswer);
+                          }
+                          return isCorrect ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-red-50 text-red-900 border-red-300";
+                        })()
+                      }`}>
+                        {(() => {
+                          const q = previewQuizData.questions[previewQIdx];
+                          let isCorrect = false;
+                          if (q?.questionType === "text") {
+                            isCorrect = String(previewSelectedAnswer || "").trim().toLowerCase() === String(q.correctAnswer || "").trim().toLowerCase();
+                          } else {
+                            isCorrect = Number(previewSelectedAnswer) === Number(q.correctAnswer);
+                          }
+                          return isCorrect ? (
+                            <p className="flex items-center gap-2 font-bold text-emerald-800">
+                              <Check size={18} className="stroke-[3]" /> Correct answer!
+                            </p>
+                          ) : (
+                            <p className="flex items-center gap-2 font-bold text-red-800">
+                              Incorrect! Correct answer: {q?.questionType === "text" ? String(q.correctAnswer) : q?.options?.[Number(q.correctAnswer)] || `Option ${Number(q.correctAnswer) + 1}`}
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer with Submit / Next Button */}
+                  <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-600">
+                      {previewFinished
+                        ? `Completed - Final Score: ${previewScore}/${previewQuizData.questions.length}`
+                        : `Current Score: ${previewScore}`}
+                    </span>
+
+                    {!previewFinished && (
+                      <div>
+                        {!previewIsSubmitted ? (
+                          <button
+                            type="button"
+                            disabled={previewSelectedAnswer === null || previewSelectedAnswer === ""}
+                            onClick={() => {
+                              const q = previewQuizData.questions[previewQIdx];
+                              let isCorrect = false;
+                              if (q?.questionType === "text") {
+                                isCorrect = String(previewSelectedAnswer || "").trim().toLowerCase() === String(q.correctAnswer || "").trim().toLowerCase();
+                              } else {
+                                isCorrect = Number(previewSelectedAnswer) === Number(q.correctAnswer);
+                              }
+                              if (isCorrect) {
+                                setPreviewScore((prev) => prev + 1);
+                              }
+                              setPreviewIsSubmitted(true);
+                            }}
+                            className="px-7 py-3 text-sm font-bold text-white bg-brand-primary hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50 cursor-pointer shadow-md"
+                          >
+                            Submit Answer
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (previewQIdx < previewQuizData.questions.length - 1) {
+                                setPreviewQIdx((prev) => prev + 1);
+                                setPreviewSelectedAnswer(null);
+                                setPreviewIsSubmitted(false);
+                              } else {
+                                setPreviewFinished(true);
+                              }
+                            }}
+                            className="px-7 py-3 text-sm font-bold text-white bg-brand-primary hover:bg-brand-hover rounded-xl transition-colors flex items-center gap-2 cursor-pointer shadow-md"
+                          >
+                            {previewQIdx < previewQuizData.questions.length - 1 ? (
+                              <>
+                                Next Question <ChevronRight size={16} />
+                              </>
+                            ) : (
+                              "Finish Preview"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-8 py-4 bg-white border-t border-gray-200 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewQIdx(0);
+                  setPreviewSelectedAnswer(null);
+                  setPreviewIsSubmitted(false);
+                  setPreviewScore(0);
+                  setPreviewFinished(false);
+                }}
+                className="text-xs sm:text-sm font-semibold text-gray-600 hover:text-gray-900 underline cursor-pointer"
+              >
+                Reset Preview Progress
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewQuizData(null)}
+                className="px-6 py-2.5 text-xs sm:text-sm font-bold text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Close Preview
               </button>
             </div>
           </div>

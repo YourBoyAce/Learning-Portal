@@ -33,6 +33,7 @@ type Module = {
   thumbnail_url?: string | null;
   created_at?: string | null;
   section_id?: string | number | null;
+  module_type?: string | null;
 };
 
 type Section = {
@@ -76,6 +77,8 @@ export default function UploadPage() {
     null,
   );
   const [moduleThumbnailPreview, setModuleThumbnailPreview] = useState("");
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
+  const [isCustomThumbnail, setIsCustomThumbnail] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -227,7 +230,7 @@ export default function UploadPage() {
       try {
         const { data, error } = await supabase
           .from("coursemodules")
-          .select("id, title, created_at, section_id")
+          .select("id, title, created_at, section_id, module_type")
           .eq("maincourse_id", selectedCurriculum)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
@@ -250,13 +253,111 @@ export default function UploadPage() {
     void fetchModules();
   }, [selectedCurriculum]);
 
-  // Filter modules by selected section
+  // Filter modules by selected section and exclude quiz modules (video upload only applies to video modules)
   const filteredModules = useMemo(() => {
-    if (!selectedSectionId) return modules;
-    return modules.filter(
-      (m) => String(m.section_id) === String(selectedSectionId),
-    );
+    let list = modules.filter((m) => m.module_type !== "quiz");
+    if (selectedSectionId) {
+      list = list.filter(
+        (m) => String(m.section_id) === String(selectedSectionId),
+      );
+    }
+    return list;
   }, [modules, selectedSectionId]);
+
+  const generateVideoThumbnail = (
+    videoFile: File,
+  ): Promise<{ file: File; url: string }> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      const videoUrl = URL.createObjectURL(videoFile);
+      video.src = videoUrl;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error("Thumbnail generation timed out"));
+      }, 10000);
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        URL.revokeObjectURL(videoUrl);
+        video.remove();
+      };
+
+      video.onloadedmetadata = () => {
+        const targetTime = video.duration && video.duration > 0.5 ? 0.5 : 0.1;
+        video.currentTime = targetTime;
+      };
+
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 360;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(
+              (blob) => {
+                cleanup();
+                if (blob) {
+                  const baseName =
+                    videoFile.name.substring(
+                      0,
+                      videoFile.name.lastIndexOf("."),
+                    ) || "thumbnail";
+                  const thumbFile = new File([blob], `${baseName}_thumb.jpg`, {
+                    type: "image/jpeg",
+                  });
+                  const previewUrl = URL.createObjectURL(thumbFile);
+                  resolve({ file: thumbFile, url: previewUrl });
+                } else {
+                  reject(new Error("Failed to create blob from canvas"));
+                }
+              },
+              "image/jpeg",
+              0.85,
+            );
+          } else {
+            cleanup();
+            reject(new Error("Could not get 2d context"));
+          }
+        } catch (err) {
+          cleanup();
+          reject(err);
+        }
+      };
+
+      video.onerror = (err) => {
+        cleanup();
+        reject(err);
+      };
+    });
+  };
+
+  const processSelectedVideo = async (file: File) => {
+    setError("");
+    setSelectedFile(file);
+    setVideoFile(file);
+
+    setIsGeneratingThumbnail(true);
+    try {
+      const { file: thumbFile, url: thumbUrl } =
+        await generateVideoThumbnail(file);
+      setModuleThumbnailFile(thumbFile);
+      setModuleThumbnailPreview(thumbUrl);
+      setIsCustomThumbnail(false);
+    } catch (err) {
+      console.warn(
+        "Could not automatically generate thumbnail from video:",
+        err,
+      );
+    } finally {
+      setIsGeneratingThumbnail(false);
+    }
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -270,18 +371,14 @@ export default function UploadPage() {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      setError("");
-      setSelectedFile(file);
-      setVideoFile(file);
+      void processSelectedVideo(file);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setError("");
-      setSelectedFile(file);
-      setVideoFile(file);
+      void processSelectedVideo(file);
     }
   };
 
@@ -310,7 +407,7 @@ export default function UploadPage() {
         selectedSectionId || null,
       );
 
-      setModules((prev) => [...prev, newModule]);
+      setModules((prev) => [...prev, { ...newModule, module_type: "video" }]);
       setSelectedModuleId(String(newModule.id));
       setIsAddModuleModalOpen(false);
       setSuccess("Module created successfully!");
@@ -371,6 +468,12 @@ export default function UploadPage() {
     const selectedModule = modules.find(
       (m) => String(m.id) === String(selectedModuleId),
     );
+
+    if (selectedModule?.module_type === "quiz") {
+      setError("Cannot upload a video to a Quiz module. Only Video modules are supported.");
+      return;
+    }
+
     const effectiveVideoTitle = selectedModule?.title || "";
 
     if (
@@ -808,8 +911,8 @@ export default function UploadPage() {
                         ? "Loading modules..."
                         : !selectedCurriculum
                           ? "Select a course first..."
-                          : modules.length === 0
-                            ? "No modules found for this course"
+                          : filteredModules.length === 0
+                            ? "No video modules found for this course"
                             : "Select module..."}
                     </option>
                     {filteredModules.map((module, mIdx) => (
@@ -824,6 +927,7 @@ export default function UploadPage() {
                   </select>
                 </div>
 
+                {/* Module Thumbnail Section (Before Video) */}
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Module Thumbnail (Optional)
@@ -837,6 +941,7 @@ export default function UploadPage() {
                       setModuleThumbnailPreview(
                         file ? URL.createObjectURL(file) : "",
                       );
+                      setIsCustomThumbnail(!!file);
                     }}
                     className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
                       !moduleThumbnailFile ? "!text-gray-400" : "!text-gray-900"
@@ -847,13 +952,24 @@ export default function UploadPage() {
                       fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
                     }}
                   />
-                  {moduleThumbnailPreview && (
-                    <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                  {isGeneratingThumbnail && (
+                    <p className="mt-2 text-xs text-blue-600 animate-pulse font-medium">
+                      Auto-capturing thumbnail frame from video...
+                    </p>
+                  )}
+                  {moduleThumbnailPreview && !isGeneratingThumbnail && (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-gray-200 relative group">
                       <img
                         src={moduleThumbnailPreview}
                         alt="Module thumbnail preview"
-                        className="w-full h-28 object-cover"
+                        className="w-full h-36 object-cover"
                       />
+                      <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2.5 py-1 rounded backdrop-blur-sm flex items-center gap-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                        {isCustomThumbnail
+                          ? "Custom thumbnail selected"
+                          : "Auto-captured from video"}
+                      </div>
                     </div>
                   )}
                 </div>

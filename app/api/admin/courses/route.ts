@@ -622,6 +622,8 @@ export async function POST(request: Request) {
             section_id: newSection.id,
             title: typeof m.title === "string" ? m.title.trim() : "",
             description: typeof m.description === "string" ? m.description.trim() : "",
+            module_type: m.module_type === "quiz" ? "quiz" : "video",
+            questions: Array.isArray(m.questions) ? m.questions : [],
             order_index: mIdx + 1,
           }))
           .filter((m: any) => m.title !== "");
@@ -650,6 +652,8 @@ export async function POST(request: Request) {
         maincourse_id: newCourse.id,
         title: typeof m.title === "string" ? m.title.trim() : "",
         description: typeof m.description === "string" ? m.description.trim() : "",
+        module_type: m.module_type === "quiz" ? "quiz" : "video",
+        questions: Array.isArray(m.questions) ? m.questions : [],
         order_index: index + 1,
       }))
       .filter((m: any) => m.title !== "");
@@ -892,6 +896,48 @@ export async function PUT(request: Request) {
       }
     }
 
+    // Collect all module IDs that should be kept across all sections
+    const keepModuleIds = validSections
+      .flatMap((sec: any) => (Array.isArray(sec.modules) ? sec.modules : []))
+      .filter((m: any) => m && m.id)
+      .map((m: any) => String(m.id));
+
+    // Fetch existing modules for this course to identify deleted modules
+    const { data: existingModules, error: fetchModulesError } = await authContext.supabaseAdmin
+      .from("coursemodules")
+      .select("id")
+      .eq("maincourse_id", id);
+
+    if (fetchModulesError) {
+      return NextResponse.json(
+        { error: logError(fetchModulesError).message },
+        { status: 500 },
+      );
+    }
+
+    const currentModuleIds = (existingModules || []).map((m: any) => String(m.id));
+    const deleteModuleIds = currentModuleIds.filter((mid: string) => !keepModuleIds.includes(mid));
+
+    if (deleteModuleIds.length > 0) {
+      await authContext.supabaseAdmin
+        .from("user_video_progress")
+        .delete()
+        .eq("course_id", id)
+        .in("video_id", deleteModuleIds);
+
+      const { error: deleteModulesError } = await authContext.supabaseAdmin
+        .from("coursemodules")
+        .delete()
+        .in("id", deleteModuleIds);
+
+      if (deleteModulesError) {
+        return NextResponse.json(
+          { error: logError(deleteModulesError).message },
+          { status: 500 },
+        );
+      }
+    }
+
     // Update existing sections
     for (let sIdx = 0; sIdx < sectionsToUpdate.length; sIdx++) {
       const sec = sectionsToUpdate[sIdx];
@@ -929,6 +975,8 @@ export async function PUT(request: Request) {
             .update({
               title: mod.title.trim(),
               description: (mod.description || "").trim(),
+              module_type: mod.module_type === "quiz" ? "quiz" : "video",
+              questions: Array.isArray(mod.questions) ? mod.questions : [],
               section_id: sec.id,
               order_index: sectionModules.findIndex((m: any) => m.id === mod.id) + 1,
             })
@@ -942,6 +990,8 @@ export async function PUT(request: Request) {
             section_id: sec.id,
             title: mod.title.trim(),
             description: (mod.description || "").trim(),
+            module_type: mod.module_type === "quiz" ? "quiz" : "video",
+            questions: Array.isArray(mod.questions) ? mod.questions : [],
             order_index: sectionModules.length - modsToInsert.length + mIdx + 1,
           }));
 
@@ -983,6 +1033,8 @@ export async function PUT(request: Request) {
             section_id: newSection.id,
             title: m.title.trim(),
             description: (m.description || "").trim(),
+            module_type: m.module_type === "quiz" ? "quiz" : "video",
+            questions: Array.isArray(m.questions) ? m.questions : [],
             order_index: mIdx + 1,
           }));
 
@@ -1009,7 +1061,7 @@ export async function PUT(request: Request) {
       if (m.id) moduleOrderMap.set(m.id, index + 1);
     });
 
-    const keepIds = modulesToUpdate.map((m: any) => m.id);
+    const keepIds = modulesToUpdate.map((m: any) => String(m.id));
 
     const { data: currentModules, error: fetchError } = await authContext.supabaseAdmin
       .from("coursemodules")
@@ -1023,10 +1075,16 @@ export async function PUT(request: Request) {
       );
     }
 
-    const currentIds = currentModules?.map((m: any) => m.id) ?? [];
+    const currentIds = currentModules?.map((m: any) => String(m.id)) ?? [];
     const deleteIds = currentIds.filter((cid: string) => !keepIds.includes(cid));
 
     if (deleteIds.length > 0) {
+      await authContext.supabaseAdmin
+        .from("user_video_progress")
+        .delete()
+        .eq("course_id", id)
+        .in("video_id", deleteIds);
+
       const { error: deleteModulesError } = await authContext.supabaseAdmin
         .from("coursemodules")
         .delete()
@@ -1046,6 +1104,8 @@ export async function PUT(request: Request) {
         .update({
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
+          module_type: mod.module_type === "quiz" ? "quiz" : "video",
+          questions: Array.isArray(mod.questions) ? mod.questions : [],
           order_index: moduleOrderMap.get(mod.id) ?? null,
           ...(mod.section_id !== undefined ? { section_id: mod.section_id || null } : {}),
         })
@@ -1067,6 +1127,8 @@ export async function PUT(request: Request) {
           maincourse_id: id,
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
+          module_type: mod.module_type === "quiz" ? "quiz" : "video",
+          questions: Array.isArray(mod.questions) ? mod.questions : [],
           order_index: orderIndex > 0 ? orderIndex : null,
           ...(mod.section_id ? { section_id: mod.section_id } : {}),
         };
