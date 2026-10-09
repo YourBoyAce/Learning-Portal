@@ -78,7 +78,7 @@ export type TypographyRole = keyof TypographyScale;
 
 export const TYPOGRAPHY_CLASSES = {
   MAIN_HEADING:
-    "text-4xl md:text-main-heading font-semibold text-brand-heading mb-4 tracking-tight leading-tight",
+    "text-2xl sm:text-3xl md:text-4xl lg:text-[44px] font-semibold text-brand-heading mb-4 tracking-tight leading-tight",
   SUBHEADING:
     "text-2xl font-semibold text-brand-heading tracking-tight",
   CAPTION:
@@ -87,5 +87,5 @@ export const TYPOGRAPHY_CLASSES = {
   PRIMARY_BUTTON:
     "justify-center bg-brand-primary hover:bg-brand-hover",
   INNERHEADING:
-    "text-[11px] font-bold text-gray-500 uppercase tracking-wider"
+    "text-sm font-medium text-gray-700 capitalize tracking-wide block mb-1.5"
 } as const;

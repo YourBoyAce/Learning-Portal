@@ -533,7 +533,7 @@ export async function deleteCourseMessage(
  * Fetch all communities (courses) a user is enrolled in.
  */
 export async function getUserCommunities(accessToken: string): Promise<{
-  courses: Array<{ id: string; title: string; thumbnail_url: string | null }>;
+  courses: Array<{ id: string; title: string; description: string | null; thumbnail_url: string | null }>;
   error: string | null;
 }> {
   try {
@@ -554,7 +554,7 @@ export async function getUserCommunities(accessToken: string): Promise<{
     if (profile?.role && profile.role.toLowerCase() === "admin") {
       const { data: courses, error: courseError } = await supabaseAdmin
         .from("maincourses")
-        .select("id, title, thumbnail_url");
+        .select("id, title, description, thumbnail_url");
       if (courseError) return { courses: [], error: logError(courseError).message };
       return { courses: courses ?? [], error: null };
     }
@@ -588,7 +588,7 @@ export async function getUserCommunities(accessToken: string): Promise<{
     // Get course details
     const { data: courses, error: courseError } = await supabaseAdmin
       .from("maincourses")
-      .select("id, title, thumbnail_url")
+      .select("id, title, description, thumbnail_url")
       .in("id", courseIds);
       
     if (courseError) return { courses: [], error: logError(courseError).message };

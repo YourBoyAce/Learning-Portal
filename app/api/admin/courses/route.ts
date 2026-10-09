@@ -715,6 +715,19 @@ export async function POST(request: Request) {
     const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const authUsers = authUsersResult.data?.users ?? [];
 
+    // Resolve the Starter bundle id so newly enrolled users get the correct tier.
+    // The tier system reads bundle_name from this FK — a null bundle_id always
+    // resolves to "Starter" via the fallback string, but the JOIN fails and the
+    // feature gates stay locked.  We populate it explicitly here.
+    const { data: starterBundle } = await authContext.supabaseAdmin
+      .schema("phase2")
+      .from("bundles")
+      .select("id")
+      .ilike("bundle_name", "%starter%")
+      .limit(1)
+      .maybeSingle();
+    const starterBundleId: string | null = (starterBundle as any)?.id ?? null;
+
     const userIdsToEnroll: string[] = [];
     for (const email of assignedScholars) {
       const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
@@ -749,12 +762,13 @@ export async function POST(request: Request) {
 
       const newEnrollments = userIdsToEnroll
         .filter((id) => !existingUserIds.has(id))
-        .map((id) => ({ 
-           user_id: id, 
+        .map((id) => ({
+           user_id: id,
            course_id: newCourse.id,
+           bundle_id: starterBundleId,
            status: "active",
            access_start_date: new Date().toISOString(),
-           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
+           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
         }));
 
       if (newEnrollments.length > 0) {
@@ -1201,6 +1215,16 @@ export async function PUT(request: Request) {
     const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const authUsers = authUsersResult.data?.users ?? [];
 
+    // Resolve the Starter bundle id so the tier system can read bundle_name correctly.
+    const { data: starterBundlePut } = await authContext.supabaseAdmin
+      .schema("phase2")
+      .from("bundles")
+      .select("id")
+      .ilike("bundle_name", "%starter%")
+      .limit(1)
+      .maybeSingle();
+    const starterBundleIdPut: string | null = (starterBundlePut as any)?.id ?? null;
+
     const userIdsToEnroll: string[] = [];
     for (const email of assignedScholars) {
       const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
@@ -1234,12 +1258,13 @@ export async function PUT(request: Request) {
 
       const newEnrollments = userIdsToEnroll
         .filter((uid) => !existingUserIds.has(uid))
-        .map((uid) => ({ 
-           user_id: uid, 
+        .map((uid) => ({
+           user_id: uid,
            course_id: id,
+           bundle_id: starterBundleIdPut,
            status: "active",
            access_start_date: new Date().toISOString(),
-           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString()
+           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
         }));
 
       if (newEnrollments.length > 0) {

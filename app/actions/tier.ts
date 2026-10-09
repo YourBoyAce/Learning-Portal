@@ -63,9 +63,11 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
   }
 
   const authPlan = getAuthUserPlanFromMetadata(user);
-  if (authPlan === "starter") return "Starter";
-  if (authPlan === "pro") return "Pro";
-  if (authPlan === "premium") return "Premium";
+  let resolvedTier: UserTier = null;
+  
+  if (authPlan === "premium") resolvedTier = "Premium";
+  else if (authPlan === "pro") resolvedTier = "Pro";
+  else if (authPlan === "starter") resolvedTier = "Starter";
 
   const { data: phase2User } = await supabaseAdmin
     .schema("phase2")
@@ -84,18 +86,19 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
     .eq("status", "active")
     .order("created_at", { ascending: false });
 
-  if (!enrollments || enrollments.length === 0) return null;
-
-  let resolvedTier: UserTier = "Starter";
-  for (const enrollment of enrollments) {
-    const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter";
-    if (typeof bundleName === "string") {
-      const lowerName = bundleName.toLowerCase();
-      if (lowerName.includes("premium")) {
-        resolvedTier = "Premium";
-        break;
-      } else if (lowerName.includes("pro") && resolvedTier === "Starter") {
-        resolvedTier = "Pro";
+  if (enrollments && enrollments.length > 0) {
+    if (resolvedTier === null) resolvedTier = "Starter"; // Baseline if they have enrollments
+    for (const enrollment of enrollments) {
+      const b = enrollment.bundles as any;
+      const bundleName = Array.isArray(b) ? (b[0]?.bundle_name ?? "Starter") : (b?.bundle_name ?? "Starter");
+      if (typeof bundleName === "string") {
+        const lowerName = bundleName.toLowerCase();
+        if (lowerName.includes("premium")) {
+          resolvedTier = "Premium";
+          break; // Max possible tier
+        } else if (lowerName.includes("pro") && resolvedTier !== "Premium") {
+          resolvedTier = "Pro";
+        }
       }
     }
   }
@@ -139,9 +142,11 @@ export async function getCourseUserTier(
   }
 
   const authPlan = getAuthUserPlanFromMetadata(user);
-  if (authPlan === "starter") return "Starter";
-  if (authPlan === "pro") return "Pro";
-  if (authPlan === "premium") return "Premium";
+  let resolvedTier: UserTier = null;
+  
+  if (authPlan === "premium") resolvedTier = "Premium";
+  else if (authPlan === "pro") resolvedTier = "Pro";
+  else if (authPlan === "starter") resolvedTier = "Starter";
 
   const { data: phase2User } = await supabaseAdmin
     .schema("phase2")
@@ -152,33 +157,44 @@ export async function getCourseUserTier(
 
   const targetUserId = phase2User?.id || authUserId;
 
-  const { data: enrollment } = await supabaseAdmin
+  const { data: enrollments } = await supabaseAdmin
     .schema("phase2")
     .from("enrollments")
     .select("*, bundles(bundle_name)")
     .eq("user_id", targetUserId)
     .eq("course_id", courseId)
     .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  if (!enrollment) {
+  if (!enrollments || enrollments.length === 0) {
     const { data: courseMember } = await supabaseAdmin
       .from("course_members")
       .select("id")
       .eq("maincourse_id", courseId)
+      .eq("email", user.email)
       .eq("status", "active")
+      .limit(1)
       .maybeSingle();
 
-    return courseMember ? "Starter" : null;
+    if (courseMember && resolvedTier === null) {
+      resolvedTier = "Starter";
+    }
+  } else {
+    if (resolvedTier === null) resolvedTier = "Starter";
+    for (const enrollment of enrollments) {
+      const b = enrollment.bundles as any;
+      const bundleName = Array.isArray(b) ? (b[0]?.bundle_name ?? "Starter") : (b?.bundle_name ?? "Starter");
+      if (typeof bundleName === "string") {
+        const lowerName = bundleName.toLowerCase();
+        if (lowerName.includes("premium")) {
+          resolvedTier = "Premium";
+          break; // Max possible
+        } else if (lowerName.includes("pro") && resolvedTier !== "Premium") {
+          resolvedTier = "Pro";
+        }
+      }
+    }
   }
 
-  const bundleName: string =
-    (enrollment.bundles as any)?.bundle_name || "Starter";
-  const lower = bundleName.toLowerCase();
-
-  if (lower.includes("premium")) return "Premium";
-  if (lower.includes("pro")) return "Pro";
-  return "Starter";
+  return resolvedTier;
 }

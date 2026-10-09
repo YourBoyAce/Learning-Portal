@@ -147,7 +147,18 @@ export default function AdminCourses() {
     text: string;
   } | null>(null);
 
-  // Quiz Preview Modal State
+  // Active Question Index tracking for single-question navigation per module (key: module identifier string, value: question index number)
+  const [activeQuestionIndices, setActiveQuestionIndices] = useState<Record<string, number>>({});
+
+  const getActiveQIdx = (moduleKey: string, totalQuestions: number) => {
+    const current = activeQuestionIndices[moduleKey] ?? 0;
+    if (totalQuestions === 0) return 0;
+    return Math.min(Math.max(0, current), totalQuestions - 1);
+  };
+
+  const setActiveQIdx = (moduleKey: string, idx: number) => {
+    setActiveQuestionIndices((prev) => ({ ...prev, [moduleKey]: idx }));
+  };
   const [previewQuizData, setPreviewQuizData] = useState<{
     title: string;
     questions: ModuleQuestion[];
@@ -404,8 +415,8 @@ export default function AdminCourses() {
             questions: Array.isArray(m.questions)
               ? m.questions
               : typeof m.questions === "string"
-              ? JSON.parse(m.questions)
-              : [],
+                ? JSON.parse(m.questions)
+                : [],
             section_id: m.section_id || null,
           })),
         );
@@ -451,8 +462,8 @@ export default function AdminCourses() {
               questions: Array.isArray(m.questions)
                 ? m.questions
                 : typeof m.questions === "string"
-                ? JSON.parse(m.questions)
-                : [],
+                  ? JSON.parse(m.questions)
+                  : [],
             })),
         }));
         setCourseSections(sectionStates);
@@ -1152,7 +1163,7 @@ export default function AdminCourses() {
   ];
 
   return (
-    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -1329,7 +1340,7 @@ export default function AdminCourses() {
                       {activeCourses.map((course) => (
                         <CarouselItem
                           key={course.id}
-                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/3"
+                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/2 xl:basis-1/3"
                         >
                           <CourseCard
                             id={course.id}
@@ -1473,7 +1484,7 @@ export default function AdminCourses() {
                       placeholder="e.g. Playwright"
                       value={courseTitle}
                       onChange={(e) => setCourseTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 placeholder:text-gray-400 placeholder:font-normal font-medium"
                     />
                   </div>
                   <div>
@@ -1493,12 +1504,12 @@ export default function AdminCourses() {
                       Thumbnail
                     </label>
                     {thumbnailPreview ? (
-                      <div className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group">
+                      <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group bg-gray-50">
                         <Image
                           src={thumbnailPreview}
                           alt="Thumbnail preview"
                           fill
-                          className="object-cover"
+                          className="object-contain"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button
@@ -1756,7 +1767,7 @@ export default function AdminCourses() {
                               placeholder="New product title (e.g. Playwright)"
                               value={newProductTitle}
                               onChange={(e) => setNewProductTitle(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary placeholder:text-gray-400 placeholder:font-normal font-medium"
                             />
                             <textarea
                               placeholder="Product description (optional)"
@@ -1768,12 +1779,12 @@ export default function AdminCourses() {
                               className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
                             />
                             {newProductThumbnailPreview ? (
-                              <div className="relative w-full h-28 rounded-lg overflow-hidden border border-gray-200 group">
+                              <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group bg-gray-50">
                                 <Image
                                   src={newProductThumbnailPreview}
                                   alt="Product thumbnail"
                                   fill
-                                  className="object-cover"
+                                  className="object-contain"
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <button
@@ -2000,12 +2011,12 @@ export default function AdminCourses() {
                           Course Thumbnail
                         </label>
                         {displayThumbnail ? (
-                          <label className="relative w-full h-40 rounded-lg overflow-hidden border border-gray-200 group block cursor-pointer">
+                          <label className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group block cursor-pointer bg-gray-50">
                             <Image
                               src={displayThumbnail}
                               alt="Course Thumbnail"
                               fill
-                              className="object-cover"
+                              className="object-contain"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                               <span className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors shadow-sm">
@@ -2063,7 +2074,7 @@ export default function AdminCourses() {
                       type="date"
                       value={startDateField}
                       onChange={(e) => setStartDateField(e.target.value)}
-                      className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-semibold outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
+                      className="w-full bg-[#1682F1]/10 border border-[#1682F1]/20 rounded-xl px-4 py-3 text-sm text-[#174778] font-medium outline-none focus:border-[#1682F1] focus:ring-2 focus:ring-[#1682F1]/20 transition-all cursor-pointer"
                     />
                   </div>
 
@@ -2077,11 +2088,8 @@ export default function AdminCourses() {
                       placeholder="https://chat.whatsapp.com/..."
                       value={whatsappLink}
                       onChange={(e) => setWhatsappLink(e.target.value)}
-                      className="w-full bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl px-4 py-3 text-sm text-gray-900 font-semibold outline-none focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 transition-all placeholder:font-normal placeholder:text-gray-400"
+                      className="w-full bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl px-4 py-3 text-sm text-gray-700 font-medium outline-none focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 transition-all placeholder:font-normal placeholder:text-gray-400"
                     />
-                    <p className="mt-1.5 text-xs text-gray-400">
-                      Students will see a &ldquo;Join WhatsApp Community&rdquo; button on their course card.
-                    </p>
                   </div>
 
                   {/* Sections & Modules */}
@@ -2127,7 +2135,7 @@ export default function AdminCourses() {
                             onChange={(e) =>
                               handleSectionChange(sIdx, "title", e.target.value)
                             }
-                            className="flex-1 px-4 py-2 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white shadow-2xs"
+                            className="flex-1 px-4 py-2 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white shadow-2xs placeholder:font-normal"
                           />
                           <button
                             type="button"
@@ -2171,13 +2179,12 @@ export default function AdminCourses() {
                                       e.target.value,
                                     )
                                   }
-                                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-900 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-gray-50/40 focus:bg-white"
+                                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-gray-50/40 focus:bg-white placeholder:font-normal"
                                 />
 
                                 {/* Module Type Selector (Top Right of Module Section) */}
-                                <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1 border transition-colors ${
-                                  mod.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
-                                }`}>
+                                <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1 border transition-colors ${mod.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                                  }`}>
                                   <select
                                     value={mod.module_type || "video"}
                                     onChange={(e) =>
@@ -2217,109 +2224,171 @@ export default function AdminCourses() {
                                   {(!mod.questions || mod.questions.length === 0) ? (
                                     <div className="text-center py-3 px-2 border border-dashed border-gray-300 rounded-lg bg-white">
                                       <p className="text-xs text-gray-800 font-semibold">No questions added yet.</p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">Click &quot;Add Question&quot; to add questions for this quiz module.</p>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {mod.questions.map((q, qIdx) => (
-                                      <div key={qIdx} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
-                                        <div className="flex items-center justify-between gap-2">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                                              Question {qIdx + 1}
-                                            </span>
-                                            <select
-                                              value={q.questionType || "mc"}
-                                              onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "questionType", e.target.value)}
-                                              className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
-                                            >
-                                              <option value="mc">Multiple Choice</option>
-                                              <option value="text">Fill in the Blank (Text)</option>
-                                            </select>
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveQuestionFromModule(sIdx, mIdx, qIdx)}
-                                            className="text-gray-400 hover:text-red-600 text-xs p-1 rounded hover:bg-red-50 transition-colors"
-                                            title="Delete Question"
-                                          >
-                                            <Trash2 size={12} />
-                                          </button>
-                                        </div>
-
-                                        <input
-                                          type="text"
-                                          placeholder={`Question ${qIdx + 1} text...`}
-                                          value={q.text}
-                                          onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "text", e.target.value)}
-                                          className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
-                                        />
-
-                                        {q.questionType === "text" ? (
-                                          <div className="space-y-1 pt-1">
-                                            <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
-                                              Correct Text Answer (Fill in the Blank)
-                                            </label>
-                                            <input
-                                              type="text"
-                                              placeholder="Type the exact correct text answer (e.g. Paris)..."
-                                              value={String(q.correctAnswer ?? "")}
-                                              onChange={(e) => handleQuestionChange(sIdx, mIdx, qIdx, "correctAnswer", e.target.value)}
-                                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
-                                            />
-                                          </div>
-                                        ) : (
-                                          <div className="space-y-1.5 pt-1">
-                                            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
-                                              Options (Select radio for correct answer)
-                                            </label>
-                                            <div className="space-y-2">
-                                              {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
-                                                <div key={oIdx} className="flex items-center gap-2 w-full">
-                                                  <input
-                                                    type="radio"
-                                                    name={`correct_${sIdx}_${mIdx}_${qIdx}`}
-                                                    checked={q.correctAnswer === oIdx}
-                                                    onChange={() => handleQuestionChange(sIdx, mIdx, qIdx, "correctAnswer", oIdx)}
-                                                    className="accent-black cursor-pointer shrink-0 w-4 h-4"
-                                                    title="Mark as correct answer"
-                                                  />
-                                                  <input
-                                                    type="text"
-                                                    placeholder={`Option ${oIdx + 1}`}
-                                                    value={opt}
-                                                    onChange={(e) => handleOptionChange(sIdx, mIdx, qIdx, oIdx, e.target.value)}
-                                                    className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
-                                                      q.correctAnswer === oIdx
-                                                        ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
-                                                        : "border-gray-200 text-gray-800 bg-white"
-                                                    }`}
-                                                  />
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200 mt-2">
+                                      <p className="text-[10px] text-gray-400 mt-0.5 mb-2">Click &quot;Add Question&quot; to add questions for this quiz module.</p>
                                       <button
                                         type="button"
                                         onClick={() => handleAddQuestionToModule(sIdx, mIdx)}
-                                        className="text-gray-900 hover:bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-900 border border-gray-300 bg-white hover:bg-gray-100 transition-colors cursor-pointer shadow-2xs"
                                       >
-                                        <Plus size={11} /> Add Question
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenQuizPreview(mod.title || `Module ${mIdx + 1}`, mod.questions)}
-                                        className="text-gray-900 hover:bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
-                                      >
-                                        <Eye size={11} /> Preview Quiz
+                                        <Plus size={13} /> Add Question
                                       </button>
                                     </div>
-                                  </>
-                                  )}
+                                  ) : (() => {
+                                    const moduleKey = `sec_${sIdx}_${mIdx}`;
+                                    const totalQ = mod.questions.length;
+                                    const currentQIdx = getActiveQIdx(moduleKey, totalQ);
+                                    const q = mod.questions[currentQIdx] || mod.questions[0];
+
+                                    return (
+                                      <div className="space-y-3">
+                                        {/* Question Card */}
+                                        {q && (
+                                          <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-3 shadow-2xs">
+                                            {/* Header with question number, type, +, trash, eye */}
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                                <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 shrink-0">
+                                                  Question {currentQIdx + 1} / {totalQ}
+                                                </span>
+                                                <select
+                                                  value={q.questionType || "mc"}
+                                                  onChange={(e) => handleQuestionChange(sIdx, mIdx, currentQIdx, "questionType", e.target.value)}
+                                                  className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer shrink-0 max-w-[140px] sm:max-w-none"
+                                                >
+                                                  <option value="mc">Multiple Choice</option>
+                                                  <option value="text">Fill in the Blank (Text)</option>
+                                                </select>
+                                              </div>
+
+                                              {/* Action symbols: +, trash, eye */}
+                                              <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    handleAddQuestionToModule(sIdx, mIdx);
+                                                    setActiveQIdx(moduleKey, totalQ);
+                                                  }}
+                                                  className="p-1.5 text-gray-700 hover:text-brand-primary hover:bg-gray-100 rounded-md transition-colors border border-gray-200"
+                                                  title="Add New Question"
+                                                >
+                                                  <Plus size={14} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleOpenQuizPreview(mod.title || `Module ${mIdx + 1}`, mod.questions)}
+                                                  className="p-1.5 text-gray-700 hover:text-brand-primary hover:bg-gray-100 rounded-md transition-colors border border-gray-200"
+                                                  title="Preview Quiz"
+                                                >
+                                                  <Eye size={14} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    handleRemoveQuestionFromModule(sIdx, mIdx, currentQIdx);
+                                                    if (currentQIdx > 0) {
+                                                      setActiveQIdx(moduleKey, currentQIdx - 1);
+                                                    }
+                                                  }}
+                                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-gray-200"
+                                                  title="Delete Current Question"
+                                                >
+                                                  <Trash2 size={14} />
+                                                </button>
+                                              </div>
+                                            </div>
+
+                                            {/* Question Text Input */}
+                                            <input
+                                              type="text"
+                                              placeholder={`Question ${currentQIdx + 1} text...`}
+                                              value={q.text}
+                                              onChange={(e) => handleQuestionChange(sIdx, mIdx, currentQIdx, "text", e.target.value)}
+                                              className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
+                                            />
+
+                                            {/* Question Answers/Options */}
+                                            {q.questionType === "text" ? (
+                                              <div className="space-y-1 pt-1">
+                                                <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
+                                                  Correct Text Answer (Fill in the Blank)
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  placeholder="Type exact correct answer..."
+                                                  value={String(q.correctAnswer ?? "")}
+                                                  onChange={(e) => handleQuestionChange(sIdx, mIdx, currentQIdx, "correctAnswer", e.target.value)}
+                                                  className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="space-y-1.5 pt-1">
+                                                <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
+                                                  Options (Select radio for correct answer)
+                                                </label>
+                                                <div className="space-y-2">
+                                                  {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
+                                                    <div key={oIdx} className="flex items-center gap-2 w-full">
+                                                      <input
+                                                        type="radio"
+                                                        name={`correct_${sIdx}_${mIdx}_${currentQIdx}`}
+                                                        checked={q.correctAnswer === oIdx}
+                                                        onChange={() => handleQuestionChange(sIdx, mIdx, currentQIdx, "correctAnswer", oIdx)}
+                                                        className="accent-black cursor-pointer shrink-0 w-4 h-4"
+                                                        title="Mark as correct answer"
+                                                      />
+                                                      <input
+                                                        type="text"
+                                                        placeholder={`Option ${oIdx + 1}`}
+                                                        value={opt}
+                                                        onChange={(e) => handleOptionChange(sIdx, mIdx, currentQIdx, oIdx, e.target.value)}
+                                                        className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
+                                                          q.correctAnswer === oIdx
+                                                            ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
+                                                            : "border-gray-200 text-gray-800 bg-white"
+                                                        }`}
+                                                      />
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Question Navigation Controls Bar */}
+                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200">
+                                          <button
+                                            type="button"
+                                            disabled={currentQIdx === 0}
+                                            onClick={() => setActiveQIdx(moduleKey, currentQIdx - 1)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-800 border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                          >
+                                            Previous Question
+                                          </button>
+                                          {currentQIdx < totalQ - 1 ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveQIdx(moduleKey, currentQIdx + 1)}
+                                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-900 border border-gray-300 bg-white hover:bg-gray-100 transition-colors"
+                                            >
+                                              Next Question
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleAddQuestionToModule(sIdx, mIdx);
+                                                setActiveQIdx(moduleKey, totalQ);
+                                              }}
+                                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-primary hover:bg-brand-hover transition-colors flex items-center gap-1"
+                                            >
+                                              <Plus size={13} /> Add Question
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ) : (
                                 <textarea
@@ -2381,9 +2450,8 @@ export default function AdminCourses() {
                           />
 
                           {/* Module Type Selector */}
-                          <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs border transition-colors ${
-                            module.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
-                          }`}>
+                          <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs border transition-colors ${module.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                            }`}>
                             <select
                               value={module.module_type || "video"}
                               onChange={(e) =>
@@ -2425,107 +2493,162 @@ export default function AdminCourses() {
                                 </button>
                               </div>
                             ) : (
-                              <>
-                                {module.questions.map((q, qIdx) => (
-                                  <div key={qIdx} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                                          Question {qIdx + 1}
-                                        </span>
-                                        <select
-                                          value={q.questionType || "mc"}
-                                          onChange={(e) => handleFlatQuestionChange(index, qIdx, "questionType", e.target.value)}
-                                          className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
-                                        >
-                                          <option value="mc">Multiple Choice</option>
-                                          <option value="text">Fill in the Blank (Text)</option>
-                                        </select>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveQuestionFromFlatModule(index, qIdx)}
-                                        className="text-gray-400 hover:text-red-600 text-xs p-1 rounded hover:bg-red-50 transition-colors"
-                                        title="Delete Question"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    </div>
+                              (() => {
+                                const moduleKey = `flat_${index}`;
+                                const totalQ = module.questions.length;
+                                const currentQIdx = getActiveQIdx(moduleKey, totalQ);
+                                const q = module.questions[currentQIdx] || module.questions[0];
 
-                                    <input
-                                      type="text"
-                                      placeholder={`Question ${qIdx + 1} text...`}
-                                      value={q.text}
-                                      onChange={(e) => handleFlatQuestionChange(index, qIdx, "text", e.target.value)}
-                                      className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
-                                    />
+                                return (
+                                  <div className="space-y-3">
+                                    {/* Question Card */}
+                                    {q && (
+                                      <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-3 shadow-2xs">
+                                        {/* Header with question number, type, +, trash, eye */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                            <span className="text-[10px] font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 shrink-0">
+                                              Question {currentQIdx + 1} / {totalQ}
+                                            </span>
+                                            <select
+                                              value={q.questionType || "mc"}
+                                              onChange={(e) => handleFlatQuestionChange(index, currentQIdx, "questionType", e.target.value)}
+                                              className="text-[10px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer shrink-0 max-w-[140px] sm:max-w-none"
+                                            >
+                                              <option value="mc">Multiple Choice</option>
+                                              <option value="text">Fill in the Blank (Text)</option>
+                                            </select>
+                                          </div>
 
-                                    {q.questionType === "text" ? (
-                                      <div className="space-y-1 pt-1">
-                                        <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
-                                          Correct Text Answer (Fill in the Blank)
-                                        </label>
+                                          {/* Action symbols: +, trash, eye */}
+                                          <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleAddQuestionToFlatModule(index);
+                                                setActiveQIdx(moduleKey, totalQ);
+                                              }}
+                                              className="p-1.5 text-gray-700 hover:text-brand-primary hover:bg-gray-100 rounded-md transition-colors border border-gray-200"
+                                              title="Add New Question"
+                                            >
+                                              <Plus size={14} />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenQuizPreview(module.title || `Module ${index + 1}`, module.questions)}
+                                              className="p-1.5 text-gray-700 hover:text-brand-primary hover:bg-gray-100 rounded-md transition-colors border border-gray-200"
+                                              title="Preview Quiz"
+                                            >
+                                              <Eye size={14} />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleRemoveQuestionFromFlatModule(index, currentQIdx);
+                                                if (currentQIdx > 0) {
+                                                  setActiveQIdx(moduleKey, currentQIdx - 1);
+                                                }
+                                              }}
+                                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-gray-200"
+                                              title="Delete Current Question"
+                                            >
+                                              <Trash2 size={14} />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Question Text Input */}
                                         <input
                                           type="text"
-                                          placeholder="Type the exact correct text answer (e.g. Paris)..."
-                                          value={String(q.correctAnswer ?? "")}
-                                          onChange={(e) => handleFlatQuestionChange(index, qIdx, "correctAnswer", e.target.value)}
-                                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
+                                          placeholder={`Question ${currentQIdx + 1} text...`}
+                                          value={q.text}
+                                          onChange={(e) => handleFlatQuestionChange(index, currentQIdx, "text", e.target.value)}
+                                          className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:border-gray-900 font-medium bg-white"
                                         />
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-1.5 pt-1">
-                                        <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
-                                          Options (Select radio for correct answer)
-                                        </label>
-                                        <div className="space-y-2">
-                                          {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
-                                            <div key={oIdx} className="flex items-center gap-2 w-full">
-                                              <input
-                                                type="radio"
-                                                name={`correct_flat_${index}_${qIdx}`}
-                                                checked={q.correctAnswer === oIdx}
-                                                onChange={() => handleFlatQuestionChange(index, qIdx, "correctAnswer", oIdx)}
-                                                className="accent-black cursor-pointer shrink-0 w-4 h-4"
-                                                title="Mark as correct answer"
-                                              />
-                                              <input
-                                                type="text"
-                                                placeholder={`Option ${oIdx + 1}`}
-                                                value={opt}
-                                                onChange={(e) => handleFlatOptionChange(index, qIdx, oIdx, e.target.value)}
-                                                className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
-                                                  q.correctAnswer === oIdx
-                                                    ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
-                                                    : "border-gray-200 text-gray-800 bg-white"
-                                                }`}
-                                              />
+
+                                        {/* Question Answers/Options */}
+                                        {q.questionType === "text" ? (
+                                          <div className="space-y-1 pt-1">
+                                            <label className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider block">
+                                              Correct Text Answer (Fill in the Blank)
+                                            </label>
+                                            <input
+                                              type="text"
+                                              placeholder="Type exact correct answer..."
+                                              value={String(q.correctAnswer ?? "")}
+                                              onChange={(e) => handleFlatQuestionChange(index, currentQIdx, "correctAnswer", e.target.value)}
+                                              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-xs font-semibold text-gray-900 bg-gray-50 focus:outline-none focus:border-gray-900"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-1.5 pt-1">
+                                            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider block">
+                                              Options (Select radio for correct answer)
+                                            </label>
+                                            <div className="space-y-2">
+                                              {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
+                                                <div key={oIdx} className="flex items-center gap-2 w-full">
+                                                  <input
+                                                    type="radio"
+                                                    name={`correct_flat_${index}_${currentQIdx}`}
+                                                    checked={q.correctAnswer === oIdx}
+                                                    onChange={() => handleFlatQuestionChange(index, currentQIdx, "correctAnswer", oIdx)}
+                                                    className="accent-black cursor-pointer shrink-0 w-4 h-4"
+                                                    title="Mark as correct answer"
+                                                  />
+                                                  <input
+                                                    type="text"
+                                                    placeholder={`Option ${oIdx + 1}`}
+                                                    value={opt}
+                                                    onChange={(e) => handleFlatOptionChange(index, currentQIdx, oIdx, e.target.value)}
+                                                    className={`flex-1 min-w-0 w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none transition-colors ${
+                                                      q.correctAnswer === oIdx
+                                                        ? "border-gray-900 bg-gray-100 font-semibold text-gray-900"
+                                                        : "border-gray-200 text-gray-800 bg-white"
+                                                    }`}
+                                                  />
+                                                </div>
+                                              ))}
                                             </div>
-                                          ))}
-                                        </div>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
-                                  </div>
-                                ))}
 
-                                {/* Bottom Actions Bar at end of last question */}
-                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAddQuestionToFlatModule(index)}
-                                    className="text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
-                                  >
-                                    <Plus size={13} /> Add Question
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenQuizPreview(module.title || `Module ${index + 1}`, module.questions)}
-                                    className="text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-gray-300 bg-white shadow-2xs cursor-pointer"
-                                  >
-                                    <Eye size={13} /> Preview Quiz
-                                  </button>
-                                </div>
-                              </>
+                                    {/* Question Navigation Controls Bar */}
+                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200">
+                                      <button
+                                        type="button"
+                                        disabled={currentQIdx === 0}
+                                        onClick={() => setActiveQIdx(moduleKey, currentQIdx - 1)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-800 border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                      >
+                                        Previous Question
+                                      </button>
+                                      {currentQIdx < totalQ - 1 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveQIdx(moduleKey, currentQIdx + 1)}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-900 border border-gray-300 bg-white hover:bg-gray-100 transition-colors"
+                                        >
+                                          Next Question
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleAddQuestionToFlatModule(index);
+                                            setActiveQIdx(moduleKey, totalQ);
+                                          }}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-primary hover:bg-brand-hover transition-colors flex items-center gap-1"
+                                        >
+                                          <Plus size={13} /> Add Question
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()
                             )}
                           </div>
                         ) : (
@@ -2546,8 +2669,8 @@ export default function AdminCourses() {
                       </div>
                     ))}
                     {courseSections.length === 0 && modules.length === 0 && (
-                      <p className="text-xs text-gray-400 italic">
-                        No sections or modules yet. Add a section to organize your content.
+                      <p className="text-xs text-gray-400 font-light">
+                        No sections or modules yet.
                       </p>
                     )}
                   </div>
@@ -2765,15 +2888,13 @@ export default function AdminCourses() {
                                 }
                               }}
                               disabled={previewIsSubmitted}
-                              className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 text-base sm:text-lg transition-all flex items-center gap-4 cursor-pointer ${
-                                isSelected
-                                  ? "border-brand-primary bg-brand-primary/5 text-brand-primary font-bold shadow-sm"
-                                  : "border-gray-200 hover:border-gray-300 text-gray-800 bg-white hover:bg-gray-50/80"
-                              }`}
+                              className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 text-base sm:text-lg transition-all flex items-center gap-4 cursor-pointer ${isSelected
+                                ? "border-brand-primary bg-brand-primary/5 text-brand-primary font-bold shadow-sm"
+                                : "border-gray-200 hover:border-gray-300 text-gray-800 bg-white hover:bg-gray-50/80"
+                                }`}
                             >
-                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                                isSelected ? "border-brand-primary bg-brand-primary text-white" : "border-gray-300"
-                              }`}>
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? "border-brand-primary bg-brand-primary text-white" : "border-gray-300"
+                                }`}>
                                 {isSelected && <Check size={14} className="stroke-[3]" />}
                               </div>
                               <span className="font-semibold">{opt || `Option ${oIdx + 1}`}</span>
@@ -2785,18 +2906,17 @@ export default function AdminCourses() {
 
                     {/* Feedback box if submitted */}
                     {previewIsSubmitted && (
-                      <div className={`p-5 rounded-2xl text-sm sm:text-base font-semibold border-2 animate-in fade-in duration-150 ${
-                        (() => {
-                          const q = previewQuizData.questions[previewQIdx];
-                          let isCorrect = false;
-                          if (q?.questionType === "text") {
-                            isCorrect = String(previewSelectedAnswer || "").trim().toLowerCase() === String(q.correctAnswer || "").trim().toLowerCase();
-                          } else {
-                            isCorrect = Number(previewSelectedAnswer) === Number(q.correctAnswer);
-                          }
-                          return isCorrect ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-red-50 text-red-900 border-red-300";
-                        })()
-                      }`}>
+                      <div className={`p-5 rounded-2xl text-sm sm:text-base font-semibold border-2 animate-in fade-in duration-150 ${(() => {
+                        const q = previewQuizData.questions[previewQIdx];
+                        let isCorrect = false;
+                        if (q?.questionType === "text") {
+                          isCorrect = String(previewSelectedAnswer || "").trim().toLowerCase() === String(q.correctAnswer || "").trim().toLowerCase();
+                        } else {
+                          isCorrect = Number(previewSelectedAnswer) === Number(q.correctAnswer);
+                        }
+                        return isCorrect ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-red-50 text-red-900 border-red-300";
+                      })()
+                        }`}>
                         {(() => {
                           const q = previewQuizData.questions[previewQIdx];
                           let isCorrect = false;

@@ -35,10 +35,12 @@ import {
   FileText,
   Image as ImageIcon,
   AtSign,
+  ArrowLeft,
 } from "lucide-react";
 
 interface CommunityChatPanelProps {
   courseId: string;
+  onBack?: () => void;
 }
 
 // ─── Timestamp formatter ──────────────────────────────────────────────────────
@@ -411,7 +413,7 @@ function FilePreviewChip({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps) {
+export default function CommunityChatPanel({ courseId, onBack }: CommunityChatPanelProps) {
   const [userId, setUserId] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
   const [accessToken, setAccessToken] = useState<string>("");
@@ -900,7 +902,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
   if (loadingInitial) {
     return (
       <div className="flex flex-col flex-1 min-h-0 bg-white">
-        <ChatHeader />
+        <ChatHeader onBack={onBack} />
         <CommunityChatSkeleton />
       </div>
     );
@@ -909,7 +911,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
   if (!isEnrolled) {
     return (
       <div className="flex flex-col flex-1 min-h-0 bg-white">
-        <ChatHeader />
+        <ChatHeader onBack={onBack} />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-gray-50/50">
           <div className="text-center max-w-xs">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -931,7 +933,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
   if (error) {
     return (
       <div className="flex flex-col flex-1 min-h-0 bg-white">
-        <ChatHeader />
+        <ChatHeader onBack={onBack} />
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <div className="text-center max-w-xs">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -971,7 +973,7 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white">
-      <ChatHeader messageCount={messages.length} />
+      <ChatHeader messageCount={messages.length} onBack={onBack} />
 
       {/* Message list */}
       <div
@@ -1176,18 +1178,28 @@ export default function CommunityChatPanel({ courseId }: CommunityChatPanelProps
 
 // ─── Chat header ──────────────────────────────────────────────────────────────
 
-function ChatHeader({ messageCount }: { messageCount?: number }) {
+function ChatHeader({ messageCount, onBack }: { messageCount?: number; onBack?: () => void }) {
   return (
-    <div className="shrink-0 p-4 border-b border-gray-50 bg-gray-50/10 text-left">
-      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-0.5 flex items-center gap-2">
-        <MessageSquare size={12} />
-        Community
-      </h3>
-      <p className="text-[11px] text-gray-400">
-        {messageCount !== undefined && messageCount > 0
-          ? `${messageCount} message${messageCount === 1 ? "" : "s"} — ask questions, share insights, connect with peers.`
-          : "Ask questions, share insights, and connect with your peers."}
-      </p>
+    <div className="shrink-0 p-4 border-b border-gray-50 bg-gray-50/10 text-left flex items-start">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="md:hidden mr-3 mt-0.5 p-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-50 transition-colors shrink-0"
+        >
+          <ArrowLeft size={16} className="text-gray-600" />
+        </button>
+      )}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-0.5 flex items-center gap-2">
+          <MessageSquare size={12} />
+          Community
+        </h3>
+        <p className="text-[11px] text-gray-400">
+          {messageCount !== undefined && messageCount > 0
+            ? `${messageCount} message${messageCount === 1 ? "" : "s"} — ask questions, share insights, connect with peers.`
+            : "Ask questions, share insights, and connect with your peers."}
+        </p>
+      </div>
     </div>
   );
 }

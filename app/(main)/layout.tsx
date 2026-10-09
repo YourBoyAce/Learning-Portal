@@ -138,16 +138,27 @@ function MainLayoutContent({
 
   const isMentor = role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
 
-  const navItems = [
-    {
+  const navItems = [];
+  
+  if (isMentor) {
+    navItems.push({
+      label: "Dashboard",
+      href: "/mentor",
+      active: pathname === "/mentor" || pathname.startsWith("/mentor/"),
+      icon: pathname === "/mentor" || pathname.startsWith("/mentor/")
+        ? ICONS.DASHBOARDLIGHT
+        : ICONS.DASHBOARD,
+    });
+  } else {
+    navItems.push({
       label: "Dashboard",
       href: "/dashboard",
       active: pathname === "/dashboard",
       icon: pathname === "/dashboard"
         ? ICONS.DASHBOARDLIGHT
         : ICONS.DASHBOARD,
-    },
-  ];
+    });
+  }
 
   // Add student-only tabs if user is not a mentor
   if (!isMentor) {
@@ -213,14 +224,8 @@ function MainLayoutContent({
       : ICONS.USERS,
   });
 
-  // If user is admin or instructor, append the Mentor Dashboard page
+  // If user is admin or instructor, append the Mentor-specific pages (Dashboard is already added at the top)
   if (isMentor) {
-    navItems.push({
-      label: "Mentor Dashboard",
-      href: "/mentor",
-      active: pathname === "/mentor" || pathname.startsWith("/mentor/"),
-      icon: ICONS.CALENDAR,
-    });
     navItems.push({
       label: "Invites",
       href: "/invites",

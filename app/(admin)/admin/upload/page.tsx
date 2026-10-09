@@ -9,6 +9,13 @@ import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import { Modal } from "@/components/ui/modal";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { createCourseModule, createCourseSection } from "@/app/actions/admin-courses";
 
 type Course = {
@@ -715,7 +722,7 @@ export default function UploadPage() {
               <div className="text-2xl font-bold text-gray-900">
                 {activeCourses.length}
               </div>
-              <div className="text-xs text-gray-500 font-medium">
+              <div className="text-xs text-gray-500 font-medium whitespace-nowrap">
                 Total Active Courses
               </div>
             </div>
@@ -733,53 +740,54 @@ export default function UploadPage() {
           </div>
         )}
 
-        {/* Main Content - 2 Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Left Panel - Upload Form */}
-          <div className="lg:col-span-1 space-y-6 min-w-0">
+        {/* Main Content - 1 Column Layout */}
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          {/* Top Panel - Upload Form */}
+          <div className="space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>
                 Upload New Video
               </h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
-                {/* Select Product */}
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Select Product
-                  </label>
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                      !selectedProductId ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                    style={{
-                      fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                      lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                      fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                    }}
-                  >
-                    <option value="" className="text-gray-400">
-                      Select product...
-                    </option>
-                    {products.map((product) => (
-                      <option
-                        key={product.id}
-                        value={String(product.id)}
-                        className="text-gray-900"
-                      >
-                        {product.title}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Select Product */}
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Select Product
+                    </label>
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                      className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
+                        !selectedProductId ? "!text-gray-400" : "!text-gray-900"
+                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                      style={{
+                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                      }}
+                    >
+                      <option value="" className="text-gray-400">
+                        Select product...
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {products.map((product) => (
+                        <option
+                          key={product.id}
+                          value={String(product.id)}
+                          className="text-gray-900"
+                        >
+                          {product.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Select Course */}
-                <div>
-                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                    Select Course
-                  </label>
+                  {/* Select Course */}
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Select Course
+                    </label>
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
@@ -811,10 +819,12 @@ export default function UploadPage() {
                     ))}
                   </select>
                 </div>
+                </div>
 
-                {/* Select Section */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Select Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
                     <label
                       className={TYPOGRAPHY_CLASSES.INNERHEADING + " !mb-0"}
                     >
@@ -926,6 +936,7 @@ export default function UploadPage() {
                     ))}
                   </select>
                 </div>
+                </div>
 
                 {/* Module Thumbnail Section (Before Video) */}
                 <div>
@@ -1029,53 +1040,61 @@ export default function UploadPage() {
             </div>
           </div>
 
-          {/* Right Panel - Active Curriculum */}
-          <div className="lg:col-span-2 min-w-0">
+          {/* Right Panel - Active Courses */}
+          <div className="min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                  Active Curriculum
+                  Active Courses
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-                {isCoursesLoading && (
-                  <p className="text-sm text-gray-500 col-span-2">
-                    Loading courses...
-                  </p>
-                )}
-
-                {!isCoursesLoading && activeCourses.length === 0 && (
-                  <p className="text-sm text-gray-500 col-span-2">
-                    No active courses yet. Create an active course to get
-                    started.
-                  </p>
-                )}
-
-                {activeCourses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    id={course.id}
-                    title={course.title}
-                    description={course.description}
-                    thumbnail={course.thumbnail_url}
-                    batchName={course.batch_name}
-                    courseStatus="active"
-                    variant="admin"
-                    showProgress={false}
-                    onEdit={() =>
-                      router.push(
-                        `/admin/courses?action=edit&courseId=${encodeURIComponent(String(course.id))}`,
-                      )
-                    }
-                    onDelete={() =>
-                      router.push(
-                        `/admin/courses?action=delete&courseId=${encodeURIComponent(String(course.id))}`,
-                      )
-                    }
-                  />
-                ))}
-              </div>
+              {isCoursesLoading ? (
+                <p className="text-sm text-gray-500">Loading courses...</p>
+              ) : activeCourses.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No active courses yet. Create an active course to get started.
+                </p>
+              ) : (
+                <div className="relative px-2 sm:px-0">
+                  <Carousel
+                    opts={{ align: "start", dragFree: true }}
+                    className="w-full relative"
+                  >
+                    <CarouselContent className="-ml-4 pb-2">
+                      {activeCourses.map((course) => (
+                        <CarouselItem
+                          key={course.id}
+                          className="pl-4 basis-full sm:basis-1/2 md:basis-1/2 lg:basis-1/2 xl:basis-1/2"
+                        >
+                          <CourseCard
+                            id={course.id}
+                            title={course.title}
+                            description={course.description}
+                            thumbnail={course.thumbnail_url}
+                            batchName={course.batch_name}
+                            courseStatus="active"
+                            variant="admin"
+                            showProgress={false}
+                            onEdit={() =>
+                              router.push(
+                                `/admin/courses?action=edit&courseId=${encodeURIComponent(String(course.id))}`,
+                              )
+                            }
+                            onDelete={() =>
+                              router.push(
+                                `/admin/courses?action=delete&courseId=${encodeURIComponent(String(course.id))}`,
+                              )
+                            }
+                          />
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="flex -left-3 sm:-left-4 w-8 h-8 bg-white border border-gray-200 shadow hover:bg-gray-50 z-10" />
+                    <CarouselNext className="flex -right-3 sm:-right-4 w-8 h-8 bg-white border border-gray-200 shadow hover:bg-gray-50 z-10" />
+                  </Carousel>
+                </div>
+              )}
             </div>
           </div>
         </div>

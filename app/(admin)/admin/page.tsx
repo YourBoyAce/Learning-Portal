@@ -278,7 +278,7 @@ export default function AdminDashboard() {
                                 }}
                                 className="text-brand-heading"
                               >
-                                {user.full_name || "Unknown"}
+                                {user.full_name || user.email?.split("@")[0] || "Unknown"}
                               </span>
                               <span className={TYPOGRAPHY_CLASSES.CAPTION}>
                                 {user.email}
@@ -329,7 +329,7 @@ export default function AdminDashboard() {
               </h2>
               <button
                 onClick={() => router.push("/admin/courses")}
-                className="text-sm text-brand-primary font-medium hover:underline"
+                className="hidden sm:block text-sm text-brand-primary font-medium hover:underline"
               >
                 View Catalog
               </button>
@@ -372,10 +372,19 @@ export default function AdminDashboard() {
                       </CarouselItem>
                     ))}
                   </CarouselContent>
-                  <CarouselPrevious className="hidden sm:flex -left-4 w-8 h-8" />
-                  <CarouselNext className="hidden sm:flex -right-4 w-8 h-8" />
+                  <CarouselPrevious className="flex -left-2 sm:-left-4 w-8 h-8 bg-white" />
+                  <CarouselNext className="flex -right-2 sm:-right-4 w-8 h-8 bg-white" />
                 </Carousel>
               )}
+              
+              <div className="mt-4 sm:hidden flex justify-center">
+                <button
+                  onClick={() => router.push("/admin/courses")}
+                  className="text-sm text-brand-primary font-medium hover:underline"
+                >
+                  View Catalog
+                </button>
+              </div>
             </div>
           </div>
         </div>

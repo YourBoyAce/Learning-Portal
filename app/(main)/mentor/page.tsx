@@ -6,8 +6,11 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/app/components/UserAvatar";
-import { Calendar, Mail, Loader2, Sparkles, CheckCircle2, AlertCircle, ExternalLink, ShieldAlert } from "lucide-react";
+import { Calendar, Mail, Loader2, Sparkles, CheckCircle2, AlertCircle, ExternalLink, ShieldAlert, BookOpen } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
+import { getUserCommunities } from "@/app/actions/community-chat";
+import CourseCard from "@/app/components/course/CourseCard";
+import { useRouter } from "next/navigation";
 
 interface UserProfile {
   id: string;
@@ -24,6 +27,8 @@ export default function MentorDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [mentorCourses, setMentorCourses] = useState<any[]>([]);
+  const router = useRouter();
 
   // Form states
   const [calLink, setCalLink] = useState("");
@@ -50,9 +55,10 @@ export default function MentorDashboardPage() {
     async function loadProfile() {
       try {
         setLoading(true);
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { data: { session }, error: authError } = await supabase.auth.getSession();
+        const user = session?.user;
 
-        if (authError || !user) {
+        if (authError || !user || !session) {
           throw new Error("User session not found.");
         }
 
@@ -63,6 +69,12 @@ export default function MentorDashboardPage() {
           .single();
 
         if (profileError) throw profileError;
+        
+        // Fetch mentor's courses
+        const { courses, error: coursesError } = await getUserCommunities(session.access_token);
+        if (!coursesError) {
+          setMentorCourses(courses || []);
+        }
 
         if (profile) {
           const loadedProfile: UserProfile = {
@@ -184,14 +196,39 @@ export default function MentorDashboardPage() {
         <div className="border-b border-gray-100 pb-6 text-left">
           <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2.5`}>
             <Calendar className="w-7 h-7 text-brand-primary" />
-            Mentor Dashboard
+            Dashboard
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Manage your scheduling configuration, bio, and expertise shown to students in Mentor Connect.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Mentor Courses Section */}
+        {mentorCourses.length > 0 && (
+          <div className="space-y-4 text-left">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-brand-primary" />
+              Your Courses
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {mentorCourses.map((course) => (
+                <div key={course.id} className="h-full">
+                  <CourseCard
+                    id={course.id}
+                    title={course.title}
+                    description={course.description || undefined}
+                    thumbnail={course.thumbnail_url || undefined}
+                    variant="user"
+                    showProgress={false}
+                    onClick={() => router.push(`/courses/${course.id}`)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-4">
           
           {/* Left Column: Settings Form */}
           <div className="lg:col-span-7 bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm text-left space-y-6">

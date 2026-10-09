@@ -14,6 +14,7 @@ import {
   X,
   PlusCircle,
   Layers,
+  MoreVertical,
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -94,6 +95,10 @@ export default function AdminQuizzes() {
   const [isSavingQuiz, setIsSavingQuiz] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+
+  // Action Menu & Details Modal State
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [viewingDetailsQuiz, setViewingDetailsQuiz] = useState<Quiz | null>(null);
 
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
@@ -424,54 +429,189 @@ export default function AdminQuizzes() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    {["Quiz Title", "Course", "Questions", "Passing Score", "Attempts", "Avg Score", "Status", "Actions"].map((h) => (
-                      <th key={h} className={`${TYPOGRAPHY_CLASSES.INNERHEADING} px-4 py-3 text-left`}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredQuizzes.map((quiz) => (
-                    <tr key={quiz.id} className="hover:bg-gray-50/30 transition-colors">
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.title}</td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">
-                        <span className="flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-gray-400" />
-                          {quiz.courseName}
-                        </span>
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.questionsCount}</td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.passingScore}%</td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">{quiz.attemptsCount}</td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500">
-                        {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${quiz.status === "Active"
-                          ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-                          : "bg-gray-50 border-gray-200 text-gray-500"
-                          }`}>
-                          {quiz.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button onClick={() => handleEdit(quiz)} className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0" title="Edit Quiz">
-                            <Pencil className="w-4 h-4 text-primary" />
-                          </Button>
-                          <Button onClick={() => handleDeleteClick(quiz)} className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0" title="Delete Quiz">
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </td>
+          <div className="space-y-4">
+            {/* MOBILE CARD VIEW (< md) */}
+            <div className="block md:hidden space-y-4">
+              {filteredQuizzes.map((quiz) => (
+                <div
+                  key={quiz.id}
+                  onClick={() => setViewingDetailsQuiz(quiz)}
+                  className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm relative cursor-pointer hover:border-brand-primary/30 transition-all space-y-2"
+                >
+                  {/* Top Row: Quiz Title & Status + 3 Dots Button */}
+                  <div className="flex items-start justify-between pr-10">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-gray-900">
+                        {quiz.title}
+                      </h4>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          quiz.status === "Active"
+                            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                            : "bg-gray-50 border-gray-200 text-gray-500"
+                        }`}
+                      >
+                        {quiz.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Course Name in light text below title */}
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                    <Layers className="w-3.5 h-3.5 text-gray-400" />
+                    <span>{quiz.courseName}</span>
+                  </div>
+
+                  {/* Top Right Corner 3 Dots Action Menu Button */}
+                  <div
+                    className="absolute top-3 right-3 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() =>
+                        setOpenActionMenuId(
+                          openActionMenuId === quiz.id ? null : quiz.id,
+                        )
+                      }
+                      className="p-1.5 text-gray-400 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors"
+                      title="Actions"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    {openActionMenuId === quiz.id && (
+                      <div className="absolute right-0 top-8 w-36 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-1 overflow-hidden text-left">
+                        <button
+                          onClick={() => {
+                            setOpenActionMenuId(null);
+                            handleEdit(quiz);
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center gap-2 font-medium"
+                        >
+                          <Pencil size={14} className="text-brand-primary" />
+                          Edit Quiz
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenActionMenuId(null);
+                            handleDeleteClick(quiz);
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2 font-semibold border-t border-gray-100"
+                        >
+                          <Trash2 size={14} className="text-red-600" />
+                          Delete Quiz
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* DESKTOP TABLE VIEW (md+) */}
+            <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      {[
+                        "Quiz Title",
+                        "Course",
+                        "Questions",
+                        "Passing Score",
+                        "Attempts",
+                        "Avg Score",
+                        "Status",
+                        "Actions",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-700 capitalize tracking-wide"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredQuizzes.map((quiz) => (
+                      <tr
+                        key={quiz.id}
+                        className="hover:bg-gray-50/30 transition-colors"
+                      >
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-900">
+                          {quiz.title}
+                        </td>
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-500">
+                          <span className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-gray-400" />
+                            {quiz.courseName}
+                          </span>
+                        </td>
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-500">
+                          {quiz.questionsCount}
+                        </td>
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-500">
+                          {quiz.passingScore}%
+                        </td>
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-500">
+                          {quiz.attemptsCount}
+                        </td>
+                        <td className="text-sm p-4 pl-6 font-medium text-gray-500">
+                          {quiz.attemptsCount > 0 ? `${quiz.averageScore}%` : "—"}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
+                              quiz.status === "Active"
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                                : "bg-gray-50 border-gray-200 text-gray-500"
+                            }`}
+                          >
+                            {quiz.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right pr-6 relative">
+                          <button
+                            onClick={() =>
+                              setOpenActionMenuId(
+                                openActionMenuId === quiz.id ? null : quiz.id,
+                              )
+                            }
+                            className="p-1.5 text-gray-400 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors"
+                            title="Actions"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          {openActionMenuId === quiz.id && (
+                            <div className="absolute right-6 top-12 w-36 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-1 overflow-hidden text-left">
+                              <button
+                                onClick={() => {
+                                  setOpenActionMenuId(null);
+                                  handleEdit(quiz);
+                                }}
+                                className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center gap-2 font-medium"
+                              >
+                                <Pencil size={14} className="text-brand-primary" />
+                                Edit Quiz
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setOpenActionMenuId(null);
+                                  handleDeleteClick(quiz);
+                                }}
+                                className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2 font-semibold border-t border-gray-100"
+                              >
+                                <Trash2 size={14} className="text-red-600" />
+                                Delete Quiz
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -791,6 +931,101 @@ export default function AdminQuizzes() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- QUIZ DETAILS MODAL FOR MOBILE CARD CLICK --- */}
+      {viewingDetailsQuiz && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  {viewingDetailsQuiz.title}
+                </h3>
+                <p className="text-xs text-gray-400 font-medium flex items-center gap-1.5 mt-0.5">
+                  <Layers className="w-3.5 h-3.5 text-gray-400" />
+                  {viewingDetailsQuiz.courseName}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingDetailsQuiz(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-xs font-semibold text-gray-500">Status</span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                    viewingDetailsQuiz.status === "Active"
+                      ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                      : "bg-gray-50 border-gray-200 text-gray-500"
+                  }`}
+                >
+                  {viewingDetailsQuiz.status}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-xs font-semibold text-gray-500">Total Questions</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {viewingDetailsQuiz.questionsCount}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-xs font-semibold text-gray-500">Passing Score</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {viewingDetailsQuiz.passingScore}%
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-b border-gray-50">
+                <span className="text-xs font-semibold text-gray-500">Total Attempts</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {viewingDetailsQuiz.attemptsCount}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2">
+                <span className="text-xs font-semibold text-gray-500">Average Score</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {viewingDetailsQuiz.attemptsCount > 0 ? `${viewingDetailsQuiz.averageScore}%` : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">
+              <Button
+                onClick={() => {
+                  const target = viewingDetailsQuiz;
+                  setViewingDetailsQuiz(null);
+                  handleEdit(target);
+                }}
+                className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1.5 text-brand-primary" />
+                Edit Quiz
+              </Button>
+              <Button
+                onClick={() => {
+                  const target = viewingDetailsQuiz;
+                  setViewingDetailsQuiz(null);
+                  handleDeleteClick(target);
+                }}
+                className="px-4 py-2 text-xs font-semibold bg-red-600 text-white hover:bg-red-700"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                Delete Quiz
+              </Button>
             </div>
           </div>
         </div>

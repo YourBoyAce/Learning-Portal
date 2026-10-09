@@ -6,6 +6,7 @@ import UserCommunitySidebar, { CommunityCourse } from "./UserCommunitySidebar";
 import CommunityChatPanel from "../courses/[id]/components/CommunityChatPanel";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
+import { ArrowLeft } from "lucide-react";
 
 export default function UserCommunitiesPage() {
     const searchParams = useSearchParams();
@@ -14,10 +15,10 @@ export default function UserCommunitiesPage() {
     const { isLoading: isTierLoading, canAccess } = useSecurityGatedData();
 
     return (
-        <div className="p-4 h-full">
-            <div className="flex h-full bg-white rounded-2xl overflow-hidden border">
+        <div className="p-0 md:p-4 h-full">
+            <div className="flex h-full md:bg-white md:rounded-2xl overflow-hidden md:border">
                 {/* LEFT SIDEBAR */}
-                <div className="w-[340px] border-r bg-[#fafafa]">
+                <div className={`w-full md:w-[340px] border-r bg-[#fafafa] flex-shrink-0 ${selectedCourse ? 'hidden md:block' : 'block'}`}>
                     <UserCommunitySidebar
                         selectedCourse={selectedCourse}
                         onSelectCourse={setSelectedCourse}
@@ -26,7 +27,7 @@ export default function UserCommunitiesPage() {
                 </div>
 
                 {/* RIGHT CHAT */}
-                <div className="flex-1 flex flex-col relative overflow-hidden">
+                <div className={`flex-1 flex-col relative overflow-hidden bg-white ${selectedCourse ? 'flex' : 'hidden md:flex'}`}>
                     {!isTierLoading && !canAccess("Chat") ? (
                         <div className="flex flex-1 items-center justify-center p-6 bg-[#fcfcfc]">
                             <UpgradeRequired
@@ -40,6 +41,7 @@ export default function UserCommunitiesPage() {
                             <CommunityChatPanel 
                                 key={selectedCourse.id}
                                 courseId={selectedCourse.id}
+                                onBack={() => setSelectedCourse(null)}
                             />
                         </div>
                     ) : (

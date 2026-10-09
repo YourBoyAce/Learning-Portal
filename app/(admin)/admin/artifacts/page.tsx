@@ -18,6 +18,8 @@ import {
   FileArchive,
   BarChart3,
   CheckCircle2,
+  MoreVertical,
+  Download,
 } from "lucide-react";
 import { supabase } from "@/app/lib/supabase";
 
@@ -110,6 +112,10 @@ export default function AdminArtifacts() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Menu Dropdown State & Details Modal State
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [viewingDetailsArtifact, setViewingDetailsArtifact] = useState<Artifact | null>(null);
+
   // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] =
     useState(false);
@@ -119,6 +125,14 @@ export default function AdminArtifacts() {
 
   const [selectedProductId, setSelectedProductId] = useState<string | number>("");
   const [products, setProducts] = useState<Product[]>([]);
+
+  const handleDownload = (art: Artifact) => {
+    if (!art.fileUrl) {
+      showToast("Download URL not available for this artifact.");
+      return;
+    }
+    window.open(art.fileUrl, "_blank");
+  };
 
   // Courses
   const [dbCourses, setDbCourses] = useState<
@@ -715,108 +729,224 @@ export default function AdminArtifacts() {
             </Button>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      File Details
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Course
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Size
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Downloads
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Uploaded
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Status
-                    </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredArtifacts.map((art) => (
-                    <tr
-                      key={art.id}
-                      className="hover:bg-gray-50/30 transition-colors group"
-                    >
-                      <td className="p-4 pl-6 max-w-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gray-50 rounded-xl shrink-0">
-                            {getFileIcon(art.type)}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-sm p-4 pl-1 font-medium text-gray-500 leading-tight">
-                              {art.name}
-                            </h4>
-                            <p className="text-xs text-gray-400 truncate mt-0.5">
-                              {art.description || "No description provided."}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-500 text-sm">
-                        <span className="flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-gray-400" />
-                          {art.courseName}
-                        </span>
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {art.size}
-                      </td>
-                      <td className="p-4 text-sm text-gray-500 text-center">
-                        {art.downloadsCount}
-                      </td>
-                      <td className="text-sm p-4 pl-6 font-medium text-gray-500 leading-tight mb-1">
-                        {new Date(art.uploadDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="p-4 text-center">
+          <>
+            {/* Mobile Card Layout (320px to 767px) */}
+            <div className="block md:hidden space-y-3">
+              {filteredArtifacts.map((art) => (
+                <div
+                  key={art.id}
+                  onClick={() => setViewingDetailsArtifact(art)}
+                  className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs relative space-y-3 cursor-pointer hover:border-brand-primary transition-all group"
+                >
+                  {/* Top Row: File Name & Status + 3 Dots Action Menu */}
+                  <div className="flex items-start justify-between gap-3 pr-8">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 bg-gray-50 rounded-xl shrink-0 group-hover:bg-blue-50 transition-colors">
+                        {getFileIcon(art.type)}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-gray-900 leading-snug truncate">
+                          {art.name}
+                        </h4>
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${art.status === "Published"
-                            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-                            : "bg-gray-50 border-gray-200 text-gray-500"
-                            }`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border mt-1 ${
+                            art.status === "Published"
+                              ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                              : "bg-gray-50 border-gray-200 text-gray-500"
+                          }`}
                         >
                           {art.status}
                         </span>
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            onClick={() => handleEdit(art)}
-                            className="h-8 w-8 bg-white hover:bg-blue-100 justify-center p-0"
-                            title="Edit Artifact"
-                          >
-                            <Pencil className="w-4 text-primary h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteClick(art)}
-                            className="h-8 w-8 bg-white hover:bg-red-100 justify-center p-0"
-                            title="Delete Artifact"
-                          >
-                            <Trash2 className="w-4 text-red-600 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3 Dots Menu Button Top Right */}
+                  <div className="absolute top-3.5 right-3.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingDetailsArtifact(art);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                      title="View Details & Actions"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Course Name (Light text) */}
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600 pt-0.5">
+                    <Layers className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span className="truncate">{art.courseName}</span>
+                  </div>
+
+                  {/* Uploaded Date (Lighter text) & Meta details */}
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+                    <span>
+                      Uploaded:{" "}
+                      {new Date(art.uploadDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span>{art.size}</span>
+                      <span>•</span>
+                      <span>{art.downloadsCount} downloads</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+
+            {/* Desktop Table Layout (768px+) */}
+            <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th className="px-6 py-3.5 text-left">
+                        File Details
+                      </th>
+                      <th className="px-4 py-3.5 text-left">
+                        Course
+                      </th>
+                      <th className="px-4 py-3.5 text-left">
+                        Size
+                      </th>
+                      <th className="px-4 py-3.5 text-center">
+                        Downloads
+                      </th>
+                      <th className="px-4 py-3.5 text-left">
+                        Uploaded
+                      </th>
+                      <th className="px-4 py-3.5 text-center">
+                        Status
+                      </th>
+                      <th className="px-6 py-3.5 text-right">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredArtifacts.map((art) => (
+                      <tr
+                        key={art.id}
+                        className="hover:bg-gray-50/30 transition-colors group"
+                      >
+                        <td className="p-4 pl-6 max-w-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-50 rounded-xl shrink-0">
+                              {getFileIcon(art.type)}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-semibold text-gray-800 leading-tight truncate">
+                                {art.name}
+                              </h4>
+                              <p className="text-xs text-gray-400 truncate mt-0.5">
+                                {art.description || "No description provided."}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4 text-gray-600 text-sm">
+                          <span className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate">{art.courseName}</span>
+                          </span>
+                        </td>
+                        <td className="text-sm p-4 font-medium text-gray-600">
+                          {art.size}
+                        </td>
+                        <td className="p-4 text-sm text-gray-600 text-center font-medium">
+                          {art.downloadsCount}
+                        </td>
+                        <td className="text-sm p-4 font-medium text-gray-600">
+                          {new Date(art.uploadDate).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${art.status === "Published"
+                              ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                              : "bg-gray-50 border-gray-200 text-gray-500"
+                              }`}
+                          >
+                            {art.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right pr-6 relative">
+                          <div className="flex items-center justify-end">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === art.id ? null : art.id);
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                              title="Actions"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {activeMenuId === art.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={() => setActiveMenuId(null)}
+                                />
+                                <div className="absolute right-6 top-12 z-20 w-36 bg-white border border-gray-100 rounded-xl shadow-lg py-1 text-left animate-in fade-in duration-150">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleEdit(art);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleDownload(art);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                  >
+                                    <Download className="w-3.5 h-3.5 text-gray-500" />
+                                    Download
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleDeleteClick(art);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -1024,6 +1154,125 @@ export default function AdminArtifacts() {
               >
                 {isUploading ? "Uploading..." : (isEditing ? "Save Changes" : "Publish Resource")}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ARTIFACT DETAILS & ACTIONS SIDE POPUP MODAL --- */}
+      {viewingDetailsArtifact && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-end z-50 p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-right-10 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-white rounded-xl border border-gray-100 shrink-0">
+                  {getFileIcon(viewingDetailsArtifact.type)}
+                </div>
+                <h3 className="text-base font-bold text-gray-900 truncate">
+                  {viewingDetailsArtifact.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setViewingDetailsArtifact(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">Status</span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                    viewingDetailsArtifact.status === "Published"
+                      ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                      : "bg-gray-50 border-gray-200 text-gray-500"
+                  }`}
+                >
+                  {viewingDetailsArtifact.status}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-gray-500 block">Associated Course</span>
+                <span className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-gray-400 shrink-0" />
+                  {viewingDetailsArtifact.courseName}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <span className="text-[11px] font-medium text-gray-400 block mb-0.5">File Size</span>
+                  <span className="text-xs font-bold text-gray-800">{viewingDetailsArtifact.size}</span>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <span className="text-[11px] font-medium text-gray-400 block mb-0.5">Total Downloads</span>
+                  <span className="text-xs font-bold text-gray-800">{viewingDetailsArtifact.downloadsCount}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <span className="text-xs font-medium text-gray-500 block">Uploaded Date</span>
+                <span className="text-xs font-semibold text-gray-800">
+                  {new Date(viewingDetailsArtifact.uploadDate).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+
+              {viewingDetailsArtifact.description && (
+                <div className="space-y-1 pt-2 border-t border-gray-100">
+                  <span className="text-xs font-medium text-gray-500 block">Description</span>
+                  <p className="text-xs text-gray-600 bg-gray-50 rounded-xl p-3 leading-relaxed">
+                    {viewingDetailsArtifact.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions Footer */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50/30 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = viewingDetailsArtifact;
+                  setViewingDetailsArtifact(null);
+                  handleEdit(target);
+                }}
+                className="px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDownload(viewingDetailsArtifact);
+                }}
+                className="px-3 py-2 text-xs font-semibold text-brand-primary bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-brand-primary" />
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = viewingDetailsArtifact;
+                  setViewingDetailsArtifact(null);
+                  handleDeleteClick(target);
+                }}
+                className="px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                Delete
+              </button>
             </div>
           </div>
         </div>

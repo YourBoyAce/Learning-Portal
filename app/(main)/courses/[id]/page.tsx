@@ -1749,6 +1749,7 @@ export default function CoursePlayerPage() {
             title="Quizzes Gated"
             description="Interactive practice quizzes for this course are exclusively available to Pro and Premium members. Upgrade your plan to test your learning and review your scores."
             requiredTier="Pro"
+            courseSlug={String(id)}
           />
         </div>
       );
@@ -1966,8 +1967,8 @@ export default function CoursePlayerPage() {
         </div>
       </header>
 
-      <main className="max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-64px)]">
-        <div className="lg:col-span-9 p-4 sm:p-6 lg:p-8 lg:border-r border-gray-100 bg-white/30">
+      <main className="max-w-[1800px] mx-auto grid grid-cols-1 xl:grid-cols-12 min-h-[calc(100vh-64px)]">
+        <div className="xl:col-span-8 p-4 sm:p-6 lg:p-8 xl:border-r border-gray-100 bg-white/30">
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
             {/* INTEGRATED VIDEO PLAYER WITH AUTO-COMPLETION */}
             <div className="relative aspect-video bg-black rounded-xl sm:rounded-[2rem] overflow-hidden shadow-2xl group border-4 sm:border-[8px] border-white ring-1 ring-gray-100">
@@ -1985,7 +1986,7 @@ export default function CoursePlayerPage() {
                     size="sm"
                     className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold text-xs"
                   >
-                    <a href="http://localhost:3000/plans" target="_blank" rel="noopener noreferrer">
+                    <a href={`/upgrade?course=${encodeURIComponent(String(id))}&mode=upgrade`}>
                       Upgrade to Unlock
                     </a>
                   </Button>
@@ -2334,7 +2335,7 @@ export default function CoursePlayerPage() {
             </div>
 
             {/* Mobile Tab Selector & Tab Content */}
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-6">
                 <button
                   onClick={() => handleTabChange("overview")}
@@ -2401,12 +2402,12 @@ export default function CoursePlayerPage() {
             </div>
 
             {/* Desktop Overview Block */}
-            <div className="hidden lg:block">{renderModuleOverview()}</div>
+            <div className="hidden xl:block">{renderModuleOverview()}</div>
           </div>
         </div>
 
         {/* Right: Module Sidebar (Desktop Only) */}
-        <div className="hidden lg:flex lg:col-span-3 bg-white lg:sticky lg:top-16 lg:h-[calc(100vh-160px)] mb-6 self-start overflow-hidden border-l border-gray-100 flex-col rounded-bl-xl rounded-br-xl">
+        <div className="hidden xl:flex xl:col-span-4 bg-white xl:sticky xl:top-16 xl:h-[calc(100vh-160px)] mb-6 self-start overflow-hidden border-l border-gray-100 flex-col rounded-bl-xl rounded-br-xl">
           <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0">
             <button
               onClick={() => handleTabChange("modules")}

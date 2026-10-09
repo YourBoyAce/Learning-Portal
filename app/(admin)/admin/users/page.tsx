@@ -324,14 +324,13 @@ export default function AdminUsers() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[380px_1fr] gap-6 lg:gap-8 items-start">
-          {/* LEFT COLUMN */}
-          <div className="flex flex-col gap-6">
-            {/* ADD NEW USER FORM */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Add New User</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] 2xl:grid-cols-[420px_1fr] gap-6 xl:gap-8 items-start">
+          {/* LEFT COLUMN: ADD NEW USER FORM */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>Add New User</h3>
 
-              <form onSubmit={handleAddUser} className="space-y-5">
+            <form onSubmit={handleAddUser} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
                 <div>
                   <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
                     Username
@@ -437,7 +436,7 @@ export default function AdminUsers() {
                 )}
 
                 {role === "admin" && (
-                  <div className="rounded-xl border border-brand-primary/15 bg-brand-primary/5 p-4 space-y-3">
+                  <div className="sm:col-span-2 rounded-xl border border-brand-primary/15 bg-brand-primary/5 p-4 space-y-3">
                     <div>
                       <p className="text-xs font-semibold text-brand-primary">
                         Admin phone number
@@ -466,77 +465,82 @@ export default function AdminUsers() {
                     </div>
                   </div>
                 )}
+              </div>
 
-                {formFeedback.message && (
-                  <div
-                    className={`p-3 rounded-lg text-sm font-medium ${
-                      formFeedback.type === "error"
-                        ? "bg-red-50 text-red-600"
-                        : formFeedback.type === "warning"
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-green-50 text-green-700"
-                    }`}
-                  >
-                    {formFeedback.message}
-                  </div>
-                )}
+              {formFeedback.message && (
+                <div
+                  className={`p-3 rounded-lg text-sm font-medium ${
+                    formFeedback.type === "error"
+                      ? "bg-red-50 text-red-600"
+                      : formFeedback.type === "warning"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-green-50 text-green-700"
+                  }`}
+                >
+                  {formFeedback.message}
+                </div>
+              )}
 
+              {/* Submit Button & Active Users Widget Row */}
+              <div className="pt-2 flex flex-col sm:flex-row xl:flex-col items-stretch sm:items-center xl:items-stretch justify-between gap-4">
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full"
+                  className="w-full sm:w-auto xl:w-full px-6 h-11 shrink-0"
                 >
                   {isSubmitting
                     ? `Creating ${role === "admin" ? "Admin" : role === "instructor" ? "Instructor" : "Scholar"}...`
                     : `Create ${role === "admin" ? "Admin" : role === "instructor" ? "Instructor" : "Scholar"}`}
                 </Button>
-              </form>
-            </div>
 
-            {/* ACTIVE USERS WIDGET */}
-            <div className="bg-brand-heading/10 backdrop-blur-md border border-brand-heading/15 rounded-2xl shadow-sm p-6 flex items-center justify-between text-brand-heading relative overflow-hidden">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500 opacity-10 rounded-full blur-2xl"></div>
+                {/* ACTIVE USERS WIDGET */}
+                <div className="bg-brand-heading/10 backdrop-blur-md border border-brand-heading/15 rounded-xl px-5 py-3 flex items-center justify-between gap-4 text-brand-heading relative overflow-hidden shrink-0">
+                  <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-500 opacity-10 rounded-full blur-xl"></div>
 
-              <div className="relative z-10">
-                <div className="flex items-center gap-2.5 mb-1.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-heading opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-heading"></span>
-                  </span>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Users logged in today
+                  <div className="relative z-10 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                      <Image
+                        src={ICONS.USERS}
+                        alt="User Icon"
+                        width={22}
+                        height={22}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-heading opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-heading"></span>
+                        </span>
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                          Users Logged In Today
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-2xl font-bold text-brand-heading relative z-10">
+                    {loading ? "-" : activeUsersCount}
                   </p>
                 </div>
-                <p className="text-4xl font-bold mt-2 text-brand-heading">
-                  {loading ? "-" : activeUsersCount}
-                </p>
               </div>
-
-              <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center relative z-10 shrink-0">
-                <Image
-                  src={ICONS.USERS}
-                  alt="User Icon"
-                  width={30}
-                  height={30}
-                />
-              </div>
-            </div>
+            </form>
           </div>
 
-          {/* RIGHT COLUMN: USER REGISTRY TABLE */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-full flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-4">
+          {/* LOWER SECTION: USER REGISTRY TABLE (FULL WIDTH) */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col w-full">
+            <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING}>User Registry</h3>
 
                 {/* TAB TOGGLE: USERS VS MENTORS VS ADMINS */}
-                <div className="flex items-center gap-1 bg-gray-100/80 p-1 rounded-xl">
+                <div className="flex items-center gap-1 bg-gray-100/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
                   <button
                     onClick={() => {
                       setActiveTab("users");
                       setCurrentPage(1);
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       activeTab === "users"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
@@ -560,7 +564,7 @@ export default function AdminUsers() {
                       setActiveTab("mentors");
                       setCurrentPage(1);
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       activeTab === "mentors"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
@@ -584,7 +588,7 @@ export default function AdminUsers() {
                       setActiveTab("admins");
                       setCurrentPage(1);
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       activeTab === "admins"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
@@ -606,7 +610,7 @@ export default function AdminUsers() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="relative flex items-center">
+                <div className="relative flex-1 sm:flex-initial flex items-center">
                   <div className="absolute left-3 text-gray-400">
                     <Search size={16} />
                   </div>
@@ -669,23 +673,147 @@ export default function AdminUsers() {
               </div>
             </div>
 
-            <div className="overflow-x-auto flex-1 light-scrollbar">
-              <table className="w-full min-w-[860px] text-left border-collapse">
+            {/* MOBILE CARD VIEW (< md) */}
+            <div className="block md:hidden p-4 space-y-4 flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="text-center py-10 text-gray-500">
+                  Loading {activeTab}...
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  No {activeTab} found.
+                </div>
+              ) : (
+                paginatedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm relative space-y-3"
+                  >
+                    {/* Top Row: User Avatar & Name + Top Right Action Button */}
+                    <div className="flex items-start justify-between pr-8">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold text-sm shrink-0">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {user.name}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                              lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                              fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                            }}
+                            className={`${TYPOGRAPHY_CLASSES.CAPTION} text-gray-500 break-all`}
+                          >
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top Right Action Button (3 vertically aligned dots) */}
+                    <div className="absolute top-3 right-3">
+                      <button
+                        onClick={() =>
+                          setOpenActionMenuId(
+                            openActionMenuId === user.id ? null : user.id,
+                          )
+                        }
+                        className="p-1.5 text-gray-400 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                      {openActionMenuId === user.id && (
+                        <div className="absolute right-0 top-8 w-44 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 overflow-hidden text-left">
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                            Change Role To:
+                          </div>
+                          {ROLES.map((r) => (
+                            <button
+                              key={r.value}
+                              onClick={() => handleChangeRole(user.id, r.value)}
+                              className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 transition-colors"
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                          <div className="border-t border-gray-100 mt-1 pt-1">
+                            <button
+                              onClick={() => handleDeleteClick(user)}
+                              className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
+                            >
+                              {user.role === "admin"
+                                ? "Remove Admin"
+                                : user.role === "instructor"
+                                  ? "Remove Instructor"
+                                  : "Remove Scholar"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Session and Time Spent in a Row */}
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
+                      <div className="flex-1 min-w-0">
+                        {user.todaySessions.length > 0 ? (
+                          <div className="space-y-1">
+                            {user.todaySessions.slice(0, 1).map((session, i) => (
+                              <div key={i} className="flex items-center gap-1 text-[11px] font-semibold flex-wrap">
+                                <LogIn className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <span className="text-emerald-700">{formatTime(session.loginAt)}</span>
+                                <span className="text-gray-300">→</span>
+                                <LogOut className="w-3 h-3 text-red-400 shrink-0" />
+                                <span className="text-red-600">{formatTime(session.logoutAt)}</span>
+                              </div>
+                            ))}
+                            {user.todaySessions.length > 1 && (
+                              <span className="text-[10px] text-gray-400 block">
+                                +{user.todaySessions.length - 1} more session{user.todaySessions.length > 2 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Not logged in today</span>
+                        )}
+                      </div>
+
+                      <div className="shrink-0">
+                        {user.todayTimeSpentSeconds > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-md border border-amber-100">
+                            <Timer className="w-3 h-3" />
+                            {formatDuration(user.todayTimeSpentSeconds)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">0s</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* DESKTOP TABLE VIEW (md+) */}
+            <div className="hidden md:block overflow-x-auto flex-1 light-scrollbar">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 capitalize tracking-wide">
                       {activeTab === "mentors" ? "Mentor" : activeTab === "admins" ? "Admin" : "User"}
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 capitalize tracking-wide">
                       Role
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 capitalize tracking-wide">
                       Today&apos;s Sessions
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 capitalize tracking-wide">
                       Time Spent
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 capitalize tracking-wide">
                       Action
                     </th>
                   </tr>
@@ -773,7 +901,7 @@ export default function AdminUsers() {
                         </td>
 
                         {/* Time Spent */}
-                        <td className="py-4 px-4 text-center">
+                        <td className="py-4 px-4">
                           {user.todayTimeSpentSeconds > 0 ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-md border border-amber-100">
                               <Timer className="w-3 h-3" />

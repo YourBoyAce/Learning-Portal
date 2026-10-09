@@ -558,7 +558,7 @@ function LoginPageInner() {
           </form>
         </div>
 
-        <div className="hidden xl:block fixed right-8 top-1/2 -translate-y-1/2 w-64">
+        <div className="mt-8 w-full max-w-md mx-auto shrink-0 xl:mt-0 xl:fixed xl:right-8 xl:top-1/2 xl:-translate-y-1/2 xl:w-64 xl:mx-0">
           <div
             className="border-l-4 p-4 rounded-r-md shadow-sm"
             style={{

@@ -358,12 +358,23 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
-import { Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff, ShieldAlert, X, CheckCircle2 } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "info" | "warning";
+  } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
@@ -450,7 +461,7 @@ export default function ProfilePage() {
     try {
       const parsedCalId = calEventTypeId.trim() ? parseInt(calEventTypeId.trim(), 10) : null;
       if (calEventTypeId.trim() && isNaN(Number(calEventTypeId.trim()))) {
-        alert("Please enter a valid numeric Event Type ID.");
+        setToast({ message: "Please enter a valid numeric Event Type ID.", type: "error" });
         setIsSaving(false);
         return;
       }
@@ -487,10 +498,10 @@ export default function ProfilePage() {
         }
       }
 
-      alert("Profile updated successfully.");
+      setToast({ message: "Profile updated successfully.", type: "success" });
     } catch (err: unknown) {
       console.error(err);
-      alert("Failed to update profile.");
+      setToast({ message: "Failed to update profile.", type: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -565,6 +576,39 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-8 font-sans">
+      {toast && (
+        <div
+          className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md
+            flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border
+            animate-in slide-in-from-top-4 fade-in duration-300
+            ${
+              toast.type === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : toast.type === "warning"
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : toast.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" />
+          ) : (
+            <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
+          )}
+          <p className="text-sm font-medium leading-snug flex-1">
+            {toast.message}
+          </p>
+          <button
+            onClick={() => setToast(null)}
+            className="shrink-0 p-0.5 rounded hover:bg-black/5 transition"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="max-w-[900px] mx-auto">
         <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>My Profile</h1>
 
