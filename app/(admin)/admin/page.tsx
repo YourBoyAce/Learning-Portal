@@ -231,13 +231,13 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[560px]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}>
                       Scholar
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}>
                       Role
                     </th>
-                    <th className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}>
+                    <th className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}>
                       Joined
                     </th>
                   </tr>
@@ -275,7 +275,7 @@ export default function AdminDashboard() {
                                   fontSize: TYPOGRAPHY.BODY.fontSize,
                                   lineHeight: TYPOGRAPHY.BODY.lineHeight,
                                   fontWeight: TYPOGRAPHY.H2.fontWeight,
-                                }}
+                                } as React.CSSProperties}
                                 className="text-brand-heading"
                               >
                                 {user.full_name || user.email?.split("@")[0] || "Unknown"}
@@ -296,14 +296,21 @@ export default function AdminDashboard() {
                             {user.role || "User"}
                           </span>
                         </td>
-                        <td style={{
-                          fontSize: TYPOGRAPHY.BODY.fontSize,
-                          lineHeight: TYPOGRAPHY.BODY.lineHeight,
-                          fontWeight: TYPOGRAPHY.H2.fontWeight,
-                        }}
+                        <td
+                          style={{
+                            fontSize: TYPOGRAPHY.BODY.fontSize,
+                            lineHeight: TYPOGRAPHY.BODY.lineHeight,
+                            fontWeight: TYPOGRAPHY.H2.fontWeight,
+                          } as React.CSSProperties}
                           className="text-brand-heading"
                         >
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {user.created_at
+                            ? new Date(user.created_at).toLocaleDateString("en-US", {
+                                month: "2-digit",
+                                day: "2-digit",
+                                year: "numeric",
+                              })
+                            : "—"}
                         </td>
                       </tr>
                     ))}

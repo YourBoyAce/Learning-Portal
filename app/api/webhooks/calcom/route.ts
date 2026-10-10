@@ -118,22 +118,46 @@ export async function POST(request: Request) {
     // 4. Try to find an existing event in calendar_events
     let matchedEvent: any = null;
 
-    if (eventDate) {
-      let query = supabaseAdmin
-        .from("calendar_events")
-        .select("*")
-        .eq("event_date", eventDate);
+    if (attendeeEmail) {
+      // Priority 1: Match by date + attendee email (case-insensitive)
+      if (eventDate) {
+        const { data: exactMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .eq("event_date", eventDate)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
 
-      if (attendeeEmail) {
-        query = query.like("description", `%${attendeeEmail}%`);
+        if (exactMatches && exactMatches.length > 0) {
+          matchedEvent = exactMatches[0];
+        }
       }
 
-      const { data: events, error: searchError } = await query;
+      // Priority 2: If timezone difference shifted the date, look for any event for this attendee missing a meet_link
+      if (!matchedEvent) {
+        const { data: pendingMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .is("meet_link", null)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
 
-      if (searchError) {
-        console.error("[calcom-webhook] Supabase search error:", searchError);
-      } else if (events && events.length > 0) {
-        matchedEvent = events[0];
+        if (pendingMatches && pendingMatches.length > 0) {
+          matchedEvent = pendingMatches[0];
+          console.log(`[calcom-webhook] Found event via attendee email fallback: ${matchedEvent.id}`);
+        }
+      }
+    } else if (eventDate) {
+      // Priority 3: Match by event_date if attendee email wasn't provided
+      const { data: dateMatches } = await supabaseAdmin
+        .from("calendar_events")
+        .select("*")
+        .eq("event_date", eventDate)
+        .is("meet_link", null)
+        .order("created_at", { ascending: false });
+
+      if (dateMatches && dateMatches.length > 0) {
+        matchedEvent = dateMatches[0];
       }
     }
 
@@ -181,7 +205,7 @@ export async function POST(request: Request) {
       const { data: mentorByEmail } = await supabaseAdmin
         .from("profiles")
         .select("id")
-        .eq("email", organizerEmail)
+        .ilike("email", organizerEmail)
         .maybeSingle();
 
       if (mentorByEmail?.id) {
@@ -198,6 +222,20 @@ export async function POST(request: Request) {
 
       if (mentorByEventType?.id) {
         mentorUserId = mentorByEventType.id;
+      }
+    }
+
+    // Check by username matching cal_link
+    const organizerUsername = payload?.organizer?.username || payload?.user?.username;
+    if (!mentorUserId && organizerUsername) {
+      const { data: mentorByCalLink } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .ilike("cal_link", `%${organizerUsername}%`)
+        .maybeSingle();
+
+      if (mentorByCalLink?.id) {
+        mentorUserId = mentorByCalLink.id;
       }
     }
 

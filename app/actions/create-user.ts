@@ -116,6 +116,10 @@ export async function createUser(formData: FormData) {
     return { success: false, error: "Please fill in all fields" };
   }
 
+  if (password.length < 6) {
+    return { success: false, error: "Password must be at least 6 characters long." };
+  }
+
   if (role === "admin" && !normalizedPhone) {
     return {
       success: false,
@@ -141,7 +145,7 @@ export async function createUser(formData: FormData) {
 
     if (authError) {
       console.error("Auth Error:", authError.message);
-      return logAndReturnActionError(authError);
+      return { success: false, error: authError.message };
     }
 
     // 2. Create their profile
@@ -231,7 +235,8 @@ export async function createUser(formData: FormData) {
     return { success: true, message: "User created and welcome email sent!" };
   } catch (error: unknown) {
     console.error("Server Action Error:", error);
-    return { success: false, error: "An unexpected server error occurred." };
+    const message = error instanceof Error ? error.message : "An unexpected server error occurred.";
+    return { success: false, error: message };
   }
 }
 

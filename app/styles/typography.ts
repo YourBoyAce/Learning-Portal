@@ -87,5 +87,7 @@ export const TYPOGRAPHY_CLASSES = {
   PRIMARY_BUTTON:
     "justify-center bg-brand-primary hover:bg-brand-hover",
   INNERHEADING:
-    "text-sm font-medium text-gray-700 capitalize tracking-wide block mb-1.5"
+    "text-sm font-medium text-gray-700 capitalize tracking-wide block mb-1.5",
+  TABLE_HEADER:
+    "text-sm font-medium text-gray-700 capitalize tracking-wide text-left"
 } as const;

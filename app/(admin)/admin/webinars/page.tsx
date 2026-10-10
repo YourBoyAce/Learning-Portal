@@ -549,22 +549,22 @@ export default function AdminWebinarsPage() {
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
                   <th
-                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                    className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}
                   >
                     Webinar Details
                   </th>
                   <th
-                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                    className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}
                   >
                     Schedule
                   </th>
                   <th
-                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                    className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}
                   >
                     Status
                   </th>
                   <th
-                    className={`${TYPOGRAPHY_CLASSES.INNERHEADING}  px-4 py-3 text-left `}
+                    className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}
                   >
                     Actions
                   </th>
