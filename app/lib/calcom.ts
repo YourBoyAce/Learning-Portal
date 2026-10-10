@@ -1,3 +1,42 @@
+/**
+ * Helper to reliably isolate Google Meet / video call URLs from Cal.com payloads.
+ * Ensures placeholder strings like "integrations:google:meet" are never treated as valid URLs.
+ */
+export function extractMeetingUrl(payload: any): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const candidates: unknown[] = [
+    payload.metadata?.videoCallUrl,
+    payload.videoCallUrl,
+    payload.meetingUrl,
+    payload.location,
+    // Google Calendar conference entries
+    payload.conferenceData?.entryPoints?.find(
+      (e: any) =>
+        e?.entryPointType === "video" ||
+        (typeof e?.uri === "string" && e.uri.includes("meet.google.com"))
+    )?.uri,
+    // External references
+    payload.references?.find(
+      (r: any) =>
+        r?.type === "google_meet" ||
+        (typeof r?.meetingUrl === "string" && r.meetingUrl.includes("meet.google.com"))
+    )?.meetingUrl,
+    // Nested booking objects
+    payload.booking?.meetingUrl,
+    payload.booking?.metadata?.videoCallUrl,
+    payload.booking?.location,
+  ];
+
+  for (const item of candidates) {
+    if (typeof item === "string" && item.trim().startsWith("http")) {
+      return item.trim();
+    }
+  }
+
+  return null;
+}
+
 export async function createCalcomBooking(params: {
   eventTypeId: number;
   startDateTimeStr: string; // "YYYY-MM-DDT[HH]:[MM]:[SS]"
@@ -52,7 +91,7 @@ export async function createCalcomBooking(params: {
     }
 
     const bookingData = result?.data;
-    const meetingUrl = bookingData?.meetingUrl || bookingData?.location || null;
+    const meetingUrl = extractMeetingUrl(bookingData);
 
     return {
       success: true,
