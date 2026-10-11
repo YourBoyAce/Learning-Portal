@@ -24,6 +24,7 @@ async function authenticate(request: Request) {
 
   return {
     userId: data.user.id,
+    userEmail: data.user.email?.trim().toLowerCase() || "",
     supabaseAdmin: createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }) as unknown as SupabaseClient,
@@ -35,32 +36,82 @@ export async function GET(request: Request) {
   if ("error" in auth) return auth.error;
 
   const courseId = new URL(request.url).searchParams.get("courseId")?.trim();
-  const { data: enrollments, error: enrollmentError } = await auth.supabaseAdmin
-    .schema("phase2")
-    .from("enrollments")
-    .select("course_id, users!inner(auth_user_id), bundles!inner(bundle_name)")
-    .eq("status", "active")
-    .eq("users.auth_user_id", auth.userId)
-    .order("created_at", { ascending: false });
-  if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
 
-  const accessibleCourseIds = ((enrollments ?? []) as EnrollmentRow[])
-    .filter((enrollment) => {
-      const bundleName = String((Array.isArray(enrollment.bundles) ? enrollment.bundles[0] : enrollment.bundles)?.bundle_name || "").toLowerCase();
-      return bundleName.includes("pro") || bundleName.includes("premium");
-    })
-    .map((enrollment) => String(enrollment.course_id));
+  // Check user role from profiles
+  const { data: profile } = await auth.supabaseAdmin
+    .from("profiles")
+    .select("role, email")
+    .eq("id", auth.userId)
+    .maybeSingle();
 
-  const requestedCourseIds = courseId ? accessibleCourseIds.filter((id) => id === courseId) : accessibleCourseIds;
-  if (requestedCourseIds.length === 0) return NextResponse.json({ quizzes: [] }, { headers: { "Cache-Control": "no-store" } });
+  const role = (profile?.role || "").toLowerCase();
+  const isAdminOrInstructor = role === "admin" || role === "instructor";
 
-  const { data: quizzes, error: quizError } = await auth.supabaseAdmin
+  let requestedCourseIds: string[] | null = null;
+
+  if (isAdminOrInstructor) {
+    if (courseId) {
+      requestedCourseIds = [courseId];
+    }
+  } else {
+    const accessibleCourseIds = new Set<string>();
+
+    // 1. Check phase2 enrollments
+    const { data: enrollments, error: enrollmentError } = await auth.supabaseAdmin
+      .schema("phase2")
+      .from("enrollments")
+      .select("course_id, users!inner(auth_user_id), bundles(bundle_name)")
+      .eq("status", "active")
+      .eq("users.auth_user_id", auth.userId)
+      .order("created_at", { ascending: false });
+
+    if (!enrollmentError && enrollments) {
+      for (const e of enrollments as any[]) {
+        if (e.course_id) accessibleCourseIds.add(String(e.course_id));
+      }
+    }
+
+    // 2. Check course_members table
+    const emailToMatch = profile?.email?.trim().toLowerCase() || auth.userEmail;
+    if (emailToMatch) {
+      const { data: memberRows } = await auth.supabaseAdmin
+        .from("course_members")
+        .select("maincourse_id")
+        .eq("email", emailToMatch)
+        .eq("status", "active");
+
+      if (memberRows) {
+        for (const m of memberRows as any[]) {
+          if (m.maincourse_id) accessibleCourseIds.add(String(m.maincourse_id));
+        }
+      }
+    }
+
+    if (courseId) {
+      if (!accessibleCourseIds.has(courseId)) {
+        return NextResponse.json({ quizzes: [] }, { headers: { "Cache-Control": "no-store" } });
+      }
+      requestedCourseIds = [courseId];
+    } else {
+      if (accessibleCourseIds.size === 0) {
+        return NextResponse.json({ quizzes: [] }, { headers: { "Cache-Control": "no-store" } });
+      }
+      requestedCourseIds = Array.from(accessibleCourseIds);
+    }
+  }
+
+  let query = auth.supabaseAdmin
     .schema("phase2")
     .from("quizzes")
     .select("id, course_id, title, questions, passing_score, status")
     .eq("status", "Active")
-    .in("course_id", requestedCourseIds)
     .order("created_at", { ascending: false });
+
+  if (requestedCourseIds && requestedCourseIds.length > 0) {
+    query = query.in("course_id", requestedCourseIds);
+  }
+
+  const { data: quizzes, error: quizError } = await query;
   if (quizError) return apiErrorResponse(quizError, undefined, 500);
   return NextResponse.json({ quizzes: quizzes ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }

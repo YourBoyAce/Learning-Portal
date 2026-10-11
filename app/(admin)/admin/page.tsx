@@ -73,8 +73,38 @@ export default function AdminDashboard() {
           .select("*")
           .order("created_at", { ascending: false });
 
+        let phase2UserMap = new Map<string, string>();
+        try {
+          const { data: p2Users } = await supabase
+            .schema("phase2" as any)
+            .from("users")
+            .select("auth_user_id, email, username");
+          if (p2Users) {
+            for (const u of p2Users) {
+              if (u.auth_user_id && u.username) phase2UserMap.set(u.auth_user_id, u.username.trim());
+              if (u.email && u.username) phase2UserMap.set(u.email.toLowerCase(), u.username.trim());
+            }
+          }
+        } catch (p2Err) {
+          console.warn("Could not fetch phase2.users:", p2Err);
+        }
+
         if (profiles) {
-          const students = profiles.filter((p) => {
+          const enrichedProfiles = profiles.map((p) => {
+            const p2Name = phase2UserMap.get(p.id) || phase2UserMap.get(p.email?.toLowerCase() || "");
+            const isFromLanding = !p.created_at && Boolean(p2Name);
+            const resolvedName = (isFromLanding && p2Name)
+              ? p2Name
+              : (p.created_at && p.full_name)
+              ? p.full_name
+              : (p2Name || p.full_name || p.email?.split("@")[0] || "Unknown");
+            return {
+              ...p,
+              full_name: resolvedName,
+            };
+          });
+
+          const students = enrichedProfiles.filter((p) => {
             const r = p.role?.toLowerCase();
             return r !== "admin" && r !== "instructor" && r !== "mentor" && r !== "lead mentor";
           });
@@ -94,7 +124,16 @@ export default function AdminDashboard() {
 
         if (logs && logs.length > 0 && profiles) {
           const profileMap = new Map<string, any>();
-          (profiles as any[]).forEach((p) => profileMap.set(p.id, p));
+          (profiles as any[]).forEach((p) => {
+            const p2Name = phase2UserMap.get(p.id) || phase2UserMap.get(p.email?.toLowerCase() || "");
+            const isFromLanding = !p.created_at && Boolean(p2Name);
+            const resolvedName = (isFromLanding && p2Name)
+              ? p2Name
+              : (p.created_at && p.full_name)
+              ? p.full_name
+              : (p2Name || p.full_name || p.email?.split("@")[0] || "Unknown");
+            profileMap.set(p.id, { ...p, full_name: resolvedName });
+          });
 
           const grouped = new Map<string, { times: string[]; totalSec: number }>();
           for (const log of logs) {

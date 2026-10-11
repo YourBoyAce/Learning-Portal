@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
 import { ICONS } from "@/app/styles/icons";
@@ -54,7 +54,8 @@ export default function AdminLayout({
 
       if (cancelled) return;
       setUserEmail(user.email ?? null);
-      setFullName(profile.full_name ?? null);
+      const resolvedName = await resolveUserName(supabase, user.id, user.email);
+      setFullName(resolvedName);
       setLoading(false);
     };
 

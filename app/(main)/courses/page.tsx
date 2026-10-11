@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import Link from "next/link";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { getMyLearningData } from "@/app/actions/my-learning";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
 import { useRouter } from "next/navigation";
@@ -301,11 +301,8 @@ export default function MyLearningDashboard() {
 
       setCurrentInsightIndex(profile?.current_insight_index || 0);
 
-      setUserProfileName(
-        profile?.full_name ||
-        session.user.email?.split("@")[0] ||
-        "Learner"
-      );
+      const resolvedName = await resolveUserName(supabase, session.user.id, session.user.email);
+      setUserProfileName(resolvedName);
 
       // --------------------------------------------------
       // INSIGHTS

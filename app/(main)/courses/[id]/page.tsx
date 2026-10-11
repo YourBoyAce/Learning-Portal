@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { fetchLearnerQuizzes, recordQuizCompletion } from "@/app/lib/quiz-completion";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import Certificate from "@/app/components/certificate/Certificate";
@@ -422,6 +422,74 @@ export default function CoursePlayerPage() {
     }
   };
 
+  const [downloadingArtifactId, setDownloadingArtifactId] = useState<string | null>(null);
+
+  const downloadArtifactFile = async (
+    fileUrl: string,
+    fileName: string,
+    filePath?: string,
+    artifactId?: string,
+  ) => {
+    try {
+      if (artifactId) setDownloadingArtifactId(artifactId);
+
+      // 1. Try direct fetch for blob download with proper filename
+      if (fileUrl) {
+        try {
+          const res = await fetch(fileUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = fileName || "artifact.pdf";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            return;
+          }
+        } catch (fetchErr) {
+          console.warn("Direct fetch failed, trying storage fallback:", fetchErr);
+        }
+      }
+
+      // 2. Try supabase storage download
+      if (filePath) {
+        const cleanPath = filePath.replace(/^artifacts\//, "");
+        const candidates = [filePath, cleanPath, `artifacts/${cleanPath}`];
+        for (const p of candidates) {
+          const { data, error } = await supabase.storage
+            .from(ARTIFACT_STORAGE_BUCKET)
+            .download(p);
+          if (!error && data) {
+            const blobUrl = URL.createObjectURL(data);
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = fileName || "artifact.pdf";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            return;
+          }
+        }
+      }
+
+      // 3. Fallback: window.open
+      if (fileUrl) {
+        window.open(fileUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("Failed to download artifact:", error);
+      if (fileUrl) {
+        window.open(fileUrl, "_blank");
+      }
+    } finally {
+      if (artifactId) setDownloadingArtifactId(null);
+    }
+  };
+
   const handleStartQuiz = (quiz: any) => {
     setActiveQuiz(quiz);
     setQuizStep("intro");
@@ -679,7 +747,10 @@ export default function CoursePlayerPage() {
       setPlaybackPositions(positionMap);
 
       // Select the best module to play
-      if (orderedModules.length > 0) {
+      const playableModules = orderedModules.filter((m) => m.module_type !== "quiz");
+      const modulesForPlayback = playableModules.length > 0 ? playableModules : orderedModules;
+
+      if (modulesForPlayback.length > 0) {
         const requestedModuleId = searchParams.get("module");
         const requestedModule = findModuleByLookupId(
           orderedModules,
@@ -690,7 +761,7 @@ export default function CoursePlayerPage() {
 
         if (!targetModule) {
           // First priority: unfinished module that already has watch progress
-          targetModule = orderedModules.find((module) => {
+          targetModule = modulesForPlayback.find((module) => {
             const moduleKey = getModuleKey(module);
             return (
               !progressMap[moduleKey] &&
@@ -700,7 +771,7 @@ export default function CoursePlayerPage() {
 
           // Second priority: first unfinished module
           if (!targetModule) {
-            targetModule = orderedModules.find((module) => {
+            targetModule = modulesForPlayback.find((module) => {
               const moduleKey = getModuleKey(module);
               return !progressMap[moduleKey];
             });
@@ -708,7 +779,7 @@ export default function CoursePlayerPage() {
 
           // Third priority: course fully completed, show last module
           if (!targetModule) {
-            targetModule = orderedModules[orderedModules.length - 1];
+            targetModule = modulesForPlayback[modulesForPlayback.length - 1];
           }
         }
 
@@ -717,17 +788,8 @@ export default function CoursePlayerPage() {
         }
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profile?.full_name) {
-        setStudentName(profile.full_name);
-      } else {
-        setStudentName(user.email?.split("@")[0] || "Learner");
-      }
+      const studentNameResolved = await resolveUserName(supabase, user.id, user.email);
+      setStudentName(studentNameResolved);
 
       const { data: certData } = await supabase
         .from("certificates")
@@ -890,6 +952,72 @@ export default function CoursePlayerPage() {
     setPlaybackPositions((prev) => ({ ...prev, [moduleKey]: 0 }));
   };
 
+  const markArtifactCompleted = async (moduleId: string) => {
+    if (!userId || !id) return;
+    const moduleKey = String(moduleId);
+    if (userProgress[moduleKey]) return;
+
+    const mod = findModuleByLookupId(modules, moduleKey);
+    const persistenceIds = getModuleProgressIds(mod);
+    const persistenceVideoId = persistenceIds[0] || moduleKey;
+
+    // Optimistically update UI so progress bar and checkmarks reflect completion immediately
+    setUserProgress((prev) => ({ ...prev, [moduleKey]: true }));
+    setModuleCompletedAt((prev) => ({
+      ...prev,
+      [moduleKey]: new Date().toISOString(),
+    }));
+    setModulePlaybackFinished((prev) => ({
+      ...prev,
+      [moduleKey]: true,
+    }));
+    setCompletionAcknowledged((prev) => ({
+      ...prev,
+      [moduleKey]: true,
+    }));
+
+    // Update local storage fallback
+    try {
+      const key = getProgressStorageKey(userId, String(id));
+      const existing = localStorage.getItem(key);
+      const parsed = existing
+        ? (JSON.parse(existing) as Record<string, boolean>)
+        : {};
+      parsed[moduleKey] = true;
+      persistenceIds.forEach((progressId) => {
+        parsed[progressId] = true;
+      });
+      localStorage.setItem(key, JSON.stringify(parsed));
+
+      const positionKey = getPlaybackPositionStorageKey(userId, String(id));
+      const existingPositions = localStorage.getItem(positionKey);
+      const parsedPositions = existingPositions
+        ? (JSON.parse(existingPositions) as Record<string, number>)
+        : {};
+      parsedPositions[moduleKey] = 0;
+      persistenceIds.forEach((progressId) => {
+        parsedPositions[progressId] = 0;
+      });
+      localStorage.setItem(positionKey, JSON.stringify(parsedPositions));
+      setPlaybackPositions((prev) => ({ ...prev, [moduleKey]: 0 }));
+    } catch (localErr) {
+      console.warn("Failed to save local progress fallback for artifact:", localErr);
+    }
+
+    try {
+      await upsertUserProgress(
+        userId,
+        String(id),
+        persistenceVideoId,
+        100,
+        true,
+        persistenceIds,
+      );
+    } catch (err) {
+      console.error("Failed to mark artifact module as completed in DB:", err);
+    }
+  };
+
   const saveLocalPlaybackPosition = (
     moduleId: string,
     positionSeconds: number,
@@ -992,6 +1120,17 @@ export default function CoursePlayerPage() {
     };
     generateCertificateInDb();
   }, [progressPercentage, hasCertificate, loading, userId, id],);
+
+  // Automatically mark artifact module as completed when opened / active
+  useEffect(() => {
+    if (!userId || !id || loading) return;
+    if (activeModule?.module_type === "artifact" && activeModuleId) {
+      const moduleKey = String(activeModuleId);
+      if (!userProgress[moduleKey]) {
+        markArtifactCompleted(moduleKey);
+      }
+    }
+  }, [activeModule?.module_type, activeModuleId, userProgress, userId, id, loading]);
 
   const totalDuration = useMemo(() => {
     let totalSeconds = 0;
@@ -1145,8 +1284,8 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Kept as a fallback / visual acknowledgement badge! */}
-            {activeModuleId && (
+            {/* Kept as a fallback / visual acknowledgement badge for non-artifact modules */}
+            {activeModuleId && activeModule?.module_type !== "artifact" && (
               <div className="flex flex-col items-end gap-2">
                 <Button
                   onClick={() => handleMarkAsCompleted(activeModuleId)}
@@ -1233,6 +1372,10 @@ export default function CoursePlayerPage() {
     setAutoPlayModuleId(null);
     setActiveModuleId(moduleKey);
     setOpenModuleMenuId(null);
+    const targetMod = findModuleByLookupId(modules, moduleKey);
+    if (targetMod?.module_type === "artifact" && !userProgress[moduleKey]) {
+      markArtifactCompleted(moduleKey);
+    }
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1323,8 +1466,9 @@ export default function CoursePlayerPage() {
     }
   };
 
-  const renderModulesList = () => {const totalModuleCount = modules.length;
-
+  const renderModulesList = () => {
+    const videoModules = modules.filter((m) => m.module_type !== "quiz");
+    const totalModuleCount = videoModules.length;
 
     return (
       <>
@@ -1371,7 +1515,7 @@ export default function CoursePlayerPage() {
         
         {/* Modules List */}
         <div className="flex flex-col gap-3 sm:gap-4 mt-6">
-          {modules.length === 0 ? (
+          {videoModules.length === 0 ? (
             <div className="text-center py-10 bg-white border border-gray-100 rounded-3xl">
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Image src={ICONS.BOOK} alt="Empty" width={32} height={32} className="opacity-40" />
@@ -1409,7 +1553,7 @@ export default function CoursePlayerPage() {
               {courseSections.map((section) => {
                 const sectionId = String(section.id);
                 const sectionModules = modules.filter(
-                  (m) => String(m.section_id) === sectionId
+                  (m) => String(m.section_id) === sectionId && m.module_type !== "quiz"
                 );
                 const completedInSection = sectionModules.filter(
                   (m) => !!userProgress[getModuleKey(m)]
@@ -1492,10 +1636,12 @@ export default function CoursePlayerPage() {
                                       ? "bg-emerald-500 border-emerald-500 text-white"
                                       : isActive
                                       ? "bg-brand-heading border-brand-heading text-white"
+                                      : mod.module_type === "artifact"
+                                      ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                                       : "bg-white border-gray-200 text-gray-400 group-hover:border-brand-heading group-hover:text-brand-heading"
                                   }`}
                                 >
-                                  {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
+                                  {isCompleted ? <CheckCircle2 size={12} /> : mod.module_type === "artifact" ? <FileText size={12} /> : idx + 1}
                                 </div>
 
                                 <div className="flex-1 min-w-0">
@@ -1509,7 +1655,11 @@ export default function CoursePlayerPage() {
                                     >
                                       {mod.title}
                                     </h4>
-                                    {mod.module_type === "quiz" ? (
+                                    {mod.module_type === "artifact" ? (
+                                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <FileText size={10} /> Artifact
+                                      </span>
+                                    ) : mod.module_type === "quiz" ? (
                                       <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                                         <HelpCircle size={10} /> Quiz
                                       </span>
@@ -1578,7 +1728,7 @@ export default function CoursePlayerPage() {
               {/* Ungrouped modules (those without a section_id) */}
               {(() => {
                 const ungrouped = modules.filter(
-                  (m) => !m.section_id || !courseSections.some((s) => String(s.id) === String(m.section_id))
+                  (m) => (!m.section_id || !courseSections.some((s) => String(s.id) === String(m.section_id))) && m.module_type !== "quiz"
                 );
                 if (ungrouped.length === 0) return null;
                 return (
@@ -1619,17 +1769,26 @@ export default function CoursePlayerPage() {
                                   ? "bg-emerald-500 border-emerald-500 text-white"
                                   : isActive
                                   ? "bg-brand-heading border-brand-heading text-white"
+                                  : mod.module_type === "artifact"
+                                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                                   : "bg-white border-gray-200 text-gray-400"
                               }`}
                             >
-                              {isCompleted ? <CheckCircle2 size={12} /> : idx + 1}
+                              {isCompleted ? <CheckCircle2 size={12} /> : mod.module_type === "artifact" ? <FileText size={12} /> : idx + 1}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
-                                isActive ? "text-brand-heading" : "text-gray-900 group-hover:text-brand-heading"
-                              }`}>
-                                {mod.title}
-                              </h4>
+                              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                <h4 className={`text-sm font-bold leading-snug transition-colors ${
+                                  isActive ? "text-brand-heading" : "text-gray-900 group-hover:text-brand-heading"
+                                }`}>
+                                  {mod.title}
+                                </h4>
+                                {mod.module_type === "artifact" && (
+                                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                    <FileText size={10} /> Artifact
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -1641,7 +1800,7 @@ export default function CoursePlayerPage() {
             </>
           ) : (
             // Flat module list (no sections — legacy view)
-            modules.map((mod, globalIndex) => {
+            videoModules.map((mod, globalIndex) => {
               const moduleKey = getModuleKey(mod);
               const isActive = moduleKey === activeModuleId;
               const isCompleted = !!userProgress[moduleKey];
@@ -2008,22 +2167,24 @@ export default function CoursePlayerPage() {
 
                       {fileUrl && (
                         <Button
-                          onClick={() => {
-                            window.open(fileUrl, '_blank');
-                            if (userId && id) {
-                              try {
-                                const key = getProgressStorageKey(userId, String(id));
-                                const existing = localStorage.getItem(key);
-                                const parsed = existing ? (JSON.parse(existing) as Record<string, boolean>) : {};
-                                parsed[moduleKey] = true;
-                                localStorage.setItem(key, JSON.stringify(parsed));
-                                setUserProgress(parsed);
-                              } catch(e) {}
+                          onClick={async () => {
+                            await downloadArtifactFile(fileUrl, fileName, qArray[0]?.correctAnswer, mod.id);
+                            if (!userProgress[moduleKey]) {
+                              markArtifactCompleted(moduleKey);
                             }
                           }}
-                          className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                          disabled={downloadingArtifactId === mod.id}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
-                          <DownloadCloud size={14} /> View File
+                          {downloadingArtifactId === mod.id ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" /> Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <DownloadCloud size={14} /> Download File
+                            </>
+                          )}
                         </Button>
                       )}
                     </div>
@@ -2087,8 +2248,8 @@ export default function CoursePlayerPage() {
 
               {fileUrl && (
                 <Button
-                  onClick={() => {
-                    window.open(fileUrl, '_blank');
+                  onClick={async () => {
+                    await downloadArtifactFile(fileUrl, fileName, qArray[0]?.correctAnswer, mod.id);
                     if (userId && id) {
                       try {
                         const key = getProgressStorageKey(userId, String(id));
@@ -2100,9 +2261,18 @@ export default function CoursePlayerPage() {
                       } catch(e) {}
                     }
                   }}
-                  className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                  disabled={downloadingArtifactId === mod.id}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <DownloadCloud size={14} /> View File
+                  {downloadingArtifactId === mod.id ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <DownloadCloud size={14} /> Download File
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -2519,6 +2689,115 @@ export default function CoursePlayerPage() {
                     );
                   })()}
                 </div>
+              ) : activeModule && activeModule.module_type === "artifact" ? (
+                <div className="w-full h-full min-h-[440px] bg-gradient-to-br from-[#0B1528] via-[#102347] to-[#0A1324] text-white rounded-2xl sm:rounded-[2rem] p-6 sm:p-10 flex flex-col justify-between relative overflow-hidden shadow-2xl border border-white/10">
+                  <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  {(() => {
+                    const qArray = Array.isArray(activeModule.questions)
+                      ? activeModule.questions
+                      : typeof activeModule.questions === "string"
+                      ? (JSON.parse(activeModule.questions) || [])
+                      : [];
+                    const fileName = qArray[0]?.options?.[0] || activeModule.title;
+                    const fileSize = qArray[0]?.options?.[1] || "";
+                    const fileUrl = qArray[0]?.text || "";
+                    const filePath = qArray[0]?.correctAnswer || "";
+                    const isDownloaded = Boolean(userProgress[getModuleKey(activeModule)]);
+
+                    return (
+                      <div className="flex-1 flex flex-col justify-between relative z-10">
+                        {/* Top Badge & Title */}
+                        <div>
+                          <div className="flex items-center justify-between gap-4 mb-4">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+                              <FileText size={12} />
+                              Course Artifact
+                            </span>
+                            {isDownloaded && (
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                                <CheckCircle2 size={14} /> Completed
+                              </span>
+                            )}
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 leading-tight">
+                            {activeModule.title}
+                          </h2>
+                          {activeModule.description ? (
+                            <p className="text-sm text-gray-300 max-w-2xl leading-relaxed">
+                              {activeModule.description}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-400 max-w-xl">
+                              This module contains a downloadable supplementary learning resource and reference document.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* File Details Card */}
+                        <div className="my-6 p-5 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-md">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 min-w-0">
+                              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400">
+                                <FileText size={28} />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-base font-bold text-white truncate max-w-md sm:max-w-lg mb-1">
+                                  {fileName}
+                                </h4>
+                                <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                                  {fileSize && <span>{fileSize}</span>}
+                                  {fileSize && <span>•</span>}
+                                  <span>Downloadable Resource</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
+                              {fileUrl && (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-2 justify-center"
+                                  title="Preview in new tab"
+                                >
+                                  View
+                                </a>
+                              )}
+                              <Button
+                                onClick={async () => {
+                                  await downloadArtifactFile(fileUrl, fileName, filePath, activeModule.id);
+                                }}
+                                disabled={downloadingArtifactId === activeModule.id}
+                                className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                {downloadingArtifactId === activeModule.id ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Downloading...
+                                  </>
+                                ) : (
+                                  <>
+                                    <DownloadCloud size={16} />
+                                    Download Artifact
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom hint */}
+                        <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-white/10">
+                          <span>Click download to save to your local machine and record module progress.</span>
+                          <span className="text-emerald-400 font-semibold">Verified Safe Resource</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               ) : activeModule && userId && videoEmbedUrl ? (
                 <CourseVideoPlayer
                   key={`${activeModule.id}-${videoEmbedUrl}`}
@@ -2632,7 +2911,7 @@ export default function CoursePlayerPage() {
                 >
                   <HelpCircle size={13} />
                   Quizzes
-                  {courseQuizzes.length > 0 && (
+                  {(courseQuizzes.length > 0 || modules.some((m) => m.module_type === "quiz")) && (
                     <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>
@@ -2694,7 +2973,7 @@ export default function CoursePlayerPage() {
             >
               <HelpCircle size={13} />
               Quizzes
-              {courseQuizzes.length > 0 && (
+              {(courseQuizzes.length > 0 || modules.some((m) => m.module_type === "quiz")) && (
                 <span className="absolute top-2 right-2 flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>

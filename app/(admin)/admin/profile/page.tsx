@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import UserAvatar from "@/app/components/UserAvatar";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
@@ -56,8 +56,10 @@ export default function ProfilePage() {
           console.error(profileError);
         }
 
+        const resolvedName = await resolveUserName(supabase, user.id, user.email);
+
         if (profile) {
-          setFullName(profile.full_name || "");
+          setFullName(profile.full_name || resolvedName || "");
           setBio(profile.bio || "");
           setPortfolioUrl(profile.portfolio_url || "");
           setPhone(profile.phone || "");
@@ -113,6 +115,33 @@ export default function ProfilePage() {
 
       if (error) {
         throw error;
+      }
+
+      // Sync name changes to phase2.users schema so they reflect on the landing site
+      try {
+        await supabase
+          .schema("phase2" as any)
+          .from("users")
+          .update({
+            username: fullName.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("auth_user_id", userId);
+      } catch (p2Err) {
+        console.warn("Could not sync to phase2.users:", p2Err);
+      }
+
+      // Update Supabase Auth user metadata so session reflects the new name across apps
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName.trim(),
+            name: fullName.trim(),
+            username: fullName.trim(),
+          },
+        });
+      } catch (authErr) {
+        console.warn("Could not update auth user metadata:", authErr);
       }
 
       dispatchProfileUpdated();

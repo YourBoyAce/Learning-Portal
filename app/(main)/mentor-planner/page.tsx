@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -166,7 +166,8 @@ export default function MentorConnectPage() {
 
         const role = profile?.role || "user";
         setCurrentUserRole(role);
-        if (profile?.full_name) setCurrentUserName(profile.full_name);
+        const resolvedName = await resolveUserName(supabase, user.id, user.email);
+        setCurrentUserName(resolvedName);
         if (profile?.phone) setCurrentUserPhone(profile.phone);
 
         if (role === "instructor" || role === "admin") {
@@ -212,7 +213,7 @@ export default function MentorConnectPage() {
       const { data, error } = await supabase
         .from("calendar_events")
         .select("id, title, description, event_date, event_time, event_type, tag, meet_link")
-        .eq("user_id", userId);
+        .or(`user_id.eq.${userId},description.ilike.%Student ID: ${userId}%`);
 
       if (error) {
         // Fallback to high fidelity mock data if DB table or query fails

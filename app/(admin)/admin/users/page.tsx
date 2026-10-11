@@ -51,6 +51,7 @@ type ProfileRow = {
   full_name: string | null;
   email: string | null;
   role: string | null;
+  created_at?: string | null;
 };
 
 const ROLES = [
@@ -151,12 +152,36 @@ export default function AdminUsers() {
       }
     }
 
+    let phase2UserMap = new Map<string, string>();
+    try {
+      const { data: p2Users } = await supabase
+        .schema("phase2" as any)
+        .from("users")
+        .select("auth_user_id, email, username");
+      if (p2Users) {
+        for (const u of p2Users) {
+          if (u.auth_user_id && u.username) phase2UserMap.set(u.auth_user_id, u.username.trim());
+          if (u.email && u.username) phase2UserMap.set(u.email.toLowerCase(), u.username.trim());
+        }
+      }
+    } catch (p2Err) {
+      console.warn("Could not fetch phase2.users:", p2Err);
+    }
+
     if (!error && profiles) {
       const transformed = (profiles as ProfileRow[]).map((profile) => {
         const userLogs = logsByUser.get(profile.id);
+        const p2Name = phase2UserMap.get(profile.id) || phase2UserMap.get(profile.email?.toLowerCase() || "");
+        const isFromLanding = !profile.created_at && Boolean(p2Name);
+        const resolvedName = (isFromLanding && p2Name)
+          ? p2Name
+          : (profile.created_at && profile.full_name)
+          ? profile.full_name
+          : (p2Name || profile.full_name || profile.email?.split("@")[0] || "Unknown");
+
         return {
           id: profile.id,
-          name: profile.full_name || profile.email?.split("@")[0] || "Unknown",
+          name: resolvedName,
           email: profile.email || "No Email",
           role: profile.role?.toLowerCase() || "user",
           todaySessions: userLogs?.sessions || [],

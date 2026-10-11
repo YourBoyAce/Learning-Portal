@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
 import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
@@ -88,13 +88,8 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       setUserEmail(user.email ?? null);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
-
-      setFullName(profile?.full_name?.trim() || null);
+      const resolvedName = await resolveUserName(supabase, user.id, user.email);
+      setFullName(resolvedName);
       setLoading(false);
     };
 

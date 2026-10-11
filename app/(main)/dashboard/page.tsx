@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import {
@@ -374,9 +374,8 @@ export default function Dashboard() {
         .single();
 
       setCurrentInsightIndex(profile?.current_insight_index || 0);
-      setUserProfileName(
-        profile?.full_name || session.user.email?.split("@")[0] || "Learner",
-      );
+      const resolvedName = await resolveUserName(supabase, session.user.id, session.user.email);
+      setUserProfileName(resolvedName);
       //Fetch Scholarly insights
       const { data: insightsData } = await supabase
         .from("scholarly_insights")

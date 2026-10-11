@@ -52,6 +52,7 @@ async function authenticate(request: Request) {
 
   return {
     userId: data.user.id,
+    userEmail: data.user.email?.trim().toLowerCase() || "",
     supabaseAdmin: createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }) as unknown as SupabaseClient,
@@ -80,21 +81,51 @@ export async function POST(request: Request) {
   }
 
   const quizRow = quiz as QuizRow;
-  const { data: enrollment, error: enrollmentError } = await auth.supabaseAdmin
-    .schema("phase2")
-    .from("enrollments")
-    .select("course_id, users!inner(auth_user_id), bundles!inner(bundle_name)")
-    .eq("course_id", quizRow.course_id)
-    .eq("status", "active")
-    .eq("users.auth_user_id", auth.userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
 
-  const bundleName = String((enrollment as { bundles?: { bundle_name?: string } | null } | null)?.bundles?.bundle_name || "").toLowerCase();
-  if (!enrollment || (!bundleName.includes("pro") && !bundleName.includes("premium"))) {
-    return NextResponse.json({ error: "Quiz access is not available for this enrollment." }, { status: 403 });
+  // Check role from profiles
+  const { data: profile } = await auth.supabaseAdmin
+    .from("profiles")
+    .select("role, email")
+    .eq("id", auth.userId)
+    .maybeSingle();
+
+  const role = (profile?.role || "").toLowerCase();
+  const isAdminOrInstructor = role === "admin" || role === "instructor";
+
+  if (!isAdminOrInstructor) {
+    const { data: enrollment, error: enrollmentError } = await auth.supabaseAdmin
+      .schema("phase2")
+      .from("enrollments")
+      .select("course_id, users!inner(auth_user_id), bundles(bundle_name)")
+      .eq("course_id", quizRow.course_id)
+      .eq("status", "active")
+      .eq("users.auth_user_id", auth.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
+
+    const bundleName = String((enrollment as { bundles?: { bundle_name?: string } | null } | null)?.bundles?.bundle_name || "").toLowerCase();
+    let hasAccess = Boolean(enrollment && (bundleName.includes("pro") || bundleName.includes("premium")));
+
+    if (!hasAccess) {
+      const emailToMatch = profile?.email?.trim().toLowerCase() || auth.userEmail;
+      if (emailToMatch) {
+        const { data: member } = await auth.supabaseAdmin
+          .from("course_members")
+          .select("id")
+          .eq("maincourse_id", quizRow.course_id)
+          .eq("email", emailToMatch)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+        if (member) hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: "Quiz access is not available for this enrollment." }, { status: 403 });
+    }
   }
 
   const answersAreCompleteAndValid = quizRow.questions.every((question) => {

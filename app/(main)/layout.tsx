@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/app/lib/supabase";
+import { supabase, resolveUserProfileDetails } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
 import UserAvatar from "@/app/components/UserAvatar";
 import Image from "next/image";
@@ -51,14 +51,9 @@ function MainLayoutContent({
       if (cancelled) return;
       setUserEmail(user.email ?? null);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, role")
-        .eq("id", user.id)
-        .single();
-
-      setFullName(profile?.full_name?.trim() || null);
-      setRole(profile?.role || null);
+      const userDetails = await resolveUserProfileDetails(supabase, user.id, user.email);
+      setFullName(userDetails.fullName);
+      setRole(userDetails.role);
 
       setLoading(false);
     };
