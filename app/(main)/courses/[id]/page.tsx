@@ -172,14 +172,14 @@ export default function CoursePlayerPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const { isLoading: isTierLoading, tier, canAccess } = useCoursePermissions(String(id));
+  const [course, setCourse] = useState<Course | null>(null);
+  const { isLoading: isTierLoading, tier, canAccess } = useCoursePermissions(course?.id || String(id));
   const isCurrentlyLoading = loading || isTierLoading;
 
   useEffect(() => {
     setGlobalLoading(isCurrentlyLoading);
     return () => setGlobalLoading(false);
   }, [isCurrentlyLoading, setGlobalLoading]);
-  const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
   const [moduleCompletedAt, setModuleCompletedAt] = useState<Record<string, string>>({});
@@ -290,7 +290,7 @@ export default function CoursePlayerPage() {
       // course-specific Pro/Premium enrollment before returning definitions.
       const fetchQuizzes = async () => {
         try {
-          const data = await fetchLearnerQuizzes(String(id));
+          const data = await fetchLearnerQuizzes(String(course.id));
           setCourseQuizzes((data || []).map((quiz) => ({
             id: String(quiz.id),
             courseId: quiz.course_id,
@@ -603,11 +603,27 @@ export default function CoursePlayerPage() {
         // Populate a compatibility array (used downstream for module filtering)
       }
 
-      const { data: courseData, error: courseError } = await supabase
+      let { data: courseData, error: courseError } = await supabase
         .from("maincourses")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
+
+      if (!courseData) {
+        // Fallback: try looking up by product_id if id is a product UUID
+        const { data: fallbackCourse, error: fallbackError } = await supabase
+          .from("maincourses")
+          .select("*")
+          .eq("product_id", id)
+          .maybeSingle();
+
+        if (fallbackCourse) {
+          courseData = fallbackCourse;
+          courseError = null;
+        } else if (fallbackError) {
+          courseError = fallbackError;
+        }
+      }
 
       if (courseError || !courseData)
         throw courseError || new Error("Course not found");
@@ -617,7 +633,7 @@ export default function CoursePlayerPage() {
       const { data: courseModules, error: modulesError } = await supabase
         .from("coursemodules")
         .select("*, section_id")
-        .eq("maincourse_id", id)
+        .eq("maincourse_id", courseData.id)
         .order("order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true });
@@ -632,7 +648,7 @@ export default function CoursePlayerPage() {
         const { data: sectionData } = await supabase
           .from("course_sections")
           .select("id, title, description, order_index")
-          .eq("maincourse_id", id)
+          .eq("maincourse_id", courseData.id)
           .order("order_index", { ascending: true })
           .order("created_at", { ascending: true });
 
@@ -650,7 +666,7 @@ export default function CoursePlayerPage() {
         .from("user_video_progress")
         .select("video_id, completed, completed_at, updated_at, last_position_seconds")
         .eq("user_id", user.id)
-        .eq("course_id", id);
+        .or(`course_id.eq.${courseData.id},course_id.eq.${id}`);
 
       if (
         progressError &&
@@ -662,7 +678,7 @@ export default function CoursePlayerPage() {
           .from("user_video_progress")
           .select("video_id, completed, completed_at, updated_at")
           .eq("user_id", user.id)
-          .eq("course_id", id);
+          .or(`course_id.eq.${courseData.id},course_id.eq.${id}`);
         progressData = fallbackResult.data;
         progressError = fallbackResult.error;
       }
@@ -795,7 +811,7 @@ export default function CoursePlayerPage() {
         .from("certificates")
         .select("id")
         .eq("user_id", user.id)
-        .eq("course_id", id)
+        .or(`course_id.eq.${courseData.id},course_id.eq.${id}`)
         .maybeSingle();
 
       setHasCertificate(!!certData);
@@ -804,7 +820,7 @@ export default function CoursePlayerPage() {
         .from("course_ratings")
         .select("rating, review")
         .eq("user_id", user.id)
-        .eq("course_id", id)
+        .or(`course_id.eq.${courseData.id},course_id.eq.${id}`)
         .maybeSingle();
 
       if (!reviewDataError && reviewData) {

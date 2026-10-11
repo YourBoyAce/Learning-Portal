@@ -162,7 +162,7 @@ export async function getCourseUserTier(
     .from("enrollments")
     .select("*, bundles(bundle_name)")
     .eq("user_id", targetUserId)
-    .eq("course_id", courseId)
+    .or(`course_id.eq.${courseId},product_id.eq.${courseId}`)
     .eq("status", "active")
     .order("created_at", { ascending: false });
 
