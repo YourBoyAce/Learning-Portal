@@ -128,20 +128,21 @@ export default function AdminCourses() {
   }
 
   const [modules, setModules] = useState<
-    Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz"; questions?: ModuleQuestion[]; section_id?: string | number | null }>
+    Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[]; section_id?: string | number | null }>
   >([]);
 
-  // ── Section state ──────────────────────────────────────────────────────────
+  // â”€â”€ Section state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   interface SectionState {
     id?: string | number;
     title: string;
     description: string;
-    modules: Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz"; questions?: ModuleQuestion[] }>;
+    modules: Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[] }>;
   }
   const [courseSections, setCourseSections] = useState<SectionState[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingArtifacts, setUploadingArtifacts] = useState<Record<string, boolean>>({});
   const [modalMessage, setModalMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -181,7 +182,7 @@ export default function AdminCourses() {
     setPreviewFinished(false);
   };
 
-  // ── Product-layer state (Active workflow) ──────────────────────────────────
+  // â”€â”€ Product-layer state (Active workflow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   interface Product {
     id: number | string;
     title: string;
@@ -236,7 +237,7 @@ export default function AdminCourses() {
   const [editingProductTitle, setEditingProductTitle] = useState("");
   const [isSavingProduct, setIsSavingProduct] = useState(false);
 
-  // ── Member/Mentor assignment state ──────────────────────────────────────────
+  // â”€â”€ Member/Mentor assignment state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [profileUsers, setProfileUsers] = useState<Profile[]>([]);
   const [scholarSelectOptions, setScholarSelectOptions] = useState<SelectOption[]>([]);
   const [mentorSelectOptions, setMentorSelectOptions] = useState<SelectOption[]>([]);
@@ -362,7 +363,7 @@ export default function AdminCourses() {
       return;
     }
 
-    // Active maincourse — pre-fill product + month from title
+    // Active maincourse â€” pre-fill product + month from title
     setCourseType("active");
     if (course.product_id) {
       setSelectedProductId(String(course.product_id));
@@ -374,7 +375,7 @@ export default function AdminCourses() {
       if (loadedProduct) {
         setSelectedProductName(loadedProduct.title);
       } else {
-        // Parse from title like "Playwright - June 2026 Weekday" → "Playwright"
+        // Parse from title like "Playwright - June 2026 Weekday" â†’ "Playwright"
         const nameFromTitle = course.title.split(" - ")[0]?.trim() ?? "";
         setSelectedProductName(nameFromTitle);
       }
@@ -582,7 +583,7 @@ export default function AdminCourses() {
     }
   };
 
-  // ── Section handlers ─────────────────────────────────────────────────────
+  // â”€â”€ Section handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleAddSection = (afterIndex?: number) => {
     const newSection: SectionState = { title: "", description: "", modules: [] };
     if (typeof afterIndex === "number" && afterIndex >= 0 && afterIndex < courseSections.length) {
@@ -761,7 +762,7 @@ export default function AdminCourses() {
         thumbnailUrl = undefined;
       }
 
-      // ── WORKFLOW 1: Upcoming → save/update product only ──────────────────
+      // â”€â”€ WORKFLOW 1: Upcoming â†’ save/update product only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (courseType === "upcoming") {
         if (!courseTitle.trim()) {
           setModalMessage({
@@ -800,7 +801,7 @@ export default function AdminCourses() {
         return;
       }
 
-      // ── WORKFLOW 2: Active → product + maincourse + modules ──────────────
+      // â”€â”€ WORKFLOW 2: Active â†’ product + maincourse + modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (!isEditing && !batchMonth) {
         setModalMessage({ type: "error", text: "Please select a month." });
         setIsSaving(false);
@@ -1162,6 +1163,63 @@ export default function AdminCourses() {
     },
   ];
 
+  const handleArtifactUpload = async (sIdx: number | null, mIdx: number, file: File) => {
+    const uploadKey = sIdx !== null ? `sec_${sIdx}_${mIdx}` : `flat_${mIdx}`;
+    try {
+      setUploadingArtifacts(prev => ({ ...prev, [uploadKey]: true }));
+      const uniqueFileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const filePath = `artifacts/${uniqueFileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("course-artifacts")
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        
+      if (uploadError) {
+        setModalMessage({ type: "error", text: "Failed to upload artifact: " + uploadError.message });
+        return;
+      }
+      
+      const { data: publicUrlData } = supabase.storage
+        .from("course-artifacts")
+        .getPublicUrl(filePath);
+        
+      const fileUrl = publicUrlData.publicUrl;
+      const artifactQuestion = {
+        questionType: "text" as const,
+        text: fileUrl, 
+        options: [file.name, `${(file.size / (1024 * 1024)).toFixed(2)} MB`], 
+        correctAnswer: filePath,
+      };
+      
+      if (sIdx !== null) {
+        setCourseSections((prev) => {
+          const newSections = [...prev];
+          const newSection = { ...newSections[sIdx] };
+          const newModules = [...newSection.modules];
+          const newModule = { ...newModules[mIdx] };
+          newModule.questions = [artifactQuestion];
+          newModules[mIdx] = newModule;
+          newSection.modules = newModules;
+          newSections[sIdx] = newSection;
+          return newSections;
+        });
+      } else {
+        setModules((prev) => {
+          const newModules = [...prev];
+          const newModule = { ...newModules[mIdx] };
+          newModule.questions = [artifactQuestion];
+          newModules[mIdx] = newModule;
+          return newModules;
+        });
+      }
+      setModalMessage({ type: "success", text: "Artifact uploaded successfully!" });
+    } catch (err: any) {
+      setModalMessage({ type: "error", text: err.message || "Failed to upload artifact." });
+    } finally {
+      setUploadingArtifacts(prev => ({ ...prev, [uploadKey]: false }));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -1429,7 +1487,7 @@ export default function AdminCourses() {
         })()}
       </div>
 
-      {/* â”€â”€â”€ CREATE / EDIT MODAL â”€â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ CREATE / EDIT MODAL Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
@@ -1448,7 +1506,7 @@ export default function AdminCourses() {
 
             {/* Modal Body - Scrollable */}
             <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
-              {/* Course type radio — only shown when creating */}
+              {/* Course type radio â€” only shown when creating */}
               {!isEditing && (
                 <div className="flex gap-6">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -1472,7 +1530,7 @@ export default function AdminCourses() {
                 </div>
               )}
 
-              {/* ── UPCOMING: simple product form ── */}
+              {/* â”€â”€ UPCOMING: simple product form â”€â”€ */}
               {courseType === "upcoming" && (
                 <>
                   <div>
@@ -1545,7 +1603,7 @@ export default function AdminCourses() {
                 </>
               )}
 
-              {/* ── ACTIVE: product + batch fields ── */}
+              {/* â”€â”€ ACTIVE: product + batch fields â”€â”€ */}
               {courseType === "active" && (
                 <>
                   {/* Product selector */}
@@ -1554,7 +1612,7 @@ export default function AdminCourses() {
                       Product
                     </label>
                     {isEditing ? (
-                      /* Edit mode — read-only display showing only the assigned product name */
+                      /* Edit mode â€” read-only display showing only the assigned product name */
                       <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800">
                         {selectedProductName ||
                           products.find((p) => String(p.id) === selectedProductId)?.title ||
@@ -1884,7 +1942,7 @@ export default function AdminCourses() {
                     </div>
                   )}
 
-                  {/* ── Assign Members ── */}
+                  {/* â”€â”€ Assign Members â”€â”€ */}
                   {isEditing && (
                     <div>
                       <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
@@ -1934,7 +1992,7 @@ export default function AdminCourses() {
                     </div>
                   )}
 
-                  {/* ── Assign Mentors / Instructors ── */}
+                  {/* â”€â”€ Assign Mentors / Instructors â”€â”€ */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
                       <Users size={14} className="text-purple-500" /> Assign Mentors / Instructors
@@ -2183,7 +2241,7 @@ export default function AdminCourses() {
                                 />
 
                                 {/* Module Type Selector (Top Right of Module Section) */}
-                                <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1 border transition-colors ${mod.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                                <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1 border transition-colors ${mod.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : mod.module_type === "artifact" ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
                                   }`}>
                                   <select
                                     value={mod.module_type || "video"}
@@ -2200,6 +2258,7 @@ export default function AdminCourses() {
                                   >
                                     <option value="video">Video</option>
                                     <option value="quiz">Quiz</option>
+                                    <option value="artifact">Artifact</option>
                                   </select>
                                 </div>
 
@@ -2390,6 +2449,59 @@ export default function AdminCourses() {
                                     );
                                   })()}
                                 </div>
+                              ) : mod.module_type === "artifact" ? (
+                                <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-3.5 -mb-3.5">
+                                  {uploadingArtifacts[`sec_${sIdx}_${mIdx}`] ? (
+                                    <div className="text-center py-5 px-3 border border-gray-200 rounded-lg bg-white shadow-2xs">
+                                      <Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto mb-2" />
+                                      <p className="text-xs font-semibold text-gray-700">Uploading Artifact...</p>
+                                    </div>
+                                  ) : mod.questions && mod.questions.length > 0 ? (
+                                    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3 shadow-2xs">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center shrink-0">
+                                          <Upload size={16} />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="text-xs font-bold text-gray-900 truncate">{mod.questions[0].options?.[0] || "Artifact"}</p>
+                                          <p className="text-[10px] text-gray-500">{mod.questions[0].options?.[1] || "Uploaded"}</p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCourseSections(prev => {
+                                            const nw = [...prev];
+                                            nw[sIdx].modules[mIdx].questions = [];
+                                            return nw;
+                                          });
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-gray-200 bg-white shadow-xs"
+                                        title="Remove Artifact"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-4 px-3 border border-dashed border-gray-300 rounded-lg bg-white">
+                                      <label className="flex flex-col items-center justify-center cursor-pointer group">
+                                        <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-emerald-50 transition-colors mb-2">
+                                          <Upload className="w-5 h-5 text-gray-400 group-hover:text-emerald-500" />
+                                        </div>
+                                        <p className="text-xs text-gray-800 font-semibold group-hover:text-emerald-600 transition-colors">Click to upload artifact file</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">PDF, ZIP, Code, etc.</p>
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleArtifactUpload(sIdx, mIdx, file);
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <textarea
                                   placeholder="Module description (optional)"
@@ -2450,7 +2562,7 @@ export default function AdminCourses() {
                           />
 
                           {/* Module Type Selector */}
-                          <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs border transition-colors ${module.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
+                          <div className={`shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs border transition-colors ${module.module_type === "quiz" ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : module.module_type === "artifact" ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-bold" : "bg-blue-50 border-blue-200 text-blue-900 font-semibold"
                             }`}>
                             <select
                               value={module.module_type || "video"}
@@ -2461,6 +2573,7 @@ export default function AdminCourses() {
                             >
                               <option value="video">Video</option>
                               <option value="quiz">Quiz</option>
+                              <option value="artifact">Artifact</option>
                             </select>
                           </div>
 
@@ -2651,6 +2764,59 @@ export default function AdminCourses() {
                               })()
                             )}
                           </div>
+                        ) : module.module_type === "artifact" ? (
+                          <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-4 -mb-4">
+                            {uploadingArtifacts[`flat_${index}`] ? (
+                              <div className="text-center py-5 px-3 border border-gray-200 rounded-lg bg-white shadow-2xs">
+                                <Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto mb-2" />
+                                <p className="text-xs font-semibold text-gray-700">Uploading Artifact...</p>
+                              </div>
+                            ) : module.questions && module.questions.length > 0 ? (
+                              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3 shadow-2xs">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center shrink-0">
+                                    <Upload size={16} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">{module.questions[0].options?.[0] || "Artifact"}</p>
+                                    <p className="text-[10px] text-gray-500">{module.questions[0].options?.[1] || "Uploaded"}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModules(prev => {
+                                      const nw = [...prev];
+                                      nw[index].questions = [];
+                                      return nw;
+                                    });
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-gray-200 bg-white shadow-xs"
+                                  title="Remove Artifact"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 px-3 border border-dashed border-gray-300 rounded-lg bg-white">
+                                <label className="flex flex-col items-center justify-center cursor-pointer group">
+                                  <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-emerald-50 transition-colors mb-2">
+                                    <Upload className="w-5 h-5 text-gray-400 group-hover:text-emerald-500" />
+                                  </div>
+                                  <p className="text-xs text-gray-800 font-semibold group-hover:text-emerald-600 transition-colors">Click to upload artifact file</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">PDF, ZIP, Code, etc.</p>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleArtifactUpload(null, index, file);
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <textarea
                             placeholder={`Description for Module ${index + 1} (optional)`}
@@ -2713,7 +2879,7 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* â”€â”€â”€ DELETE CONFIRMATION MODAL â”€â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ DELETE CONFIRMATION MODAL Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       {showDeleteConfirm && deletingCourse && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -2760,7 +2926,7 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* ─── PRODUCT DELETE CONFIRMATION MODAL ─── */}
+      {/* â”€â”€â”€ PRODUCT DELETE CONFIRMATION MODAL â”€â”€â”€ */}
       {showProductDeleteConfirm && deletingProduct && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -2807,7 +2973,7 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* ─── QUIZ PREVIEW MODAL POPUP (ENLARGED & PROMINENT) ─── */}
+      {/* â”€â”€â”€ QUIZ PREVIEW MODAL POPUP (ENLARGED & PROMINENT) â”€â”€â”€ */}
       {previewQuizData && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[70] p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden border border-gray-100">

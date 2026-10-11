@@ -195,6 +195,20 @@ export default function AdminArtifacts() {
         console.error(error);
         return;
       }
+      
+      const { data: moduleData, error: moduleError } = await supabase
+        .from("coursemodules")
+        .select(`
+        *,
+        maincourses (
+          title
+        )
+      `)
+        .eq("module_type", "artifact");
+
+      if (moduleError) {
+        console.error(moduleError);
+      }
 
       const mapped: Artifact[] =
         data?.map((item: any) => ({
@@ -213,8 +227,30 @@ export default function AdminArtifacts() {
           fileUrl: item.file_url,
           filePath: item.file_path,
         })) || [];
+        
+      const moduleMapped: Artifact[] = 
+        moduleData?.map((item: any) => ({
+          id: `module-${item.id}`,
+          name: item.title || "Module Artifact",
+          type: "Other",
+          courseName:
+            item.maincourses?.title || "Unknown Course",
+          courseId: item.maincourse_id,
+          batchId: null,
+          size: "0 MB",
+          uploadDate: item.created_at || new Date().toISOString(),
+          downloadsCount: 0,
+          status: "Published",
+          description: item.description || "",
+          fileUrl: "",
+          filePath: "",
+        })) || [];
+        
+      const allArtifacts = [...mapped, ...moduleMapped].sort((a, b) => 
+        new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
+      );
 
-      setArtifacts(mapped);
+      setArtifacts(allArtifacts);
     } catch (err) {
       console.error(err);
     }

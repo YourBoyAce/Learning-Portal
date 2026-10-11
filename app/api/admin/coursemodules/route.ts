@@ -95,6 +95,45 @@ export async function POST(request: Request) {
     typeof formData.get("title") === "string"
       ? String(formData.get("title")).trim()
       : "";
+  const moduleType =
+    typeof formData.get("moduleType") === "string"
+      ? String(formData.get("moduleType")).trim()
+      : "";
+      
+  const moduleId =
+    typeof formData.get("moduleId") === "string"
+      ? String(formData.get("moduleId")).trim()
+      : "";
+
+  if (moduleType === "artifact") {
+    const fileUrl = formData.get("fileUrl") as string;
+    const filePath = formData.get("filePath") as string;
+    const fileSize = formData.get("fileSize") as string;
+    const fileName = formData.get("fileName") as string;
+    
+    if (!moduleId) {
+       return NextResponse.json({ error: "moduleId is required for artifact upload." }, { status: 400 });
+    }
+    
+    const { data: moduleResult, error: dbError } = await authContext.supabaseAdmin
+      .from("coursemodules")
+      .update({
+        questions: [{ url: fileUrl, path: filePath, size: fileSize, name: fileName }]
+      })
+      .eq("id", moduleId)
+      .select("*")
+      .single();
+      
+    if (dbError) {
+      return apiErrorResponse(dbError, undefined, 500);
+    }
+    return NextResponse.json({
+      success: true,
+      module: moduleResult,
+      message: "Artifact uploaded successfully and linked to the module.",
+    });
+  }
+
   const cloudflareUid =
     typeof formData.get("cloudflareUid") === "string"
       ? String(formData.get("cloudflareUid")).trim()
@@ -165,10 +204,6 @@ export async function POST(request: Request) {
     videoUrl = `https://watch.cloudflarestream.com/${uid}`;
   }
 
-  const moduleId =
-    typeof formData.get("moduleId") === "string"
-      ? String(formData.get("moduleId")).trim()
-      : "";
   const batchId =
     typeof formData.get("batchId") === "string"
       ? String(formData.get("batchId")).trim()

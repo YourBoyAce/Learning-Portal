@@ -477,7 +477,7 @@ export default function UploadPage() {
     );
 
     if (selectedModule?.module_type === "quiz") {
-      setError("Cannot upload a video to a Quiz module. Only Video modules are supported.");
+      setError("Cannot upload a file to a Quiz module.");
       return;
     }
 
@@ -511,6 +511,58 @@ export default function UploadPage() {
       }
 
       const fileSize = selectedFile.size;
+      
+      if (selectedModule?.module_type === "artifact") {
+        setUploadStatus("Uploading artifact to storage...");
+        const uniqueFileName = `${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const filePath = `artifacts/${uniqueFileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("course-artifacts")
+          .upload(filePath, selectedFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+          
+        if (uploadError) {
+          throw new Error("Failed to upload artifact: " + uploadError.message);
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from("course-artifacts")
+          .getPublicUrl(filePath);
+          
+        const fileUrl = publicUrlData.publicUrl;
+        
+        const payload = new FormData();
+        payload.append("moduleType", "artifact");
+        payload.append("moduleId", selectedModuleId);
+        payload.append("fileUrl", fileUrl);
+        payload.append("filePath", filePath);
+        payload.append("fileSize", `${(fileSize / (1024 * 1024)).toFixed(2)} MB`);
+        payload.append("fileName", selectedFile.name);
+        
+        const response = await fetch("/api/admin/coursemodules", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: payload,
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(result?.error || `Request failed (${response.status}).`);
+        }
+        
+        setSelectedFile(null);
+        setUploadProgress(100);
+        setUploadStatus("");
+        setSuccess("Artifact uploaded successfully and linked to the module.");
+        setIsUploading(false);
+        return;
+      }
+
       const chunkSize = 190 * 1024 * 1024; // 190MB chunks
       const numChunks = Math.ceil(fileSize / chunkSize);
       const uploadedUIDs: string[] = [];
@@ -687,7 +739,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl min-[1440px]:max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className={TYPOGRAPHY_CLASSES.MAIN_HEADING}>
@@ -740,9 +792,9 @@ export default function UploadPage() {
           </div>
         )}
 
-        {/* Main Content - 1 Column Layout */}
-        <div className="grid grid-cols-1 gap-6 mb-8">
-          {/* Top Panel - Upload Form */}
+        {/* Main Content: 1 Column below 1440px, 2 Columns (side-by-side) from 1440px */}
+        <div className="grid grid-cols-1 min-[1440px]:grid-cols-2 gap-6 mb-8 items-start">
+          {/* Left Panel - Upload Form */}
           <div className="space-y-6 min-w-0">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className={TYPOGRAPHY_CLASSES.SUBHEADING + " mb-4"}>

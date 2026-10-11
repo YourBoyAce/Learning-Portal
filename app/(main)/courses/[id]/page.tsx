@@ -65,7 +65,7 @@ interface Module {
   created_at?: string | null;
   duration: string;
   order_index: number;
-  module_type?: "video" | "quiz";
+  module_type?: "video" | "quiz" | "artifact";
   questions?: any;
   section_id?: string | number | null;
 }
@@ -1766,6 +1766,108 @@ export default function CoursePlayerPage() {
           </p>
         </div>
 
+        {/* Sections for Quizzes */}
+        {courseSections.map((section, sIdx) => {
+          const sectionQuizzes = modules.filter(
+            (m) => String(m.section_id) === String(section.id) && m.module_type === "quiz"
+          );
+          if (sectionQuizzes.length === 0) return null;
+
+          return (
+            <div key={section.id} className="mb-6">
+              <div className="px-6 py-3 bg-gray-50/80 border-y border-gray-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">
+                    Section {sIdx + 1}
+                  </span>
+                  <h4 className="text-sm font-bold text-gray-600">{section.title}</h4>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                {sectionQuizzes.map((mod) => {
+                  const moduleKey = getModuleKey(mod);
+                  const isCompleted = !!userProgress[moduleKey];
+                  const qCount = Array.isArray(mod.questions) ? mod.questions.length : 0;
+                  
+                  return (
+                    <div
+                      key={mod.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        selectModule(moduleKey);
+                        if (window.innerWidth < 1280) handleTabChange("overview");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-2 border-b border-gray-100 group text-left cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${isCompleted ? "bg-emerald-500 text-white" : "bg-blue-50 text-brand-heading group-hover:bg-brand-heading group-hover:text-white"}`}>
+                          {isCompleted ? <CheckCircle2 size={16} /> : <HelpCircle size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand-heading transition-colors leading-snug mb-1">
+                            {mod.title}
+                          </h4>
+                          <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            <span>{qCount} Qs</span>
+                            <span>•</span>
+                            <span>Course Module</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Global/Ungrouped Quizzes Header */}
+        {(courseQuizzes.length > 0 || modules.some(m => m.module_type === "quiz" && (!m.section_id || !courseSections.some(s => String(s.id) === String(m.section_id))))) && (
+          <div className="px-6 py-3 bg-gray-50/80 border-y border-gray-100 flex items-center justify-between">
+            <h4 className="text-sm font-bold text-gray-600">General Quizzes</h4>
+          </div>
+        )}
+
+        {/* Ungrouped Module Quizzes */}
+        {modules.filter(m => m.module_type === "quiz" && (!m.section_id || !courseSections.some(s => String(s.id) === String(m.section_id)))).map((mod) => {
+          const moduleKey = getModuleKey(mod);
+          const isCompleted = !!userProgress[moduleKey];
+          const qCount = Array.isArray(mod.questions) ? mod.questions.length : 0;
+          
+          return (
+            <div
+              key={mod.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                selectModule(moduleKey);
+                if (window.innerWidth < 1280) handleTabChange("overview");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-2 border-b border-gray-100 group text-left cursor-pointer"
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${isCompleted ? "bg-emerald-500 text-white" : "bg-blue-50 text-brand-heading group-hover:bg-brand-heading group-hover:text-white"}`}>
+                  {isCompleted ? <CheckCircle2 size={16} /> : <HelpCircle size={16} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-brand-heading transition-colors leading-snug mb-1">
+                    {mod.title}
+                  </h4>
+                  <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span>{qCount} Qs</span>
+                    <span>•</span>
+                    <span>Course Module</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
         {courseQuizzes.map((quiz) => {
           const score = bestScores[quiz.id];
           const hasAttempted = score !== undefined;
@@ -1819,7 +1921,7 @@ export default function CoursePlayerPage() {
           );
         })}
 
-        {courseQuizzes.length === 0 && (
+        {(courseQuizzes.length === 0 && modules.filter(m => m.module_type === "quiz").length === 0) && (
           <div className="p-10 text-center text-gray-400">
             <FileText size={32} className="mx-auto mb-4 opacity-20" />
             <p className="text-xs font-bold uppercase tracking-widest">
@@ -1842,6 +1944,170 @@ export default function CoursePlayerPage() {
             Download supplementary materials, code snippets, and resources.
           </p>
         </div>
+
+        {/* Sections for Artifacts */}
+        {courseSections.map((section, sIdx) => {
+          const sectionArtifacts = modules.filter(
+            (m) => String(m.section_id) === String(section.id) && m.module_type === "artifact"
+          );
+          if (sectionArtifacts.length === 0) return null;
+
+          return (
+            <div key={section.id} className="mb-6">
+              <div className="px-6 py-3 bg-gray-50/80 border-y border-gray-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">
+                    Section {sIdx + 1}
+                  </span>
+                  <h4 className="text-sm font-bold text-gray-600">{section.title}</h4>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                {sectionArtifacts.map((mod) => {
+                  const moduleKey = getModuleKey(mod);
+                  const isCompleted = !!userProgress[moduleKey];
+                  const qArray = Array.isArray(mod.questions) ? mod.questions : [];
+                  const fileName = qArray[0]?.options?.[0] || "Artifact File";
+                  const fileSize = qArray[0]?.options?.[1] || "";
+                  const fileUrl = qArray[0]?.text || "";
+
+                  return (
+                    <div
+                      key={mod.id}
+                      className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${isCompleted ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                          {isCompleted ? <CheckCircle2 size={16} /> : <FileText size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => {
+                          selectModule(moduleKey);
+                          if (window.innerWidth < 1280) handleTabChange("overview");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}>
+                          <h4 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-snug mb-1">
+                            {mod.title}
+                          </h4>
+                          <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            <span className="text-emerald-600 truncate max-w-[150px] inline-block align-bottom">{fileName}</span>
+                            {fileSize && (
+                              <>
+                                <span>•</span>
+                                <span>{fileSize}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {mod.description && (
+                        <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                          {mod.description}
+                        </p>
+                      )}
+
+                      {fileUrl && (
+                        <Button
+                          onClick={() => {
+                            window.open(fileUrl, '_blank');
+                            if (userId && id) {
+                              try {
+                                const key = getProgressStorageKey(userId, String(id));
+                                const existing = localStorage.getItem(key);
+                                const parsed = existing ? (JSON.parse(existing) as Record<string, boolean>) : {};
+                                parsed[moduleKey] = true;
+                                localStorage.setItem(key, JSON.stringify(parsed));
+                                setUserProgress(parsed);
+                              } catch(e) {}
+                            }
+                          }}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                        >
+                          <DownloadCloud size={14} /> View File
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Global/Ungrouped Artifacts Header */}
+        {(courseArtifacts.length > 0 || modules.some(m => m.module_type === "artifact" && (!m.section_id || !courseSections.some(s => String(s.id) === String(m.section_id))))) && (
+          <div className="px-6 py-3 bg-gray-50/80 border-y border-gray-100 flex items-center justify-between">
+            <h4 className="text-sm font-bold text-gray-600">General Artifacts</h4>
+          </div>
+        )}
+
+        {/* Ungrouped Module Artifacts */}
+        {modules.filter(m => m.module_type === "artifact" && (!m.section_id || !courseSections.some(s => String(s.id) === String(m.section_id)))).map((mod) => {
+          const moduleKey = getModuleKey(mod);
+          const isCompleted = !!userProgress[moduleKey];
+          const qArray = Array.isArray(mod.questions) ? mod.questions : [];
+          const fileName = qArray[0]?.options?.[0] || "Artifact File";
+          const fileSize = qArray[0]?.options?.[1] || "";
+          const fileUrl = qArray[0]?.text || "";
+
+          return (
+            <div
+              key={mod.id}
+              className="p-5 hover:bg-gray-50/50 transition-all flex flex-col gap-4 border-b border-gray-100 group text-left"
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${isCompleted ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                  {isCompleted ? <CheckCircle2 size={16} /> : <FileText size={16} />}
+                </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => {
+                  selectModule(moduleKey);
+                  if (window.innerWidth < 1280) handleTabChange("overview");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}>
+                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-snug mb-1">
+                    {mod.title}
+                  </h4>
+                  <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <span className="text-emerald-600 truncate max-w-[150px] inline-block align-bottom">{fileName}</span>
+                    {fileSize && (
+                      <>
+                        <span>•</span>
+                        <span>{fileSize}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {mod.description && (
+                <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                  {mod.description}
+                </p>
+              )}
+
+              {fileUrl && (
+                <Button
+                  onClick={() => {
+                    window.open(fileUrl, '_blank');
+                    if (userId && id) {
+                      try {
+                        const key = getProgressStorageKey(userId, String(id));
+                        const existing = localStorage.getItem(key);
+                        const parsed = existing ? (JSON.parse(existing) as Record<string, boolean>) : {};
+                        parsed[moduleKey] = true;
+                        localStorage.setItem(key, JSON.stringify(parsed));
+                        setUserProgress(parsed);
+                      } catch(e) {}
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold shadow-none bg-white border-2 border-gray-100 text-gray-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <DownloadCloud size={14} /> View File
+                </Button>
+              )}
+            </div>
+          );
+        })}
 
         {courseArtifacts.map((art) => (
           <div
@@ -1885,7 +2151,7 @@ export default function CoursePlayerPage() {
           </div>
         ))}
 
-        {courseArtifacts.length === 0 && (
+        {(courseArtifacts.length === 0 && modules.filter(m => m.module_type === "artifact").length === 0) && (
           <div className="p-10 text-center text-gray-400">
             <Layers size={32} className="mx-auto mb-4 opacity-20" />
             <p className="text-xs font-bold uppercase tracking-widest">

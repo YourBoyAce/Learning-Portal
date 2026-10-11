@@ -171,7 +171,7 @@ export async function GET(request: Request) {
     return apiErrorResponse(productsError, undefined, 500);
   }
 
-  // Products that already have a linked maincourse are "active" — don't show them in upcoming.
+  // Products that already have a linked maincourse are "active" â€” don't show them in upcoming.
   const linkedProductIds = new Set(
     ((maincoursesData ?? []) as any[])
       .map((c) => c.product_id)
@@ -194,7 +194,7 @@ export async function GET(request: Request) {
     ...upcomingProducts,
   ];
 
-  // ── Fetch mentors for active courses ──
+  // â”€â”€ Fetch mentors for active courses â”€â”€
   const { data: allMembers } = await authContext.supabaseAdmin
     .from("course_members")
     .select("maincourse_id, email");
@@ -510,7 +510,7 @@ export async function POST(request: Request) {
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
 
-  // ── WORKFLOW 1: Upcoming → insert into products only ──────────────────────
+  // â”€â”€ WORKFLOW 1: Upcoming â†’ insert into products only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (courseType === "upcoming") {
     const title = typeof body?.title === "string" ? body.title.trim() : "";
     const description = typeof body?.description === "string" ? body.description.trim() : "";
@@ -524,7 +524,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  // ── WORKFLOW 2: Active → product + maincourse + modules + members ─────────
+  // â”€â”€ WORKFLOW 2: Active â†’ product + maincourse + modules + members â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const description = typeof body?.description === "string" ? body.description.trim() : "";
   if (!description) {
     return NextResponse.json({ error: "Description is required for active courses." }, { status: 400 });
@@ -622,7 +622,7 @@ export async function POST(request: Request) {
             section_id: newSection.id,
             title: typeof m.title === "string" ? m.title.trim() : "",
             description: typeof m.description === "string" ? m.description.trim() : "",
-            module_type: m.module_type === "quiz" ? "quiz" : "video",
+            module_type: ["quiz", "artifact"].includes(m.module_type) ? m.module_type : "video",
             questions: Array.isArray(m.questions) ? m.questions : [],
             order_index: mIdx + 1,
           }))
@@ -652,7 +652,7 @@ export async function POST(request: Request) {
         maincourse_id: newCourse.id,
         title: typeof m.title === "string" ? m.title.trim() : "",
         description: typeof m.description === "string" ? m.description.trim() : "",
-        module_type: m.module_type === "quiz" ? "quiz" : "video",
+        module_type: ["quiz", "artifact"].includes(m.module_type) ? m.module_type : "video",
         questions: Array.isArray(m.questions) ? m.questions : [],
         order_index: index + 1,
       }))
@@ -716,7 +716,7 @@ export async function POST(request: Request) {
     const authUsers = authUsersResult.data?.users ?? [];
 
     // Resolve the Starter bundle id so newly enrolled users get the correct tier.
-    // The tier system reads bundle_name from this FK — a null bundle_id always
+    // The tier system reads bundle_name from this FK â€” a null bundle_id always
     // resolves to "Starter" via the fallback string, but the JOIN fails and the
     // feature gates stay locked.  We populate it explicitly here.
     const { data: starterBundle } = await authContext.supabaseAdmin
@@ -802,7 +802,7 @@ export async function PUT(request: Request) {
     ? thumbnailUrl
     : hasThumbnailField ? null : undefined;
 
-  // ── Upcoming: edit product record ─────────────────────────────────────────
+  // â”€â”€ Upcoming: edit product record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (courseType === "upcoming") {
     const productId = body?.id;
     const title = typeof body?.title === "string" ? body.title.trim() : "";
@@ -826,7 +826,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  // ── Active: edit maincourse record ────────────────────────────────────────
+  // â”€â”€ Active: edit maincourse record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const id = normalizeId(body?.id);
   const description = typeof body?.description === "string" ? body.description.trim() : "";
 
@@ -868,7 +868,7 @@ export async function PUT(request: Request) {
     return apiErrorResponse(updateError, undefined, 500);
   }
 
-  // ── Step: Handle sections ──────────────────────────────────────────────────
+  // â”€â”€ Step: Handle sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sections = body?.sections;
   if (Array.isArray(sections)) {
     const validSections = sections.filter(
@@ -989,7 +989,7 @@ export async function PUT(request: Request) {
             .update({
               title: mod.title.trim(),
               description: (mod.description || "").trim(),
-              module_type: mod.module_type === "quiz" ? "quiz" : "video",
+              module_type: ["quiz", "artifact"].includes(mod.module_type) ? mod.module_type : "video",
               questions: Array.isArray(mod.questions) ? mod.questions : [],
               section_id: sec.id,
               order_index: sectionModules.findIndex((m: any) => m.id === mod.id) + 1,
@@ -1004,7 +1004,7 @@ export async function PUT(request: Request) {
             section_id: sec.id,
             title: mod.title.trim(),
             description: (mod.description || "").trim(),
-            module_type: mod.module_type === "quiz" ? "quiz" : "video",
+            module_type: ["quiz", "artifact"].includes(mod.module_type) ? mod.module_type : "video",
             questions: Array.isArray(mod.questions) ? mod.questions : [],
             order_index: sectionModules.length - modsToInsert.length + mIdx + 1,
           }));
@@ -1047,7 +1047,7 @@ export async function PUT(request: Request) {
             section_id: newSection.id,
             title: m.title.trim(),
             description: (m.description || "").trim(),
-            module_type: m.module_type === "quiz" ? "quiz" : "video",
+            module_type: ["quiz", "artifact"].includes(m.module_type) ? m.module_type : "video",
             questions: Array.isArray(m.questions) ? m.questions : [],
             order_index: mIdx + 1,
           }));
@@ -1061,7 +1061,7 @@ export async function PUT(request: Request) {
     }
   }
 
-  // ── Step: Handle flat modules (legacy / ungrouped) ────────────────────────
+  // â”€â”€ Step: Handle flat modules (legacy / ungrouped) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const modules = body?.modules;
   if (Array.isArray(modules)) {
     const validModules = modules.filter(
@@ -1118,7 +1118,7 @@ export async function PUT(request: Request) {
         .update({
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
-          module_type: mod.module_type === "quiz" ? "quiz" : "video",
+          module_type: ["quiz", "artifact"].includes(mod.module_type) ? mod.module_type : "video",
           questions: Array.isArray(mod.questions) ? mod.questions : [],
           order_index: moduleOrderMap.get(mod.id) ?? null,
           ...(mod.section_id !== undefined ? { section_id: mod.section_id || null } : {}),
@@ -1141,7 +1141,7 @@ export async function PUT(request: Request) {
           maincourse_id: id,
           title: mod.title.trim(),
           description: (mod.description || "").trim(),
-          module_type: mod.module_type === "quiz" ? "quiz" : "video",
+          module_type: ["quiz", "artifact"].includes(mod.module_type) ? mod.module_type : "video",
           questions: Array.isArray(mod.questions) ? mod.questions : [],
           order_index: orderIndex > 0 ? orderIndex : null,
           ...(mod.section_id ? { section_id: mod.section_id } : {}),
@@ -1161,7 +1161,7 @@ export async function PUT(request: Request) {
     }
   }
 
-  // ── Step: Assign scholars and mentors via course_members ──────────────────
+  // â”€â”€ Step: Assign scholars and mentors via course_members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let assignedScholars = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
@@ -1297,7 +1297,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Valid id is required." }, { status: 400 });
   }
 
-  // ── Upcoming → delete from products ──────────────────────────────────────
+  // â”€â”€ Upcoming â†’ delete from products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (source === "product") {
     const { error: productDeleteError } = await authContext.supabaseAdmin
       .from("products")
@@ -1310,7 +1310,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  // ── Active → delete maincourse and all related data ───────────────────────
+  // â”€â”€ Active â†’ delete maincourse and all related data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Fetch the product_id linked to this maincourse before deleting it
   const { data: courseRow } = await authContext.supabaseAdmin

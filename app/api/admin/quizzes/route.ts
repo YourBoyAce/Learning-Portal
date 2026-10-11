@@ -56,13 +56,35 @@ async function courseExists(supabaseAdmin: SupabaseClient, courseId: string) {
 export async function GET(request: Request) {
   const auth = await authenticateAdmin(request);
   if ("error" in auth) return auth.error;
+  
   const { data: quizzes, error } = await auth.supabaseAdmin.schema("phase2").from("quizzes").select("id, course_id, title, questions, passing_score, status, attempts_count, average_score, created_at, updated_at").order("created_at", { ascending: false });
   if (error) return apiErrorResponse(error, undefined, 500);
+  
+  const { data: moduleQuizzes, error: moduleError } = await auth.supabaseAdmin.from("coursemodules").select("id, maincourse_id, title, questions, created_at").eq("module_type", "quiz");
+  if (moduleError) return apiErrorResponse(moduleError, undefined, 500);
+
   const quizRows = (quizzes ?? []) as QuizRow[];
-  const courseIds = [...new Set(quizRows.map((quiz) => quiz.course_id))];
+  const modRows = (moduleQuizzes ?? []).map(mod => ({
+    id: `module-${mod.id}`,
+    course_id: String(mod.maincourse_id),
+    title: mod.title,
+    questions: mod.questions || [],
+    passing_score: 80,
+    status: "Active",
+    attempts_count: 0,
+    average_score: 0,
+    created_at: mod.created_at
+  })) as QuizRow[];
+
+  const allQuizzes = [...quizRows, ...modRows].sort((a, b) => {
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+
+  const courseIds = [...new Set(allQuizzes.map((quiz) => quiz.course_id))];
   const { data: courses } = courseIds.length ? await auth.supabaseAdmin.from("maincourses").select("id, title").in("id", courseIds) : { data: [] };
   const courseTitleById = new Map(((courses ?? []) as CourseRow[]).map((course) => [String(course.id), course.title]));
-  return NextResponse.json({ quizzes: quizRows.map((quiz) => ({ ...quiz, course_name: courseTitleById.get(String(quiz.course_id)) ?? "Unknown Course" })) }, { headers: { "Cache-Control": "no-store" } });
+  
+  return NextResponse.json({ quizzes: allQuizzes.map((quiz) => ({ ...quiz, course_name: courseTitleById.get(String(quiz.course_id)) ?? "Unknown Course" })) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
