@@ -124,27 +124,75 @@ export default function StudentPracticeCenter() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
 
-        // 2. Fetch enrolled course IDs
-        const { data: enrollments, error: enrollError } = await supabase
-          .schema("phase2")
-          .from("enrollments")
-          .select("course_id, users!inner(auth_user_id)")
-          .eq("users.auth_user_id", session.user.id)
-          .eq("status", "active");
-
-        if (enrollError) throw enrollError;
-        const enrolledIds = (enrollments || []).map(e => String(e.course_id));
-
-        // 3. Fetch courses to build Name mapping
+        // 2. Fetch courses to build Name mapping and resolve products
         const { data: dbCourses } = await supabase
           .from("maincourses")
-          .select("id, title");
+          .select("id, title, product_id");
 
         const mapping: Record<string, string> = {};
         if (dbCourses) {
           dbCourses.forEach(c => {
             mapping[String(c.id)] = c.title;
           });
+        }
+
+        // Check if admin or instructor
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        const role = (profile?.role || (session.user.user_metadata as any)?.role || "").toLowerCase();
+        const isStaff = role === "admin" || role === "instructor";
+
+        let enrolledIds: string[] = [];
+        if (isStaff) {
+          enrolledIds = (dbCourses || []).map(c => String(c.id));
+        } else {
+          const courseIdSet = new Set<string>();
+
+          // A. phase2.enrollments (both course_id and courses linked to product_id)
+          const { data: enrollments } = await supabase
+            .schema("phase2")
+            .from("enrollments")
+            .select("course_id, product_id, users!inner(auth_user_id)")
+            .eq("users.auth_user_id", session.user.id)
+            .eq("status", "active");
+
+          const productIds: string[] = [];
+          if (enrollments) {
+            for (const e of enrollments as any[]) {
+              if (e.course_id) courseIdSet.add(String(e.course_id));
+              if (e.product_id) productIds.push(String(e.product_id));
+            }
+          }
+
+          if (productIds.length > 0 && dbCourses) {
+            for (const c of dbCourses) {
+              if (c.product_id && productIds.includes(String(c.product_id))) {
+                courseIdSet.add(String(c.id));
+              }
+            }
+          }
+
+          // B. course_members table
+          const userEmail = session.user.email?.trim().toLowerCase();
+          if (userEmail) {
+            const { data: memberRows } = await supabase
+              .from("course_members")
+              .select("maincourse_id")
+              .ilike("email", userEmail)
+              .eq("status", "active");
+
+            if (memberRows) {
+              for (const m of memberRows as any[]) {
+                if (m.maincourse_id) courseIdSet.add(String(m.maincourse_id));
+              }
+            }
+          }
+
+          enrolledIds = Array.from(courseIdSet);
         }
 
         // The authenticated server route verifies the learner's active,
@@ -409,8 +457,8 @@ if (artifactsError) {
             <div className="py-6">
               <UpgradeRequired
                 title="Practice Quizzes Gated"
-                description="Interactive practice quizzes are exclusively available to Pro and Premium members. Upgrade your plan to test your learning and review your scores."
-                requiredTier="Pro"
+                description="Interactive practice quizzes are available to all enrolled learners. Enroll in a course to test your learning and review your scores."
+                requiredTier="Starter"
               />
             </div>
           ) : (
@@ -499,8 +547,8 @@ if (artifactsError) {
             <div className="py-6">
               <UpgradeRequired
                 title="Study Materials Gated"
-                description="Downloadable study materials, boilerplates, and exercises are exclusively available to Pro and Premium members. Upgrade your plan to access these resources."
-                requiredTier="Pro"
+                description="Downloadable study materials, boilerplates, and exercises are available to all enrolled learners. Enroll in a course to access these resources."
+                requiredTier="Starter"
               />
             </div>
           ) : (

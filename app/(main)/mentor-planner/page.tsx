@@ -398,12 +398,12 @@ export default function MentorConnectPage() {
       if (!res.ok) throw new Error(result?.error || "Failed to submit request.");
 
       setRequestMessage({ type: "success", text: "Your booking request was sent to the mentor! You will be notified when they RSVP." });
+      setRequestDate("");
+      setRequestTopic("");
       setTimeout(() => {
         setIsCalModalOpen(false);
-        setRequestDate("");
-        setRequestTopic("");
         setRequestMessage({ type: "", text: "" });
-      }, 3000);
+      }, 1200);
     } catch (err: any) {
       console.error("Error submitting connect request:", err);
       setRequestMessage({ type: "error", text: err.message || "Failed to send request." });

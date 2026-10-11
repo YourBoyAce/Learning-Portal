@@ -16,7 +16,7 @@ export const TIER_HIERARCHY: Record<NonNullable<UserTier>, number> = {
 };
 
 export const TIER_FEATURES: Record<NonNullable<UserTier>, Feature[]> = {
-  Starter: ["Videos", "Chat", "Ratings"],
+  Starter: ["Videos", "Chat", "Ratings", "Labs", "Quizzes"],
   Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Mentorship"],
   Premium: [
     "Videos",

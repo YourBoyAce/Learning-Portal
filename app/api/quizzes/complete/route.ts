@@ -105,8 +105,30 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (enrollmentError) return apiErrorResponse(enrollmentError, undefined, 500);
 
-    const bundleName = String((enrollment as { bundles?: { bundle_name?: string } | null } | null)?.bundles?.bundle_name || "").toLowerCase();
-    let hasAccess = Boolean(enrollment && (bundleName.includes("pro") || bundleName.includes("premium")));
+    let hasAccess = Boolean(enrollment);
+
+    if (!hasAccess) {
+      // Check if enrolled via product_id
+      const { data: targetCourse } = await auth.supabaseAdmin
+        .from("maincourses")
+        .select("product_id")
+        .eq("id", quizRow.course_id)
+        .maybeSingle();
+
+      if (targetCourse?.product_id) {
+        const { data: prodEnrollment } = await auth.supabaseAdmin
+          .schema("phase2")
+          .from("enrollments")
+          .select("id, users!inner(auth_user_id)")
+          .eq("product_id", targetCourse.product_id)
+          .eq("status", "active")
+          .eq("users.auth_user_id", auth.userId)
+          .limit(1)
+          .maybeSingle();
+
+        if (prodEnrollment) hasAccess = true;
+      }
+    }
 
     if (!hasAccess) {
       const emailToMatch = profile?.email?.trim().toLowerCase() || auth.userEmail;
@@ -115,7 +137,7 @@ export async function POST(request: Request) {
           .from("course_members")
           .select("id")
           .eq("maincourse_id", quizRow.course_id)
-          .eq("email", emailToMatch)
+          .ilike("email", emailToMatch)
           .eq("status", "active")
           .limit(1)
           .maybeSingle();

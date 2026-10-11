@@ -129,7 +129,7 @@ export default function MyLearningDashboard() {
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
 
-  const { isLoading: isTierLoading, tier } = useSecurityGatedData();
+  const { isLoading: isTierLoading, tier, canAccess } = useSecurityGatedData();
   const isCurrentlyLoading = loading || isTierLoading;
 
   useEffect(() => {
@@ -678,10 +678,14 @@ export default function MyLearningDashboard() {
                   Welcome back to{" "}
                   <span className="font-bold text-brand-primary">The Automate</span>.
                   You have{" "}
-                  <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
-                    {stats.liveSessions} upcoming webinars
-                  </span>{" "}
-                  and{" "}
+                  {!isTierLoading && canAccess("Webinars") && stats.liveSessions > 0 ? (
+                    <>
+                      <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
+                        {stats.liveSessions} upcoming webinar{stats.liveSessions !== 1 ? "s" : ""}
+                      </span>{" "}
+                      and{" "}
+                    </>
+                  ) : null}
                   <span className="font-semibold text-brand-success underline decoration-dotted underline-offset-4">
                     {stats.pendingModules} pending module
                     {stats.pendingModules !== 1 ? "s" : ""}

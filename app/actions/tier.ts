@@ -101,6 +101,20 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
         }
       }
     }
+  } else if (resolvedTier === null) {
+    const emailToMatch = user.email?.trim().toLowerCase();
+    if (emailToMatch) {
+      const { data: memberRows } = await supabaseAdmin
+        .from("course_members")
+        .select("id")
+        .ilike("email", emailToMatch)
+        .eq("status", "active")
+        .limit(1);
+
+      if (memberRows && memberRows.length > 0) {
+        resolvedTier = "Starter";
+      }
+    }
   }
 
   return resolvedTier;

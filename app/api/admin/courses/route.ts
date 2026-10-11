@@ -984,7 +984,7 @@ export async function PUT(request: Request) {
 
         for (let mIdx = 0; mIdx < modsToUpdate.length; mIdx++) {
           const mod = modsToUpdate[mIdx];
-          await authContext.supabaseAdmin
+          const { error: secModUpdateError } = await authContext.supabaseAdmin
             .from("coursemodules")
             .update({
               title: mod.title.trim(),
@@ -996,6 +996,13 @@ export async function PUT(request: Request) {
             })
             .eq("id", mod.id)
             .eq("maincourse_id", id);
+
+          if (secModUpdateError) {
+            return NextResponse.json(
+              { error: logError(secModUpdateError).message },
+              { status: 500 },
+            );
+          }
         }
 
         if (modsToInsert.length > 0) {
@@ -1009,9 +1016,16 @@ export async function PUT(request: Request) {
             order_index: sectionModules.length - modsToInsert.length + mIdx + 1,
           }));
 
-          await authContext.supabaseAdmin
+          const { error: secModInsertError } = await authContext.supabaseAdmin
             .from("coursemodules")
             .insert(insertData);
+
+          if (secModInsertError) {
+            return NextResponse.json(
+              { error: logError(secModInsertError).message },
+              { status: 500 },
+            );
+          }
         }
       }
     }

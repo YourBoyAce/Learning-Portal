@@ -290,7 +290,12 @@ export default function CoursePlayerPage() {
       // course-specific Pro/Premium enrollment before returning definitions.
       const fetchQuizzes = async () => {
         try {
-          const data = await fetchLearnerQuizzes(String(course.id));
+          let data = await fetchLearnerQuizzes(String(course.id));
+          if ((!data || data.length === 0) && id && String(id) !== String(course.id)) {
+            try {
+              data = await fetchLearnerQuizzes(String(id));
+            } catch {}
+          }
           setCourseQuizzes((data || []).map((quiz) => ({
             id: String(quiz.id),
             courseId: quiz.course_id,
@@ -311,11 +316,15 @@ export default function CoursePlayerPage() {
       // 3. Fetch artifacts directly from Supabase (admin panel saves to DB, not localStorage)
       const fetchArtifacts = async () => {
         try {
+          const courseFilter = id && String(id) !== String(course.id)
+            ? `course_id.eq.${course.id},course_id.eq.${id}`
+            : `course_id.eq.${course.id}`;
+
           const { data: dbArtifacts, error } = await supabase
             .from("course_artifacts")
             .select(`*, maincourses(title)`)
             .eq("status", "Published")
-            .eq("course_id", id);
+            .or(courseFilter);
 
           if (!error && dbArtifacts && dbArtifacts.length > 0) {
             const batchFiltered = dbArtifacts.filter((it: any) => {
@@ -640,10 +649,8 @@ export default function CoursePlayerPage() {
 
       if (modulesError) throw modulesError;
       
-      const orderedModules = courseModules ?? [];
-      setModules(orderedModules);
-
       // Fetch sections for this course
+      let sectionRows: any[] = [];
       try {
         const { data: sectionData } = await supabase
           .from("course_sections")
@@ -653,11 +660,34 @@ export default function CoursePlayerPage() {
           .order("created_at", { ascending: true });
 
         if (sectionData && sectionData.length > 0) {
+          sectionRows = sectionData;
           setCourseSections(sectionData);
         }
       } catch {
         // Sections are optional, continue without them
       }
+
+      // order_index restarts within each section, so order modules by
+      // section position first, then by their position inside the section.
+      const rawModules = courseModules ?? [];
+      const sectionPosition = new Map<string, number>(
+        sectionRows.map((s: any, i: number) => [String(s.id), i]),
+      );
+      const orderedModules =
+        sectionRows.length > 0
+          ? rawModules
+              .map((m: any, i: number) => ({ m, i }))
+              .sort((a, b) => {
+                const sa = a.m.section_id != null ? sectionPosition.get(String(a.m.section_id)) : undefined;
+                const sb = b.m.section_id != null ? sectionPosition.get(String(b.m.section_id)) : undefined;
+                const pa = sa ?? Number.MAX_SAFE_INTEGER;
+                const pb = sb ?? Number.MAX_SAFE_INTEGER;
+                if (pa !== pb) return pa - pb;
+                return a.i - b.i; // keep query order (order_index, created_at, id)
+              })
+              .map(({ m }) => m)
+          : rawModules;
+      setModules(orderedModules);
 
       let { data: progressData, error: progressError }: {
         data: any[] | null;
@@ -1483,7 +1513,7 @@ export default function CoursePlayerPage() {
   };
 
   const renderModulesList = () => {
-    const videoModules = modules.filter((m) => m.module_type !== "quiz");
+    const videoModules = modules;
     const totalModuleCount = videoModules.length;
 
     return (
@@ -1569,7 +1599,7 @@ export default function CoursePlayerPage() {
               {courseSections.map((section) => {
                 const sectionId = String(section.id);
                 const sectionModules = modules.filter(
-                  (m) => String(m.section_id) === sectionId && m.module_type !== "quiz"
+                  (m) => String(m.section_id) === sectionId
                 );
                 const completedInSection = sectionModules.filter(
                   (m) => !!userProgress[getModuleKey(m)]
@@ -1744,7 +1774,7 @@ export default function CoursePlayerPage() {
               {/* Ungrouped modules (those without a section_id) */}
               {(() => {
                 const ungrouped = modules.filter(
-                  (m) => (!m.section_id || !courseSections.some((s) => String(s.id) === String(m.section_id))) && m.module_type !== "quiz"
+                  (m) => (!m.section_id || !courseSections.some((s) => String(s.id) === String(m.section_id)))
                 );
                 if (ungrouped.length === 0) return null;
                 return (
@@ -1922,8 +1952,8 @@ export default function CoursePlayerPage() {
         <div className="p-6">
           <UpgradeRequired
             title="Quizzes Gated"
-            description="Interactive practice quizzes for this course are exclusively available to Pro and Premium members. Upgrade your plan to test your learning and review your scores."
-            requiredTier="Pro"
+            description="Interactive practice quizzes for this course are available to all enrolled learners. Enroll in this course to test your learning and review your scores."
+            requiredTier="Starter"
             courseSlug={String(id)}
           />
         </div>

@@ -209,9 +209,9 @@ function MainLayoutContent({
     icon: pathname === "/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
   });
 
-  // Mentor Planner is visible to everyone
+  // Mentor Connect is visible to everyone
   navItems.push({
-    label: "Mentor Planner",
+    label: "Mentor Connect",
     href: "/mentor-planner",
     active: pathname === "/mentor-planner",
     icon: pathname === "/mentor-planner"

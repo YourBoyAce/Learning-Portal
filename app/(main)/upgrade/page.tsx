@@ -612,7 +612,7 @@ export default function UpgradePage() {
           Upgrade to Pro
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Unlock Labs, Quizzes, and Mentorship for the courses you choose.
+          Unlock Mentor Connect for the courses you choose.
         </p>
       </div>
 

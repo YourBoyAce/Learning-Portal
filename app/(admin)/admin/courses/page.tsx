@@ -741,6 +741,12 @@ export default function AdminCourses() {
     return urlData.publicUrl ?? null;
   };
 
+  // Artifact modules may be saved without a typed title; fall back to the file name
+  const withArtifactTitle = <T extends { title: string; module_type?: string; questions?: ModuleQuestion[] }>(m: T): T => {
+    if (m.title.trim() || m.module_type !== "artifact" || !m.questions?.length) return m;
+    return { ...m, title: m.questions[0].options?.[0] || "Artifact" };
+  };
+
   const handleSaveCourse = async () => {
     try {
       setIsSaving(true);
@@ -883,6 +889,7 @@ export default function AdminCourses() {
                 title: s.title.trim(),
                 description: s.description.trim(),
                 modules: s.modules
+                  .map(withArtifactTitle)
                   .filter((m) => m.title.trim())
                   .map((m) => ({
                     ...(m.id && { id: m.id }),
@@ -895,6 +902,7 @@ export default function AdminCourses() {
           }
           : {
             modules: modules
+              .map(withArtifactTitle)
               .filter((m) => m.title.trim())
               .map((m) => ({
                 ...(m.id && { id: m.id }),

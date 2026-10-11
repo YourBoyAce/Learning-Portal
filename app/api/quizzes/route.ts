@@ -60,14 +60,28 @@ export async function GET(request: Request) {
     const { data: enrollments, error: enrollmentError } = await auth.supabaseAdmin
       .schema("phase2")
       .from("enrollments")
-      .select("course_id, users!inner(auth_user_id), bundles(bundle_name)")
+      .select("course_id, product_id, users!inner(auth_user_id)")
       .eq("status", "active")
       .eq("users.auth_user_id", auth.userId)
       .order("created_at", { ascending: false });
 
+    const productIds: string[] = [];
     if (!enrollmentError && enrollments) {
       for (const e of enrollments as any[]) {
         if (e.course_id) accessibleCourseIds.add(String(e.course_id));
+        if (e.product_id) productIds.push(String(e.product_id));
+      }
+    }
+
+    if (productIds.length > 0) {
+      const { data: prodCourses } = await auth.supabaseAdmin
+        .from("maincourses")
+        .select("id")
+        .in("product_id", productIds);
+      if (prodCourses) {
+        for (const pc of prodCourses as any[]) {
+          if (pc.id) accessibleCourseIds.add(String(pc.id));
+        }
       }
     }
 
@@ -77,7 +91,7 @@ export async function GET(request: Request) {
       const { data: memberRows } = await auth.supabaseAdmin
         .from("course_members")
         .select("maincourse_id")
-        .eq("email", emailToMatch)
+        .ilike("email", emailToMatch)
         .eq("status", "active");
 
       if (memberRows) {
@@ -88,7 +102,25 @@ export async function GET(request: Request) {
     }
 
     if (courseId) {
-      if (!accessibleCourseIds.has(courseId)) {
+      let hasAccess = accessibleCourseIds.has(courseId);
+      if (!hasAccess) {
+        const { data: targetCourse } = await auth.supabaseAdmin
+          .from("maincourses")
+          .select("id, product_id")
+          .or(`id.eq.${courseId},product_id.eq.${courseId}`)
+          .maybeSingle();
+
+        if (targetCourse) {
+          if (
+            accessibleCourseIds.has(String(targetCourse.id)) ||
+            (targetCourse.product_id && accessibleCourseIds.has(String(targetCourse.product_id)))
+          ) {
+            hasAccess = true;
+          }
+        }
+      }
+
+      if (!hasAccess) {
         return NextResponse.json({ quizzes: [] }, { headers: { "Cache-Control": "no-store" } });
       }
       requestedCourseIds = [courseId];
