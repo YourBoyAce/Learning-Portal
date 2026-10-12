@@ -38,6 +38,7 @@ type CourseEnrollmentRow = {
 async function filterAssignableMemberEmails(
   supabaseAdmin: SupabaseClient,
   emails: string[],
+  cachedAuthUsers?: any[],
 ): Promise<string[]> {
   if (emails.length === 0) return emails;
 
@@ -47,10 +48,15 @@ async function filterAssignableMemberEmails(
 
   if (error) throw new Error(error.message);
 
-  const authUsersResult =
-    await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  let authUsers = cachedAuthUsers;
+  if (!authUsers) {
+    const authUsersResult =
+      await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    authUsers = authUsersResult.data?.users ?? [];
+  }
+
   const authEmailById = new Map(
-    (authUsersResult.data?.users ?? []).map((user) => [
+    authUsers.map((user: any) => [
       user.id,
       user.email?.trim().toLowerCase() ?? "",
     ]),
@@ -678,9 +684,14 @@ export async function POST(request: Request) {
         .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
         .filter((email: string) => EMAIL_RE.test(email))
     : [];
+
+  const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const authUsers = authUsersResult.data?.users ?? [];
+
   assignedScholars = await filterAssignableMemberEmails(
     authContext.supabaseAdmin,
     assignedScholars,
+    authUsers,
   );
 
   const assignedMentors = Array.isArray(body?.assigned_mentors)
@@ -712,13 +723,7 @@ export async function POST(request: Request) {
 
   // Step 6: Auto-enroll scholars into phase2.enrollments
   if (assignedScholars.length > 0) {
-    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const authUsers = authUsersResult.data?.users ?? [];
-
     // Resolve the Starter bundle id so newly enrolled users get the correct tier.
-    // The tier system reads bundle_name from this FK â€” a null bundle_id always
-    // resolves to "Starter" via the fallback string, but the JOIN fails and the
-    // feature gates stay locked.  We populate it explicitly here.
     const { data: starterBundle } = await authContext.supabaseAdmin
       .schema("phase2")
       .from("bundles")
@@ -728,22 +733,30 @@ export async function POST(request: Request) {
       .maybeSingle();
     const starterBundleId: string | null = (starterBundle as any)?.id ?? null;
 
+    // Batch query phase2.users matching assigned scholars
+    const { data: p2Users } = await authContext.supabaseAdmin
+      .schema("phase2")
+      .from("users")
+      .select("id, auth_user_id, email")
+      .in("email", assignedScholars);
+
+    const p2IdByEmail = new Map<string, string>();
+    const p2IdByAuthId = new Map<string, string>();
+    for (const u of p2Users ?? []) {
+      if (u.email) p2IdByEmail.set(u.email.toLowerCase(), u.id);
+      if (u.auth_user_id) p2IdByAuthId.set(u.auth_user_id, u.id);
+    }
+
     const userIdsToEnroll: string[] = [];
     for (const email of assignedScholars) {
-      const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      if (authUser) {
-        // Must resolve the phase2 user id from auth user id
-        const { data: p2User } = await authContext.supabaseAdmin
-          .schema("phase2")
-          .from("users")
-          .select("id")
-          .eq("auth_user_id", authUser.id)
-          .maybeSingle();
-
-        if (p2User) {
-           userIdsToEnroll.push(p2User.id);
-        } else {
-           userIdsToEnroll.push(authUser.id); // fallback for existing records
+      const p2Id = p2IdByEmail.get(email);
+      if (p2Id) {
+        userIdsToEnroll.push(p2Id);
+      } else {
+        const authUser = authUsers.find((u) => u.email?.toLowerCase() === email);
+        if (authUser) {
+          const idFromAuth = p2IdByAuthId.get(authUser.id);
+          userIdsToEnroll.push(idFromAuth || authUser.id);
         }
       }
     }
@@ -1175,16 +1188,12 @@ export async function PUT(request: Request) {
     }
   }
 
-  // â”€â”€ Step: Assign scholars and mentors via course_members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Step: Assign scholars and mentors via course_members ──────────────────
   let assignedScholars = Array.isArray(body?.assigned_scholars)
     ? body.assigned_scholars
         .map((v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : ""))
         .filter((email: string) => EMAIL_RE.test(email))
     : [];
-  assignedScholars = await filterAssignableMemberEmails(
-    authContext.supabaseAdmin,
-    assignedScholars,
-  );
 
   const assignedMentors = Array.isArray(body?.assigned_mentors)
     ? body.assigned_mentors
@@ -1194,6 +1203,15 @@ export async function PUT(request: Request) {
 
   // Only update course_members if the fields were explicitly sent
   if (body?.assigned_scholars !== undefined || body?.assigned_mentors !== undefined) {
+    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUsers = authUsersResult.data?.users ?? [];
+
+    assignedScholars = await filterAssignableMemberEmails(
+      authContext.supabaseAdmin,
+      assignedScholars,
+      authUsers,
+    );
+
     // Clear existing course_members for this course
     const { error: clearMembersError } = await authContext.supabaseAdmin
       .from("course_members")
@@ -1226,9 +1244,6 @@ export async function PUT(request: Request) {
     }
 
     // Re-sync phase2.enrollments for scholars
-    const authUsersResult = await authContext.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const authUsers = authUsersResult.data?.users ?? [];
-
     // Resolve the Starter bundle id so the tier system can read bundle_name correctly.
     const { data: starterBundlePut } = await authContext.supabaseAdmin
       .schema("phase2")
@@ -1239,55 +1254,66 @@ export async function PUT(request: Request) {
       .maybeSingle();
     const starterBundleIdPut: string | null = (starterBundlePut as any)?.id ?? null;
 
-    const userIdsToEnroll: string[] = [];
-    for (const email of assignedScholars) {
-      const authUser = authUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-      if (authUser) {
-        const { data: p2User } = await authContext.supabaseAdmin
-          .schema("phase2")
-          .from("users")
-          .select("id")
-          .eq("auth_user_id", authUser.id)
-          .maybeSingle();
+    if (assignedScholars.length > 0) {
+      // Batch query phase2.users matching assigned scholars
+      const { data: p2Users } = await authContext.supabaseAdmin
+        .schema("phase2")
+        .from("users")
+        .select("id, auth_user_id, email")
+        .in("email", assignedScholars);
 
-        if (p2User) {
-           userIdsToEnroll.push(p2User.id);
+      const p2IdByEmail = new Map<string, string>();
+      const p2IdByAuthId = new Map<string, string>();
+      for (const u of p2Users ?? []) {
+        if (u.email) p2IdByEmail.set(u.email.toLowerCase(), u.id);
+        if (u.auth_user_id) p2IdByAuthId.set(u.auth_user_id, u.id);
+      }
+
+      const userIdsToEnroll: string[] = [];
+      for (const email of assignedScholars) {
+        const p2Id = p2IdByEmail.get(email);
+        if (p2Id) {
+          userIdsToEnroll.push(p2Id);
         } else {
-           userIdsToEnroll.push(authUser.id);
+          const authUser = authUsers.find((u) => u.email?.toLowerCase() === email);
+          if (authUser) {
+            const idFromAuth = p2IdByAuthId.get(authUser.id);
+            userIdsToEnroll.push(idFromAuth || authUser.id);
+          }
         }
       }
-    }
 
-    if (userIdsToEnroll.length > 0) {
-      const { data: existing } = await authContext.supabaseAdmin
-        .schema("phase2")
-        .from("enrollments")
-        .select("user_id")
-        .eq("course_id", id)
-        .in("user_id", userIdsToEnroll);
-
-      const existingUserIds = new Set(
-        ((existing ?? []) as any[]).map((e) => e.user_id),
-      );
-
-      const newEnrollments = userIdsToEnroll
-        .filter((uid) => !existingUserIds.has(uid))
-        .map((uid) => ({
-           user_id: uid,
-           course_id: id,
-           bundle_id: starterBundleIdPut,
-           status: "active",
-           access_start_date: new Date().toISOString(),
-           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        }));
-
-      if (newEnrollments.length > 0) {
-        const { error: enrollError } = await authContext.supabaseAdmin
+      if (userIdsToEnroll.length > 0) {
+        const { data: existing } = await authContext.supabaseAdmin
           .schema("phase2")
           .from("enrollments")
-          .insert(newEnrollments);
+          .select("user_id")
+          .eq("course_id", id)
+          .in("user_id", userIdsToEnroll);
 
-        if (enrollError) console.error("Enrollment error:", enrollError.message);
+        const existingUserIds = new Set(
+          ((existing ?? []) as any[]).map((e) => e.user_id),
+        );
+
+        const newEnrollments = userIdsToEnroll
+          .filter((uid) => !existingUserIds.has(uid))
+          .map((uid) => ({
+             user_id: uid,
+             course_id: id,
+             bundle_id: starterBundleIdPut,
+             status: "active",
+             access_start_date: new Date().toISOString(),
+             access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          }));
+
+        if (newEnrollments.length > 0) {
+          const { error: enrollError } = await authContext.supabaseAdmin
+            .schema("phase2")
+            .from("enrollments")
+            .insert(newEnrollments);
+
+          if (enrollError) console.error("Enrollment error:", enrollError.message);
+        }
       }
     }
   }

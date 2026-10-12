@@ -69,7 +69,7 @@ export async function createCalcomBooking(params: {
         "cal-api-version": apiVersion,
       },
       body: JSON.stringify({
-        eventTypeId: params.eventTypeId,
+        eventTypeId: Number(params.eventTypeId),
         start: startIso,
         attendee: {
           name: params.attendee.name,

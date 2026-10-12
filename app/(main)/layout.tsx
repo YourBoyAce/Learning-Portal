@@ -11,6 +11,7 @@ import { ICONS } from "@/app/styles/icons";
 import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import MentionNotificationsBell from "@/app/components/MentionNotificationsBell";
+import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 
 function MainLayoutContent({
   children,
@@ -28,6 +29,7 @@ function MainLayoutContent({
   const [role, setRole] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { canAccess } = useSecurityGatedData();
 
   // Close sidebar on path change
   useEffect(() => {
@@ -157,6 +159,14 @@ function MainLayoutContent({
 
   // Add student-only tabs if user is not a mentor
   if (!isMentor) {
+    const landingBase = (process.env.NEXT_PUBLIC_LANDING_SITE_URL || "").trim().replace(/\/$/, "");
+    const landingLiveSessionsUrl =
+      process.env.NEXT_PUBLIC_LANDING_LIVE_SESSION_URL?.trim() ||
+      (landingBase ? `${landingBase}/payment?planName=Premium` : "/upgrade");
+    const hasLiveSessionsAccess = canAccess("Webinars");
+    const liveSessionHref = hasLiveSessionsAccess ? "/webinars" : landingLiveSessionsUrl;
+    const isExternalLiveSession = !hasLiveSessionsAccess && liveSessionHref.startsWith("http");
+
     navItems.push(
       {
         label: "My Learning",
@@ -165,6 +175,7 @@ function MainLayoutContent({
         icon: pathname === "/courses"
           ? ICONS.BOOKLIGHT
           : ICONS.BOOK,
+        isExternal: false,
       },
       {
         label: "Quizzes",
@@ -173,6 +184,7 @@ function MainLayoutContent({
         icon: pathname === "/practice" && activeTab !== "artifacts"
           ? ICONS.BULBLIGHT
           : ICONS.BULB,
+        isExternal: false,
       },
       {
         label: "Artifacts",
@@ -181,12 +193,14 @@ function MainLayoutContent({
         icon: pathname === "/practice" && activeTab === "artifacts"
           ? ICONS.MATERIALLIGHT
           : ICONS.MATERIAL,
+        isExternal: false,
       },
       {
         label: "Live Sessions",
-        href: "/webinars",
+        href: liveSessionHref,
         active: pathname === "/webinars",
         icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
+        isExternal: isExternalLiveSession,
       }
     );
   }
@@ -269,25 +283,45 @@ function MainLayoutContent({
           </div>
 
           <nav className="flex-1 px-4 py-2 text-gray-500 flex flex-col gap-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active
-                    ? "nav-item-active"
-                    : "nav-item-inactive"
-                  }`}
-              >
-                <Image
-                  src={item.icon}
-                  alt={item.label}
-                  width={20}
-                  height={20}
-                />
+            {navItems.map((item) => {
+              if (item.isExternal) {
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className="nav-item flex items-center gap-3 px-4 py-3 nav-item-inactive"
+                  >
+                    <Image
+                      src={item.icon}
+                      alt={item.label}
+                      width={20}
+                      height={20}
+                    />
+                    <span>{item.label}</span>
+                  </a>
+                );
+              }
 
-                <span>{item.label}</span>
-              </Link>
-            ))}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active
+                      ? "nav-item-active"
+                      : "nav-item-inactive"
+                    }`}
+                >
+                  <Image
+                    src={item.icon}
+                    alt={item.label}
+                    width={20}
+                    height={20}
+                  />
+
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="p-6 space-y-4">

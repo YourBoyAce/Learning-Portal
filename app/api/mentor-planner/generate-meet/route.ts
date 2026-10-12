@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
     const startDateTimeStr = `${event.event_date}T${event.event_time}`;
     const bookingResult = await createCalcomBooking({
-      eventTypeId: mentorProfile.cal_event_type_id,
+      eventTypeId: Number(mentorProfile.cal_event_type_id),
       startDateTimeStr,
       attendee: {
         name: studentName,

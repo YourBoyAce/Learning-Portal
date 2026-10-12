@@ -84,6 +84,10 @@ export default function AdminUsers() {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("user");
   const [plan, setPlan] = useState("starter");
+  const [products, setProducts] = useState<Array<{ id: number | string; title: string }>>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [latestCourseName, setLatestCourseName] = useState<string>("");
+  const [loadingLatestCourse, setLoadingLatestCourse] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formFeedback, setFormFeedback] = useState({ type: "", message: "" });
 
@@ -205,6 +209,50 @@ export default function AdminUsers() {
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
   }, [pathname]);
 
+  useEffect(() => {
+    async function loadProducts() {
+      const { data } = await supabase
+        .from("products")
+        .select("id, title")
+        .order("created_at", { ascending: false });
+      if (data) {
+        setProducts(data);
+      }
+    }
+    loadProducts();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProductId) {
+      setLatestCourseName("");
+      return;
+    }
+    let cancelled = false;
+    async function fetchLatestCourse() {
+      setLoadingLatestCourse(true);
+      const { data } = await supabase
+        .from("maincourses")
+        .select("id, title")
+        .eq("product_id", selectedProductId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!cancelled) {
+        if (data?.title) {
+          setLatestCourseName(data.title);
+        } else {
+          setLatestCourseName("No active course found for this product");
+        }
+        setLoadingLatestCourse(false);
+      }
+    }
+    fetchLatestCourse();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProductId]);
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -216,6 +264,9 @@ export default function AdminUsers() {
     formData.append("password", password);
     formData.append("role", role);
     formData.append("plan", plan);
+    if (selectedProductId) {
+      formData.append("productId", selectedProductId);
+    }
     if (role === "admin") {
       formData.append("phone", phone);
     }
@@ -241,6 +292,8 @@ export default function AdminUsers() {
       setPhone("");
       setRole("user");
       setPlan("starter");
+      setSelectedProductId("");
+      setLatestCourseName("");
       fetchUsers();
     } else {
       setFormFeedback({
@@ -449,25 +502,61 @@ export default function AdminUsers() {
                 </div>
 
                 {role === "user" && (
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      User Plan
-                    </label>
-                    <select
-                      value={plan}
-                      onChange={(e) => setPlan(e.target.value)}
-                      className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                      style={{
-                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                      }}
-                    >
-                      <option value="starter">Starter</option>
-                      <option value="pro">Pro</option>
-                      <option value="premium">Premium</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        Select Product
+                      </label>
+                      <select
+                        value={selectedProductId}
+                        onChange={(e) => setSelectedProductId(e.target.value)}
+                        className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                        style={{
+                          fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                          lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                          fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                        }}
+                      >
+                        <option value="">Choose Product (Optional)</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedProductId && (
+                        <p className="text-xs text-brand-primary mt-1.5 font-medium flex items-center gap-1">
+                          {loadingLatestCourse ? (
+                            <span className="animate-pulse">Loading latest course…</span>
+                          ) : (
+                            <span>
+                              <strong>Latest Course:</strong> {latestCourseName}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                        User Plan
+                      </label>
+                      <select
+                        value={plan}
+                        onChange={(e) => setPlan(e.target.value)}
+                        className={`${TYPOGRAPHY_CLASSES.CAPTION} !text-gray-900 placeholder:!text-gray-400 w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
+                        style={{
+                          fontSize: TYPOGRAPHY.CAPTION.fontSize,
+                          lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
+                          fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
+                        }}
+                      >
+                        <option value="starter">Starter</option>
+                        <option value="pro">Pro</option>
+                        <option value="premium">Premium</option>
+                      </select>
+                    </div>
+                  </>
                 )}
 
                 {role === "admin" && (

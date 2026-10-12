@@ -56,11 +56,14 @@ export async function POST(request: Request) {
     const supabaseAdmin = createServiceRoleClient();
 
     // 1. Extract meeting URL
-    const meetUrl = extractMeetingUrl(payload);
+    const meetUrl =
+      extractMeetingUrl(payload) ||
+      extractMeetingUrl(body?.data) ||
+      extractMeetingUrl(body);
     console.log(`[calcom-webhook] Extracted meeting URL: ${meetUrl || "(None found)"}`);
 
     // 2. Parse booking date and time
-    const startStr = payload?.startTime || payload?.start;
+    const startStr = payload?.startTime || payload?.start || body?.data?.startTime || body?.data?.start;
     let eventDate: string | null = null;
     let eventTime: string | null = null;
 
@@ -76,26 +79,114 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Extract attendee and organizer information
+    // 3. Extract attendee, organizer, and Event Type ID
     const attendees = Array.isArray(payload?.attendees)
       ? payload.attendees
       : payload?.attendees
       ? [payload.attendees]
+      : Array.isArray(body?.data?.attendees)
+      ? body.data.attendees
       : [];
     const attendee = attendees[0] || {};
     const attendeeEmail: string = attendee?.email?.trim() || "";
     const attendeeName: string = attendee?.name?.trim() || "Student";
-    const organizerEmail: string = payload?.organizer?.email?.trim() || "";
-    const eventTypeId = payload?.eventTypeId || payload?.event_type_id || null;
+    const organizerEmail: string =
+      payload?.organizer?.email?.trim() ||
+      body?.data?.organizer?.email?.trim() ||
+      payload?.hosts?.[0]?.email?.trim() ||
+      body?.data?.hosts?.[0]?.email?.trim() ||
+      "";
+
+    // Extract eventTypeId robustly across Cal.com v1 and v2 payload shapes
+    const rawEventTypeId =
+      payload?.eventTypeId ??
+      payload?.event_type_id ??
+      payload?.eventType?.id ??
+      payload?.type?.id ??
+      payload?.booking?.eventTypeId ??
+      payload?.booking?.eventType?.id ??
+      body?.data?.eventTypeId ??
+      body?.data?.eventType?.id ??
+      body?.data?.booking?.eventTypeId ??
+      body?.eventTypeId ??
+      null;
+
+    const eventTypeId =
+      rawEventTypeId !== null && rawEventTypeId !== undefined && !isNaN(Number(rawEventTypeId))
+        ? Number(rawEventTypeId)
+        : null;
+
+    console.log(
+      `[calcom-webhook] Parsed event: date=${eventDate}, time=${eventTime}, attendee=${attendeeEmail}, organizer=${organizerEmail}, eventTypeId=${eventTypeId}`
+    );
+
+    // 4. Resolve Target Mentor
+    // When multiple mentors share the same Cal.com account, eventTypeId is the ONLY true differentiator!
+    // We MUST prioritize cal_event_type_id lookup BEFORE organizerEmail.
+    let targetMentorId: string | null = null;
+
+    if (eventTypeId) {
+      const { data: mentorByEventType } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("cal_event_type_id", eventTypeId)
+        .maybeSingle();
+
+      if (mentorByEventType?.id) {
+        targetMentorId = mentorByEventType.id;
+        console.log(
+          `[calcom-webhook] Resolved mentor ${mentorByEventType.full_name || mentorByEventType.email} (${targetMentorId}) via cal_event_type_id: ${eventTypeId}`
+        );
+      }
+    }
+
+    // Fallback to organizerEmail ONLY if eventTypeId did not match a mentor profile
+    if (!targetMentorId && organizerEmail) {
+      const { data: mentorByEmail } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .ilike("email", organizerEmail)
+        .maybeSingle();
+
+      if (mentorByEmail?.id) {
+        targetMentorId = mentorByEmail.id;
+        console.log(`[calcom-webhook] Resolved mentor (${targetMentorId}) via organizer email: ${organizerEmail}`);
+      }
+    }
+
+    // Fallback to organizer username matching cal_link
+    const organizerUsername =
+      payload?.organizer?.username ||
+      payload?.user?.username ||
+      payload?.hosts?.[0]?.username;
+    if (!targetMentorId && organizerUsername) {
+      const { data: mentorByCalLink } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .ilike("cal_link", `%${organizerUsername}%`)
+        .maybeSingle();
+
+      if (mentorByCalLink?.id) {
+        targetMentorId = mentorByCalLink.id;
+        console.log(`[calcom-webhook] Resolved mentor (${targetMentorId}) via cal_link username: ${organizerUsername}`);
+      }
+    }
 
     // Handle cancellation
     if (triggerEvent === "BOOKING_CANCELLED") {
       if (eventDate && attendeeEmail) {
-        const { error: cancelError } = await supabaseAdmin
+        let cancelQuery = supabaseAdmin
           .from("calendar_events")
           .update({ tag: "status:cancelled", meet_link: null })
           .eq("event_date", eventDate)
           .like("description", `%${attendeeEmail}%`);
+
+        // If target mentor is known, scope cancellation to that mentor only
+        if (targetMentorId) {
+          cancelQuery = cancelQuery.eq("user_id", targetMentorId);
+        }
+
+        const { error: cancelError } = await cancelQuery;
 
         if (cancelError) {
           console.error("[calcom-webhook] Error updating cancelled event:", cancelError);
@@ -104,12 +195,76 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, event: "BOOKING_CANCELLED" });
     }
 
-    // 4. Try to find an existing event in calendar_events
+    // 5. Match existing event in calendar_events
+    // We prioritize matching the SPECIFIC mentor's event, especially unlinked sessions
     let matchedEvent: any = null;
 
-    if (attendeeEmail) {
-      // Priority 1: Match by date + attendee email (case-insensitive)
+    if (targetMentorId && attendeeEmail) {
+      // Priority 1A: Specific mentor + date + attendee + missing meet_link (cleanest match)
       if (eventDate) {
+        const { data: pendingMentorMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .eq("user_id", targetMentorId)
+          .eq("event_date", eventDate)
+          .is("meet_link", null)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
+
+        if (pendingMentorMatches && pendingMentorMatches.length > 0) {
+          matchedEvent = pendingMentorMatches[0];
+          console.log(`[calcom-webhook] Matched mentor ${targetMentorId} pending event: ${matchedEvent.id}`);
+        }
+      }
+
+      // Priority 1B: Specific mentor + date + attendee (even if meet_link is already set)
+      if (!matchedEvent && eventDate) {
+        const { data: exactMentorMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .eq("user_id", targetMentorId)
+          .eq("event_date", eventDate)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
+
+        if (exactMentorMatches && exactMentorMatches.length > 0) {
+          matchedEvent = exactMentorMatches[0];
+          console.log(`[calcom-webhook] Matched mentor ${targetMentorId} exact date event: ${matchedEvent.id}`);
+        }
+      }
+
+      // Priority 1C: Specific mentor + attendee + missing meet_link (handles UTC timezone day shifts)
+      if (!matchedEvent) {
+        const { data: timezoneMentorMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .eq("user_id", targetMentorId)
+          .is("meet_link", null)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
+
+        if (timezoneMentorMatches && timezoneMentorMatches.length > 0) {
+          matchedEvent = timezoneMentorMatches[0];
+          console.log(`[calcom-webhook] Matched mentor ${targetMentorId} unlinked event via attendee fallback: ${matchedEvent.id}`);
+        }
+      }
+    } else if (attendeeEmail) {
+      // Fallback matching if target mentor could NOT be resolved via eventTypeId or organizerEmail
+      if (eventDate) {
+        const { data: unlinkedMatches } = await supabaseAdmin
+          .from("calendar_events")
+          .select("*")
+          .eq("event_date", eventDate)
+          .is("meet_link", null)
+          .ilike("description", `%${attendeeEmail}%`)
+          .order("created_at", { ascending: false });
+
+        if (unlinkedMatches && unlinkedMatches.length > 0) {
+          matchedEvent = unlinkedMatches[0];
+        }
+      }
+
+      if (!matchedEvent && eventDate) {
         const { data: exactMatches } = await supabaseAdmin
           .from("calendar_events")
           .select("*")
@@ -122,7 +277,6 @@ export async function POST(request: Request) {
         }
       }
 
-      // Priority 2: If timezone difference shifted the date, look for any event for this attendee missing a meet_link
       if (!matchedEvent) {
         const { data: pendingMatches } = await supabaseAdmin
           .from("calendar_events")
@@ -133,24 +287,27 @@ export async function POST(request: Request) {
 
         if (pendingMatches && pendingMatches.length > 0) {
           matchedEvent = pendingMatches[0];
-          console.log(`[calcom-webhook] Found event via attendee email fallback: ${matchedEvent.id}`);
         }
       }
     } else if (eventDate) {
-      // Priority 3: Match by event_date if attendee email wasn't provided
-      const { data: dateMatches } = await supabaseAdmin
+      // Fallback matching by date only
+      let dateQuery = supabaseAdmin
         .from("calendar_events")
         .select("*")
         .eq("event_date", eventDate)
-        .is("meet_link", null)
-        .order("created_at", { ascending: false });
+        .is("meet_link", null);
 
+      if (targetMentorId) {
+        dateQuery = dateQuery.eq("user_id", targetMentorId);
+      }
+
+      const { data: dateMatches } = await dateQuery.order("created_at", { ascending: false });
       if (dateMatches && dateMatches.length > 0) {
         matchedEvent = dateMatches[0];
       }
     }
 
-    // 5. Update existing event or insert a new one
+    // 6. Update existing event or insert a new one
     if (matchedEvent) {
       // Update the existing session with the Google Meet link and accepted status
       const updatedTag = (matchedEvent.tag || "").includes("status:accepted")
@@ -179,7 +336,7 @@ export async function POST(request: Request) {
       }
 
       console.log(
-        `[calcom-webhook] Successfully updated calendar_event ${matchedEvent.id} with meet_link: ${meetUrl}`
+        `[calcom-webhook] Successfully updated calendar_event ${matchedEvent.id} for mentor ${matchedEvent.user_id} with meet_link: ${meetUrl}`
       );
 
       return NextResponse.json({
@@ -190,54 +347,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // 6. Fallback: If no existing event matched, find the mentor profile and insert a new calendar_event
-    let mentorUserId: string | null = null;
-
-    if (organizerEmail) {
-      const { data: mentorByEmail } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .ilike("email", organizerEmail)
-        .maybeSingle();
-
-      if (mentorByEmail?.id) {
-        mentorUserId = mentorByEmail.id;
-      }
-    }
-
-    if (!mentorUserId && eventTypeId) {
-      const { data: mentorByEventType } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("cal_event_type_id", eventTypeId)
-        .maybeSingle();
-
-      if (mentorByEventType?.id) {
-        mentorUserId = mentorByEventType.id;
-      }
-    }
-
-    // Check by username matching cal_link
-    const organizerUsername = payload?.organizer?.username || payload?.user?.username;
-    if (!mentorUserId && organizerUsername) {
-      const { data: mentorByCalLink } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .ilike("cal_link", `%${organizerUsername}%`)
-        .maybeSingle();
-
-      if (mentorByCalLink?.id) {
-        mentorUserId = mentorByCalLink.id;
-      }
-    }
-
-    if (mentorUserId && eventDate && eventTime) {
+    // 7. Fallback: If no existing event matched, insert a new calendar_event for targetMentorId
+    if (targetMentorId && eventDate && eventTime) {
       const formattedDescription = `${payload?.title || "1-on-1 Session"}\n\n---\nRequested by: ${attendeeName} (${attendeeEmail})\nDuration: ${payload?.duration || 30} minutes`;
 
       const { data: newEvent, error: insertError } = await supabaseAdmin
         .from("calendar_events")
         .insert({
-          user_id: mentorUserId,
+          user_id: targetMentorId,
           title: payload?.title || `1-on-1 with ${attendeeName}`,
           description: formattedDescription,
           event_date: eventDate,
@@ -258,7 +375,7 @@ export async function POST(request: Request) {
       }
 
       console.log(
-        `[calcom-webhook] Created new calendar_event ${newEvent?.id} for mentor ${mentorUserId} with meet_link: ${meetUrl}`
+        `[calcom-webhook] Created new calendar_event ${newEvent?.id} for mentor ${targetMentorId} with meet_link: ${meetUrl}`
       );
 
       return NextResponse.json({

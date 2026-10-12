@@ -206,6 +206,16 @@ export default function LiveWebinarsPage() {
   }, [isCurrentlyLoading, setGlobalLoading]);
 
   useEffect(() => {
+    if (!isTierLoading && !canAccess("Webinars")) {
+      const landingBase = (process.env.NEXT_PUBLIC_LANDING_SITE_URL || "").trim().replace(/\/$/, "");
+      const landingLiveSessionsUrl =
+        process.env.NEXT_PUBLIC_LANDING_LIVE_SESSION_URL?.trim() ||
+        (landingBase ? `${landingBase}/payment?planName=Premium` : "/upgrade");
+      window.location.href = landingLiveSessionsUrl;
+    }
+  }, [isTierLoading, canAccess]);
+
+  useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
@@ -278,12 +288,11 @@ export default function LiveWebinarsPage() {
 
         {/* ── Content ── */}
         {!isTierLoading && !canAccess("Webinars") ? (
-          <div className="py-6">
-            <UpgradeRequired
-              title="Cohort Webinars Gated"
-              description="Live cohort webinars are exclusively available to Premium members. Upgrade your plan to participate in live Q&A sessions, cohort discussions, and interactive workshops."
-              requiredTier="Premium"
-            />
+          <div className="py-20 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-primary border-t-transparent" />
+            <p className="text-gray-600 font-medium text-sm">
+              Redirecting to Live Sessions Plan…
+            </p>
           </div>
         ) : (
           <div className="space-y-10">

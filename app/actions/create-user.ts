@@ -144,6 +144,7 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
   const plan = String(formData.get("plan") || "starter")
     .trim()
     .toLowerCase();
+  const productId = String(formData.get("productId") || "").trim();
   const phoneInput = String(formData.get("phone") || "").trim();
   const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
   const normalizedPlan = ["starter", "pro", "premium"].includes(plan)
@@ -166,6 +167,8 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
   }
 
   const displayName = username;
+
+  let assignedCourseTitle: string | null = null;
 
   try {
     // 1. Create the user in auth.users
@@ -210,8 +213,9 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
       }
 
       // 2b. Wire to phase2.users table
+      let phase2UserId: string | null = null;
       try {
-        const { error: phase2UserError } = await supabaseAdmin
+        const { data: p2UpsertData, error: phase2UserError } = await supabaseAdmin
           .schema("phase2" as any)
           .from("users")
           .upsert(
@@ -223,13 +227,100 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
               created_at: new Date().toISOString(),
             },
             { onConflict: "auth_user_id" }
-          );
+          )
+          .select("id")
+          .maybeSingle();
 
         if (phase2UserError) {
           console.error("Phase 2 User sync error:", phase2UserError.message);
+        } else if (p2UpsertData?.id) {
+          phase2UserId = p2UpsertData.id;
         }
       } catch (p2Err) {
         console.error("Phase 2 User creation exception:", p2Err);
+      }
+
+      // 2c. If productId is provided, assign the latest course of that product with the chosen plan
+      if (productId) {
+        try {
+          const { data: latestCourse } = await supabaseAdmin
+            .from("maincourses")
+            .select("id, title")
+            .eq("product_id", productId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestCourse?.id) {
+            assignedCourseTitle = latestCourse.title;
+
+            // Resolve bundle corresponding to the normalized plan
+            let bundleQuery = supabaseAdmin
+              .schema("phase2" as any)
+              .from("bundles")
+              .select("id, bundle_name");
+
+            if (normalizedPlan === "premium") {
+              bundleQuery = bundleQuery.ilike("bundle_name", "%premium%");
+            } else if (normalizedPlan === "pro") {
+              bundleQuery = bundleQuery
+                .ilike("bundle_name", "%pro%")
+                .not("bundle_name", "ilike", "%premium%");
+            } else {
+              bundleQuery = bundleQuery.ilike("bundle_name", "%starter%");
+            }
+
+            const { data: bundleData } = await bundleQuery.limit(1).maybeSingle();
+            const targetBundleId = (bundleData as any)?.id ?? null;
+
+            const enrollUserId = phase2UserId || authData.user.id;
+
+            // Insert into phase2.enrollments
+            const { error: enrollError } = await supabaseAdmin
+              .schema("phase2" as any)
+              .from("enrollments")
+              .insert({
+                user_id: enrollUserId,
+                course_id: latestCourse.id,
+                bundle_id: targetBundleId,
+                status: "active",
+                access_start_date: new Date().toISOString(),
+                access_end_date: new Date(
+                  new Date().setFullYear(new Date().getFullYear() + 1)
+                ).toISOString(),
+              });
+
+            if (enrollError) {
+              console.error("phase2.enrollments insertion error:", enrollError.message);
+            }
+
+            // Insert into course_members
+            const { error: cmError } = await supabaseAdmin
+              .from("course_members")
+              .insert({
+                maincourse_id: latestCourse.id,
+                email: email,
+              });
+
+            if (cmError) {
+              console.error("course_members insertion error:", cmError.message);
+            }
+
+            // Insert into course_enrollments for legacy compatibility
+            try {
+              await supabaseAdmin.from("course_enrollments").insert({
+                user_id: authData.user.id,
+                course_id: latestCourse.id,
+                status: "active",
+                enrolled_at: new Date().toISOString(),
+              });
+            } catch (ceErr) {
+              console.warn("course_enrollments insertion warning:", ceErr);
+            }
+          }
+        } catch (enrollException) {
+          console.error("Course assignment exception:", enrollException);
+        }
       }
 
       // 3. Send the Welcome Email
@@ -247,6 +338,11 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
               <h2 style="color: #174778;">Welcome, ${displayName}!</h2>
               <p style="color: #374151; font-size: 16px; line-height: 1.5;">
                 Your account has been successfully created. You can now log in to access your courses.
+                ${
+                  assignedCourseTitle
+                    ? `<br/>You have been enrolled in <strong>${assignedCourseTitle}</strong> (${normalizedPlan.toUpperCase()} Plan).`
+                    : ""
+                }
               </p>
               
               <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -273,7 +369,10 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
     }
 
     revalidatePath("/admin/users");
-    return { success: true, message: "User created and welcome email sent!" };
+    const successMsg = assignedCourseTitle
+      ? `User created and enrolled in "${assignedCourseTitle}" (${normalizedPlan.toUpperCase()})!`
+      : "User created and welcome email sent!";
+    return { success: true, message: successMsg };
   } catch (error: unknown) {
     console.error("Server Action Error:", error);
     return { success: false, error: "An unexpected server error occurred." };

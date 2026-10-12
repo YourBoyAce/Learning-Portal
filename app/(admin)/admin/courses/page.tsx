@@ -305,6 +305,9 @@ export default function AdminCourses() {
     setWhatsappLink("");
     setSelectedScholars([]);
     setSelectedMentors([]);
+    setScholarSelectOptions([]);
+    setMentorSelectOptions([]);
+    setIsLoadingMembers(false);
   };
 
   const handleCreateNew = () => {
@@ -355,6 +358,11 @@ export default function AdminCourses() {
     setThumbnailPreview(course.thumbnail_url || "");
     setModalMessage(null);
     resetActiveFields();
+    setSelectedScholars([]);
+    setSelectedMentors([]);
+    setScholarSelectOptions([]);
+    setMentorSelectOptions([]);
+    setIsLoadingMembers(true);
 
     // Detect if this is an upcoming product or an active maincourse
     if (course._source === "product" || course.course_type === "upcoming") {
@@ -481,7 +489,10 @@ export default function AdminCourses() {
 
       const res = await fetch(
         `/api/admin/courses?includeMembers=true&courseId=${encodeURIComponent(String(course.id))}`,
-        { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } },
+        {
+          headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+          cache: "no-store",
+        },
       );
       const result = await res.json().catch(() => null);
       if (res.ok && Array.isArray(result?.users)) {
@@ -937,6 +948,10 @@ export default function AdminCourses() {
       setCourseSections([]);
       setThumbnailFile(null);
       setThumbnailPreview("");
+      setSelectedScholars([]);
+      setSelectedMentors([]);
+      setScholarSelectOptions([]);
+      setMentorSelectOptions([]);
       resetActiveFields();
     } catch (error) {
       setModalMessage({

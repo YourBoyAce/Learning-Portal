@@ -99,29 +99,40 @@ export async function POST(request: Request) {
 
     let meetLink = null;
     if (mentorProfile?.cal_event_type_id) {
-      const startDateTimeStr = `${event.event_date}T${event.event_time}`;
-      const { createCalcomBooking } = await import("@/app/lib/calcom");
-      const bookingResult = await createCalcomBooking({
-        eventTypeId: mentorProfile.cal_event_type_id,
-        startDateTimeStr,
-        attendee: {
-          name: studentName,
-          email: studentEmail,
+      const eventTypeIdNum = Number(mentorProfile.cal_event_type_id);
+      if (!isNaN(eventTypeIdNum) && eventTypeIdNum > 0) {
+        const startDateTimeStr = `${event.event_date}T${event.event_time}`;
+        const { createCalcomBooking } = await import("@/app/lib/calcom");
+        const bookingResult = await createCalcomBooking({
+          eventTypeId: eventTypeIdNum,
+          startDateTimeStr,
+          attendee: {
+            name: studentName,
+            email: studentEmail,
+          }
+        });
+        if (bookingResult.success && bookingResult.meetingUrl) {
+          meetLink = bookingResult.meetingUrl;
+        } else if (!bookingResult.success) {
+          console.warn("[mentor-planner/rsvp] Cal.com booking notice:", bookingResult.error);
         }
-      });
-      if (bookingResult.success && bookingResult.meetingUrl) {
-        meetLink = bookingResult.meetingUrl;
       }
     }
 
     // Update status:pending to status:accepted in the tag and store meet_link
     const newTag = (event.tag || "").replace("status:pending", "status:accepted");
+    const updatePayload: Record<string, any> = {
+      tag: newTag,
+    };
+    if (meetLink) {
+      updatePayload.meet_link = meetLink;
+    } else if (event.meet_link) {
+      updatePayload.meet_link = event.meet_link;
+    }
+
     const { data: updatedEvent, error: updateError } = await supabaseAdmin
       .from("calendar_events")
-      .update({ 
-        tag: newTag,
-        meet_link: meetLink
-      })
+      .update(updatePayload)
       .eq("id", eventId)
       .select()
       .single();
