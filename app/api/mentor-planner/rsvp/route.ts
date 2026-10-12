@@ -98,6 +98,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     let meetLink = null;
+    let bookingWarning: string | null = null;
     if (mentorProfile?.cal_event_type_id) {
       const eventTypeIdNum = Number(mentorProfile.cal_event_type_id);
       if (!isNaN(eventTypeIdNum) && eventTypeIdNum > 0) {
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
         if (bookingResult.success && bookingResult.meetingUrl) {
           meetLink = bookingResult.meetingUrl;
         } else if (!bookingResult.success) {
+          bookingWarning = bookingResult.error || "Cal.com schedule error";
           console.warn("[mentor-planner/rsvp] Cal.com booking notice:", bookingResult.error);
         }
       }
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
       return apiErrorResponse(updateError, undefined, 500);
     }
 
-    return NextResponse.json({ success: true, event: updatedEvent });
+    return NextResponse.json({ success: true, event: updatedEvent, warning: bookingWarning });
   } else if (action === "decline") {
     // Delete the event
     const { error: deleteError } = await supabaseAdmin

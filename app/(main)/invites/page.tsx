@@ -154,10 +154,17 @@ export default function InvitesPage() {
       const result = await res.json().catch(() => null);
       if (!res.ok) throw new Error(result?.error || "Failed to submit RSVP response.");
 
-      setPageMessage({
-        type: "success",
-        text: action === "accept" ? "Invitation accepted! slot has been added to your planner." : "Invitation declined successfully.",
-      });
+      if (result?.warning) {
+        setPageMessage({
+          type: "error",
+          text: `Invitation accepted, but meet link generation had an issue: ${result.warning}`,
+        });
+      } else {
+        setPageMessage({
+          type: "success",
+          text: action === "accept" ? "Invitation accepted! slot has been added to your planner." : "Invitation declined successfully.",
+        });
+      }
 
       // Reload
       const { data: { user } } = await supabase.auth.getUser();

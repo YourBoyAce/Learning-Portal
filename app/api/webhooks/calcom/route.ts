@@ -174,23 +174,19 @@ export async function POST(request: Request) {
 
     // Handle cancellation
     if (triggerEvent === "BOOKING_CANCELLED") {
-      if (eventDate && attendeeEmail) {
-        let cancelQuery = supabaseAdmin
+      if (eventDate && attendeeEmail && targetMentorId) {
+        const { error: cancelError } = await supabaseAdmin
           .from("calendar_events")
           .update({ tag: "status:cancelled", meet_link: null })
+          .eq("user_id", targetMentorId)
           .eq("event_date", eventDate)
           .like("description", `%${attendeeEmail}%`);
-
-        // If target mentor is known, scope cancellation to that mentor only
-        if (targetMentorId) {
-          cancelQuery = cancelQuery.eq("user_id", targetMentorId);
-        }
-
-        const { error: cancelError } = await cancelQuery;
 
         if (cancelError) {
           console.error("[calcom-webhook] Error updating cancelled event:", cancelError);
         }
+      } else {
+        console.warn("[calcom-webhook] Skipping cancellation: missing mentor or event details.");
       }
       return NextResponse.json({ success: true, event: "BOOKING_CANCELLED" });
     }

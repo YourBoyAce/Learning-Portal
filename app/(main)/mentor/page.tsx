@@ -6,7 +6,7 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/app/components/UserAvatar";
-import { Calendar, Mail, Loader2, Sparkles, CheckCircle2, AlertCircle, ExternalLink, ShieldAlert, BookOpen } from "lucide-react";
+import { Calendar, Mail, Loader2, Sparkles, CheckCircle2, AlertCircle, ExternalLink, ShieldAlert, BookOpen, Copy, Check } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 import { getUserCommunities } from "@/app/actions/community-chat";
 import CourseCard from "@/app/components/course/CourseCard";
@@ -34,6 +34,7 @@ export default function MentorDashboardPage() {
   const [calLink, setCalLink] = useState("");
   const [mentorBio, setMentorBio] = useState("");
   const [mentorExpertise, setMentorExpertise] = useState("");
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
   
   // Feedback messages
   const [message, setMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
@@ -426,15 +427,96 @@ export default function MentorDashboardPage() {
 
             </div>
 
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left">
-              <h4 className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1.5">
-                <AlertCircle size={14} className="text-slate-500" />
-                How student booking works
-              </h4>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                When students click the "Schedule 1-on-1" button on your card from their Mentor Connect dashboard, 
-                an interactive modal will open loading your Cal.com link: <strong>cal.com/{calLink || "..."}</strong>.
-              </p>
+            {/* Mentor Onboarding Checklist (One-Time Setup) */}
+            <div className="bg-slate-50/80 border border-slate-200 rounded-3xl p-6 text-left space-y-4 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Mentor Onboarding Checklist (One-Time Setup):
+              </h3>
+
+              <ol className="space-y-3.5 text-xs text-gray-700 leading-relaxed">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">1</span>
+                  <div>
+                    <strong>Sign Up:</strong> Create an account on{" "}
+                    <a href="https://cal.com" target="_blank" rel="noopener noreferrer" className="text-brand-primary underline hover:text-brand-primary/80 inline-flex items-center gap-1 font-semibold">
+                      cal.com <ExternalLink size={11} />
+                    </a>.
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">2</span>
+                  <div>
+                    <strong>Connect Calendar:</strong> Go to Settings → Integrations → Google Calendar and click Connect.
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">3</span>
+                  <div>
+                    <strong>Set Event Location:</strong> Under Events, open your event type and set Location to Google Meet <span className="text-amber-600 font-bold">(crucial!)</span>.
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">4</span>
+                  <div>
+                    <strong>Copy Event ID:</strong> Copy the number at the end of the URL (e.g., cal.com/event-types/7425761 → <code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-brand-primary font-mono font-bold text-[11px]">7425761</code>).
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">5</span>
+                  <div className="w-full space-y-2">
+                    <div>
+                      <strong>Add Webhook in Cal.com:</strong>
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 text-[11px] shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-500">5.1.</span>
+                        <span>Go to Settings → Webhooks → New Webhook.</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                        <div className="truncate font-mono text-[10px] text-slate-800">
+                          <span className="font-bold text-slate-500 mr-1">5.2. URL:</span>
+                          https://automate-learning-portal.vercel.app/api/webhooks/calcom
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText("https://automate-learning-portal.vercel.app/api/webhooks/calcom");
+                            setCopiedWebhook(true);
+                            setTimeout(() => setCopiedWebhook(false), 2500);
+                          }}
+                          className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-white hover:bg-slate-150 border border-slate-200 text-slate-700 rounded transition-all"
+                        >
+                          {copiedWebhook ? (
+                            <><Check size={11} className="text-emerald-600" /> <span className="text-emerald-600">Copied!</span></>
+                          ) : (
+                            <><Copy size={11} /> Copy URL</>
+                          )}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-500">5.3.</span>
+                        <span>Check <strong>Booking Created</strong>, <strong>Rescheduled</strong>, <strong>Cancelled</strong> → Save.</span>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[10px] font-bold flex items-center justify-center mt-0.5">6</span>
+                  <div>
+                    <strong>Save in Portal:</strong> Go to Profile (
+                    <a href="/profile" className="text-brand-primary underline hover:text-brand-primary/80 font-bold">
+                      /profile
+                    </a>
+                    ) in your portal, paste the Event Type ID, and click Save Changes.
+                  </div>
+                </li>
+              </ol>
             </div>
 
           </div>

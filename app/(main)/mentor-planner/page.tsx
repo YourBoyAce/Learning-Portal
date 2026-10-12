@@ -101,6 +101,7 @@ export default function MentorConnectPage() {
   const [requestDuration, setRequestDuration] = useState("60");
   const [requestTopic, setRequestTopic] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [isGeneratingMeet, setIsGeneratingMeet] = useState(false);
   const [requestMessage, setRequestMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
     type: "",
     text: "",
@@ -581,6 +582,33 @@ export default function MentorConnectPage() {
       // Fallback local remove
       setEvents((prev) => prev.filter((e) => e.id !== eventToDelete.id));
       setIsDetailsModalOpen(false);
+    }
+  };
+
+  // Generate meet link on-demand for accepted sessions missing a meet_link
+  const handleGenerateMeet = async () => {
+    setIsGeneratingMeet(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch("/api/mentor-planner/generate-meet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const result = await res.json().catch(() => null);
+      if (res.ok && result?.success) {
+        if (currentUserId) {
+          await loadCalendarEvents(currentUserId);
+        }
+        setIsDetailsModalOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to generate meet link:", err);
+    } finally {
+      setIsGeneratingMeet(false);
     }
   };
 
@@ -1214,12 +1242,24 @@ export default function MentorConnectPage() {
                             <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
                             <p className="font-bold">Meet link not yet generated</p>
                           </div>
-                          <p>Complete Cal.com setup in your Profile to generate Meet links for accepted bookings.</p>
+                          <p>A Google Meet link has not been generated for this session yet.</p>
+                          <Button
+                            onClick={handleGenerateMeet}
+                            disabled={isGeneratingMeet}
+                            className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white text-[11px] py-2 h-auto rounded-lg font-bold flex items-center justify-center gap-1.5"
+                          >
+                            {isGeneratingMeet ? (
+                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Meet Link...</>
+                            ) : (
+                              <><Video size={13} /> Generate Google Meet Link</>
+                            )}
+                          </Button>
                           <Button
                             onClick={() => window.location.href = "/profile"}
-                            className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] py-1.5 h-auto rounded-lg font-bold"
+                            variant="outline"
+                            className="w-full text-slate-600 border-slate-200 text-[10px] py-1.5 h-auto rounded-lg font-semibold"
                           >
-                            Go to Profile Settings
+                            Cal.com Profile Settings
                           </Button>
                         </div>
                       ) : (

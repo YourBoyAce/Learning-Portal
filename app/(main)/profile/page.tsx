@@ -358,7 +358,7 @@ import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
-import { Lock, Loader2, Eye, EyeOff, ShieldAlert, X, CheckCircle2 } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff, ShieldAlert, X, CheckCircle2, Copy, Check, ExternalLink } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
 export default function ProfilePage() {
@@ -385,6 +385,7 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [calEventTypeId, setCalEventTypeId] = useState("");
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   // --- New Password State ---
   const [newPassword, setNewPassword] = useState("");
@@ -880,8 +881,8 @@ export default function ProfilePage() {
 
             {/* CAL.COM SETUP (INSTRUCTOR/ADMIN ONLY) */}
             {(role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin") && (
-              <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8 space-y-6">
+                <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
                   <svg className="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
@@ -890,11 +891,95 @@ export default function ProfilePage() {
                   </h3>
                 </div>
 
-                <p className="text-[13px] text-gray-500 mb-6 leading-relaxed">
-                  Provide your Cal.com Event Type ID to enable automatic Google Meet link generation for accepted student bookings.
-                </p>
+                {/* Mentor Onboarding Checklist (One-Time Setup) */}
+                <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5 sm:p-6 text-left space-y-4">
+                  <h4 className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Mentor Onboarding Checklist (One-Time Setup):
+                  </h4>
 
-                <div className="space-y-4">
+                  <ol className="space-y-3.5 text-[13px] text-gray-700 leading-relaxed">
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">1</span>
+                      <div>
+                        <strong>Sign Up:</strong> Create an account on{" "}
+                        <a href="https://cal.com" target="_blank" rel="noopener noreferrer" className="text-brand-primary underline hover:text-brand-primary/80 inline-flex items-center gap-1 font-semibold">
+                          cal.com <ExternalLink size={12} />
+                        </a>.
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">2</span>
+                      <div>
+                        <strong>Connect Calendar:</strong> Go to Settings → Integrations → Google Calendar and click Connect.
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">3</span>
+                      <div>
+                        <strong>Set Event Location:</strong> Under Events, open your event type and set Location to Google Meet <span className="text-amber-600 font-bold">(crucial!)</span>.
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">4</span>
+                      <div>
+                        <strong>Copy Event ID:</strong> Copy the number at the end of the URL (e.g., cal.com/event-types/7425761 → <code className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-brand-primary font-mono font-bold text-xs">7425761</code>).
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">5</span>
+                      <div className="w-full space-y-2">
+                        <div>
+                          <strong>Add Webhook in Cal.com:</strong>
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-500">5.1.</span>
+                            <span>Go to Settings → Webhooks → New Webhook.</span>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                            <div className="truncate font-mono text-[11px] text-slate-800">
+                              <span className="font-bold text-slate-500 mr-1.5">5.2. URL:</span>
+                              https://automate-learning-portal.vercel.app/api/webhooks/calcom
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText("https://automate-learning-portal.vercel.app/api/webhooks/calcom");
+                                setCopiedWebhook(true);
+                                setTimeout(() => setCopiedWebhook(false), 2500);
+                              }}
+                              className="shrink-0 flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-150 border border-slate-200 text-slate-700 rounded transition-all"
+                            >
+                              {copiedWebhook ? (
+                                <><Check size={12} className="text-emerald-600" /> <span className="text-emerald-600">Copied!</span></>
+                              ) : (
+                                <><Copy size={12} /> Copy URL</>
+                              )}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-500">5.3.</span>
+                            <span>Check <strong>Booking Created</strong>, <strong>Rescheduled</strong>, <strong>Cancelled</strong> → Save.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+
+                    <li className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-brand-primary text-[11px] font-bold flex items-center justify-center mt-0.5">6</span>
+                      <div>
+                        <strong>Save in Portal:</strong> Go to Profile (/profile) in your portal, paste the Event Type ID, and click Save Changes.
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="space-y-4 pt-1">
                   <div>
                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
                       CAL.COM EVENT TYPE ID
@@ -904,10 +989,10 @@ export default function ProfilePage() {
                       value={calEventTypeId}
                       onChange={(e) => setCalEventTypeId(e.target.value)}
                       className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-3.5 text-[13px] text-gray-800 font-medium focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors"
-                      placeholder="e.g. 123456"
+                      placeholder="e.g. 7425761"
                     />
                     <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">
-                      You can find this ID in the URL of your Cal.com event type page (e.g. cal.com/event-types/<b>123456</b>).
+                      Paste the Event Type ID from step 4 above (e.g. <b>7425761</b>), then click <b>Save Changes</b> below.
                     </p>
                   </div>
                 </div>
