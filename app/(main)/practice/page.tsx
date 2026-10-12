@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
-import { fetchLearnerQuizzes, type LearnerQuizDefinition, recordQuizCompletion } from "@/app/lib/quiz-completion";
+import { fetchLearnerQuizzes, type LearnerQuizDefinition, recordQuizCompletion, verifyLearnerAnswer } from "@/app/lib/quiz-completion";
 import {Button} from "@/components/ui/button";
 import {ICONS} from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
@@ -114,6 +114,8 @@ export default function StudentPracticeCenter() {
   const [quizScore, setQuizScore] = useState(0);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<number, number>>({});
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     const loadStudentData = async () => {
@@ -280,37 +282,54 @@ if (artifactsError) {
     setQuizScore(0);
     setIsAnswerSubmitted(false);
     setUserAnswers({});
+    setRevealedAnswers({});
+    setIsVerifying(false);
     setShowQuizModal(true);
   };
 
   const handleAnswerSelect = (optionIndex: number) => {
-    if (!isAnswerSubmitted) {
+    if (!isAnswerSubmitted && !isVerifying) {
       setSelectedAnswer(optionIndex);
     }
   };
 
-  const handleVerifyAnswer = () => {
-    if (selectedAnswer === null || isAnswerSubmitted) return;
-    
-    const currentQuestion = activeQuiz.questions[currentQuestionIndex];
-    const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
-    
-    if (isCorrect) {
-      setQuizScore(prev => prev + 1);
+  const handleVerifyAnswer = async () => {
+    if (selectedAnswer === null || isAnswerSubmitted || isVerifying || !activeQuiz) return;
+    setIsVerifying(true);
+    try {
+      const currentQuestion = activeQuiz.questions[currentQuestionIndex];
+      const result = await verifyLearnerAnswer(
+        activeQuiz.id,
+        currentQuestion.id || String(currentQuestionIndex),
+        selectedAnswer,
+      );
+
+      if (result.isCorrect) {
+        setQuizScore((prev) => prev + 1);
+      }
+
+      setRevealedAnswers((prev) => ({
+        ...prev,
+        [currentQuestionIndex]: Number(result.correctAnswer),
+      }));
+
+      setUserAnswers((prev) => ({
+        ...prev,
+        [currentQuestionIndex]: selectedAnswer,
+      }));
+
+      setIsAnswerSubmitted(true);
+    } catch (err) {
+      console.error("Unable to verify quiz answer:", err);
+    } finally {
+      setIsVerifying(false);
     }
-    
-    setUserAnswers(prev => ({
-      ...prev,
-      [currentQuestionIndex]: selectedAnswer
-    }));
-    
-    setIsAnswerSubmitted(true);
   };
 
   const handleNextQuestion = () => {
     setSelectedAnswer(null);
     setIsAnswerSubmitted(false);
-    setCurrentQuestionIndex(prev => prev + 1);
+    setCurrentQuestionIndex((prev) => prev + 1);
   };
 
   const handleViewResults = async () => {
@@ -353,6 +372,8 @@ if (artifactsError) {
     setQuizScore(0);
     setIsAnswerSubmitted(false);
     setUserAnswers({});
+    setRevealedAnswers({});
+    setIsVerifying(false);
   };
 
   // Download Action
@@ -707,7 +728,7 @@ if (artifactsError) {
                   <div className="space-y-3">
                     {activeQuiz.questions[currentQuestionIndex].options.map((option: string, oIdx: number) => {
                       const isSelected = selectedAnswer === oIdx;
-                      const isCorrectAnswer = oIdx === activeQuiz.questions[currentQuestionIndex].correctAnswer;
+                      const isCorrectAnswer = revealedAnswers[currentQuestionIndex] === oIdx;
                       
                       let optionStyle = "border-gray-200 bg-white text-gray-800 hover:border-brand-primary/50 hover:bg-gray-50/30";
                       
@@ -727,7 +748,7 @@ if (artifactsError) {
                         <button
                           key={oIdx}
                           onClick={() => handleAnswerSelect(oIdx)}
-                          disabled={isAnswerSubmitted}
+                          disabled={isAnswerSubmitted || isVerifying}
                           className={`w-full text-left p-4 rounded-2xl border transition-all text-sm flex items-start justify-between gap-3 ${optionStyle}`}
                         >
                           <span className="flex items-start gap-3">
@@ -755,10 +776,10 @@ if (artifactsError) {
                     {!isAnswerSubmitted ? (
                       <Button
                         onClick={handleVerifyAnswer}
-                        disabled={selectedAnswer === null}
+                        disabled={selectedAnswer === null || isVerifying}
                         className={`w-full px-6 py-5 rounded-full text-white text-xs uppercase tracking-wider disabled:opacity-50 sm:w-auto sm:px-8 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
                       >
-                        Verify Answer
+                        {isVerifying ? "Verifying..." : "Verify Answer"}
                       </Button>
                     ) : (
                       currentQuestionIndex < activeQuiz.questions.length - 1 ? (

@@ -88,13 +88,51 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { transporter } from "@/app/lib/mailer";
 import { normalizePhoneNumber } from "@/app/lib/phone-verification";
 import { logAndReturnActionError } from "@/app/lib/error-handler";
 import { logError } from "@/app/lib/error-handler";
 
-export async function createUser(formData: FormData) {
+async function verifyAdminCaller(accessToken?: string): Promise<{ ok: true; adminUserId: string } | { ok: false; error: string }> {
+  const token = accessToken?.trim();
+  if (!token) {
+    return { ok: false, error: "Unauthorized: Missing administrative credentials." };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { ok: false, error: "Authentication service is not configured." };
+  }
+
+  const authClient = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !user) {
+    return { ok: false, error: "Unauthorized: Invalid or expired administrative session." };
+  }
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError || profile?.role?.toLowerCase() !== "admin") {
+    return { ok: false, error: "Forbidden: Administrator permissions required." };
+  }
+
+  return { ok: true, adminUserId: user.id };
+}
+
+export async function createUser(formData: FormData, adminAccessToken?: string) {
+  const token = adminAccessToken || String(formData.get("accessToken") || "").trim();
+  const callerAuth = await verifyAdminCaller(token);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
+
   const username = String(formData.get("username") || "").trim();
   const email = String(formData.get("email") || "")
     .trim()
@@ -164,10 +202,10 @@ export async function createUser(formData: FormData) {
         });
 
       if (profileError) {
-        console.error("Profile Error:", profileError.message);
+        console.error("Profile Error:", profileError);
         return {
           success: false,
-          error: "User created, but profile failed: " + profileError.message,
+          error: "User account created, but profile setup failed. Please contact support.",
         };
       }
 
@@ -196,6 +234,9 @@ export async function createUser(formData: FormData) {
 
       // 3. Send the Welcome Email
       try {
+        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_LANDING_SITE_URL || "").replace(/\/$/, "");
+        const loginUrl = siteUrl ? `${siteUrl}/login` : "/login";
+
         await transporter.sendMail({
           from: `"The Automate Learning Portal" <${process.env.ADMIN_EMAIL}>`,
           to: email,
@@ -219,7 +260,7 @@ export async function createUser(formData: FormData) {
                 <strong>Go to Profile -> Security & Authentication -> Update Password.</strong>
               </p>
 
-              <a href="${process.env.NEXT_PUBLIC_SITE_URL}/login" 
+              <a href="${loginUrl}" 
                  style="display: inline-block; background-color: #2283FF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">
                 Log In Now
               </a>
@@ -235,12 +276,16 @@ export async function createUser(formData: FormData) {
     return { success: true, message: "User created and welcome email sent!" };
   } catch (error: unknown) {
     console.error("Server Action Error:", error);
-    const message = error instanceof Error ? error.message : "An unexpected server error occurred.";
-    return { success: false, error: message };
+    return { success: false, error: "An unexpected server error occurred." };
   }
 }
 
-export async function updateUserRole(userId: string, newRole: string) {
+export async function updateUserRole(userId: string, newRole: string, adminAccessToken?: string) {
+  const callerAuth = await verifyAdminCaller(adminAccessToken);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
+
   try {
     const { error } = await supabaseAdmin
       .from("profiles")
@@ -259,7 +304,11 @@ export async function updateUserRole(userId: string, newRole: string) {
   }
 }
 
-export async function deleteUser(userId: string) {
+export async function deleteUser(userId: string, adminAccessToken?: string) {
+  const callerAuth = await verifyAdminCaller(adminAccessToken);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
   // userId here is the Supabase Auth UUID (= profiles.id).
   // We must wipe all three layers so that the same email is treated
   // as a brand-new user if they purchase again later.

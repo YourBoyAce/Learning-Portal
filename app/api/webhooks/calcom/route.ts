@@ -38,18 +38,7 @@ export async function POST(request: Request) {
       body?.triggerEvent || body?.type || body?.event || "UNKNOWN";
     const payload: any = body?.payload || body?.data || body;
 
-    // DIAGNOSTIC LOGGING: Log the entire raw JSON body when booking events trigger
-    if (
-      triggerEvent === "BOOKING_CREATED" ||
-      triggerEvent === "BOOKING_RESCHEDULED" ||
-      triggerEvent === "BOOKING_CANCELLED"
-    ) {
-      console.log(`\n================== [CAL.COM WEBHOOK: ${triggerEvent}] ==================`);
-      console.log(JSON.stringify(body, null, 2));
-      console.log("========================================================================\n");
-    } else {
-      console.log(`[calcom-webhook] Received event: ${triggerEvent}`);
-    }
+    console.log(`[calcom-webhook] Received event: ${triggerEvent}`);
 
     // Handle PING / TEST events from Cal.com webhook setup
     if (triggerEvent === "PING" || triggerEvent === "TEST" || triggerEvent === "webhook_test") {
@@ -183,7 +172,10 @@ export async function POST(request: Request) {
 
       if (updateError) {
         console.error("[calcom-webhook] Error updating calendar event:", updateError);
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to update calendar event." },
+          { status: 500 }
+        );
       }
 
       console.log(
@@ -259,7 +251,10 @@ export async function POST(request: Request) {
 
       if (insertError) {
         console.error("[calcom-webhook] Error inserting new calendar_event:", insertError);
-        return NextResponse.json({ error: insertError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to create calendar event." },
+          { status: 500 }
+        );
       }
 
       console.log(

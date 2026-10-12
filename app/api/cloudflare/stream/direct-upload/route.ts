@@ -1,8 +1,52 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { error: "Supabase environment variables are not configured." },
+        { status: 500 },
+      );
+    }
+
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: authData, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !authData.user) {
+      return NextResponse.json({ error: "Invalid session." }, { status: 401 });
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    if (profileError || profile?.role?.toLowerCase() !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden: Admin access required." },
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
     const accountId =
       process.env.CLOUDFLARE_ACCOUNT_ID ||
       process.env.CLOUDFLARE_STREAM_ACCOUNT_ID;
@@ -10,15 +54,10 @@ export async function POST(request: Request) {
       process.env.CLOUDFLARE_STREAM_API_TOKEN ||
       process.env.CLOUDFLARE_API_TOKEN;
 
-      console.log("Account ID:", accountId);
-console.log("Token exists:", !!apiToken);
-console.log("Token length:", apiToken?.length);
-
     if (!accountId || !apiToken) {
       return NextResponse.json(
         {
-          error:
-            "Cloudflare Stream is not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_STREAM_API_TOKEN (or CLOUDFLARE_API_TOKEN).",
+          error: "Cloudflare Stream is not configured on the server.",
         },
         { status: 500 },
       );
@@ -44,11 +83,11 @@ console.log("Token length:", apiToken?.length);
     );
 
     const json = await response.json();
-    console.log("Cloudflare response:", json);
     if (!response.ok || !json?.success || !json?.result?.uploadURL) {
+      console.error("[cloudflare-direct-upload] Cloudflare error:", json?.errors);
       return NextResponse.json(
-        { error: json?.errors?.[0]?.message || "Failed to create direct upload URL." },
-        { status: 500 },
+        { error: "Failed to create direct upload URL." },
+        { status: 502 },
       );
     }
 
@@ -57,14 +96,6 @@ console.log("Token length:", apiToken?.length);
       uid: json.result.uid,
     });
   } catch (error: unknown) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to initialize Cloudflare upload.",
-      },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "Cloudflare direct upload", 500);
   }
 }

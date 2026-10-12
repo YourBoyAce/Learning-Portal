@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { normalizePhoneNumber } from "@/app/lib/phone-verification";
+import { hashOtpCode, normalizePhoneNumber } from "@/app/lib/phone-verification";
 
 export async function consumePhoneVerification(phoneNumber: string, code: string) {
   const normalizedPhone = normalizePhoneNumber(phoneNumber);
@@ -9,15 +9,34 @@ export async function consumePhoneVerification(phoneNumber: string, code: string
     return { ok: false as const, error: "Invalid verification code. Please try again." };
   }
 
-  const { data: verification, error: lookupError } = await supabaseAdmin
+  const hashedCode = hashOtpCode(trimmedCode);
+
+  let { data: verification, error: lookupError } = await supabaseAdmin
     .from("phone_verifications")
     .select("id, expires_at, verified")
     .eq("phone_number", normalizedPhone)
-    .eq("otp_code", trimmedCode)
+    .eq("otp_code", hashedCode)
     .eq("verified", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Backward compatibility with any legacy unhashed code created right before deployment
+  if (!verification) {
+    const { data: legacyVerification } = await supabaseAdmin
+      .from("phone_verifications")
+      .select("id, expires_at, verified")
+      .eq("phone_number", normalizedPhone)
+      .eq("otp_code", trimmedCode)
+      .eq("verified", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (legacyVerification) {
+      verification = legacyVerification;
+    }
+  }
 
   if (lookupError || !verification) {
     return { ok: false as const, error: "Invalid verification code. Please try again." };

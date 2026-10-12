@@ -145,5 +145,19 @@ export async function GET(request: Request) {
 
   const { data: quizzes, error: quizError } = await query;
   if (quizError) return apiErrorResponse(quizError, undefined, 500);
-  return NextResponse.json({ quizzes: quizzes ?? [] }, { headers: { "Cache-Control": "no-store" } });
+
+  // Security guard: Strip correctAnswer keys so correct answers are never leaked upfront
+  const sanitizedQuizzes = (quizzes ?? []).map((quiz: any) => ({
+    ...quiz,
+    questions: Array.isArray(quiz.questions)
+      ? quiz.questions.map((q: any) => {
+          if (!q || typeof q !== "object") return q;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { correctAnswer, ...cleanQuestion } = q;
+          return cleanQuestion;
+        })
+      : [],
+  }));
+
+  return NextResponse.json({ quizzes: sanitizedQuizzes }, { headers: { "Cache-Control": "no-store" } });
 }

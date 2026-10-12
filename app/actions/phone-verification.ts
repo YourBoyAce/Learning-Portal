@@ -3,7 +3,7 @@
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { formatPhoneForSmsGateway, maskPhoneNumber, normalizePhoneNumber } from "@/app/lib/phone-verification";
+import { formatPhoneForSmsGateway, hashOtpCode, maskPhoneNumber, normalizePhoneNumber } from "@/app/lib/phone-verification";
 import { consumePhoneVerification } from "@/app/lib/phone-verification-db";
 import {
   buildTextBeeOtpMessage,
@@ -68,7 +68,7 @@ export async function sendFreeOTP(phoneNumber: string) {
 
     const { error: insertError } = await supabaseAdmin.from("phone_verifications").insert({
       phone_number: normalizedPhone,
-      otp_code: otpCode,
+      otp_code: hashOtpCode(otpCode),
       expires_at: expiresAt,
       verified: false,
     });
@@ -133,19 +133,8 @@ export async function sendFreeOTP(phoneNumber: string) {
       };
     }
 
-    if (process.env.NODE_ENV === "development") {
-      console.info("[DEV] OTP stored for testing:", {
-        phone: normalizedPhone,
-        otpCode,
-        smsMessage,
-        smsBatchId: providerResult.smsBatchId,
-      });
-    }
-
     console.info("TextBee SMS queued:", {
-      phone: normalizedPhone,
-      smsRecipient,
-      smsMessage,
+      phone: maskPhoneNumber(normalizedPhone),
       simSubscriptionId: simSubscriptionId ?? "device default SIM",
       status: smsResponse.status,
       smsBatchId: providerResult.smsBatchId,

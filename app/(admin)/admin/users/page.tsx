@@ -220,7 +220,13 @@ export default function AdminUsers() {
       formData.append("phone", phone);
     }
 
-    const result = await createUser(formData);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    if (token) {
+      formData.append("accessToken", token);
+    }
+
+    const result = await createUser(formData, token);
 
     if (result.success) {
       setFormFeedback({
@@ -287,7 +293,9 @@ export default function AdminUsers() {
   };
 
   const handleChangeRole = async (userId: string, newRole: string) => {
-    await updateUserRole(userId, newRole);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    await updateUserRole(userId, newRole, token);
     setOpenActionMenuId(null);
     showToast("Role updated successfully.");
     fetchUsers();
@@ -303,7 +311,9 @@ export default function AdminUsers() {
     if (!deletingUser) return;
     setIsDeleting(true);
     try {
-      await deleteUser(deletingUser.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+      await deleteUser(deletingUser.id, token);
       showToast("User removed successfully.");
       fetchUsers();
     } catch (err) {

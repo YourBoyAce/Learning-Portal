@@ -77,9 +77,6 @@ export async function POST(request: Request) {
   } catch (e) {}
 
   // ── Call landing site init-handoff ────────────────────────────────────────
-  // NOTE: In development this requires the landing site dev server to be
-  // running on the same machine (default: http://localhost:3000).
-  // Start it with:  cd d:\automate-phase2-landing\web && npm run dev
   let handoffToken: string;
   try {
     const res = await fetch(`${LANDING_SITE_URL}/api/upgrade/init-handoff`, {
@@ -109,20 +106,13 @@ export async function POST(request: Request) {
 
     handoffToken = data.token;
   } catch (err: any) {
-    // Most likely cause: landing site is not running / not reachable at LANDING_SITE_URL.
-    // In development: start the landing site with `npm run dev` (port 3000).
-    // In production: verify NEXT_PUBLIC_LANDING_SITE_URL points to the deployed landing site.
     console.error(
       `[request-handoff] Could not reach landing site at ${LANDING_SITE_URL}:`,
       err?.message,
     );
     return NextResponse.json(
       {
-        error:
-          "The checkout service is not reachable. " +
-          (process.env.NODE_ENV === "development"
-            ? "Make sure the landing site dev server is running on port 3000."
-            : "Please try again or contact support."),
+        error: "The checkout service is temporarily unavailable. Please try again or contact support.",
       },
       { status: 502 },
     );

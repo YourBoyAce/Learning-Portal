@@ -61,6 +61,7 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/courses/:path*',
-    '/admin/:path*'
+    '/admin/:path*',
+    '/premium/:path*',
   ],
 };

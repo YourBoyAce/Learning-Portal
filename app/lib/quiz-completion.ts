@@ -46,3 +46,24 @@ export async function recordQuizCompletion(
   if (!response.ok) throw new Error(result?.error || "Unable to record quiz completion.");
   return result as { success: true; awarded: boolean; score: number };
 }
+
+export async function verifyLearnerAnswer(
+  quizId: string,
+  questionId: string,
+  selectedAnswer: number | string,
+) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Please log in again to verify answers.");
+
+  const response = await fetch("/api/quizzes/verify-answer", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ quizId, questionId, selectedAnswer }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || "Unable to verify answer.");
+  return result as { isCorrect: boolean; correctAnswer: number | string };
+}

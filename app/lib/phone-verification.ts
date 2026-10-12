@@ -1,4 +1,10 @@
+import crypto from "crypto";
+
 const PLAIN_PHONE_REGEX = /^\d{10,15}$/;
+
+export function hashOtpCode(code: string): string {
+  return crypto.createHash("sha256").update(code.trim()).digest("hex");
+}
 
 export function normalizePhoneNumber(input: string): string | null {
   const trimmed = input.trim();

@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch and one-off maintenance scripts
+scratch/
+refactor-errors.js
+fix-ts.js

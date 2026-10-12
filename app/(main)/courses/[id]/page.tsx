@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
-import { fetchLearnerQuizzes, recordQuizCompletion } from "@/app/lib/quiz-completion";
+import { fetchLearnerQuizzes, recordQuizCompletion, verifyLearnerAnswer } from "@/app/lib/quiz-completion";
 import { upsertUserProgress } from "@/app/actions/user-progress";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
@@ -257,6 +257,8 @@ export default function CoursePlayerPage() {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, number | string>>({});
   const [bestScores, setBestScores] = useState<Record<string, number>>({});
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<number, any>>({});
+  const [isVerifyingQuiz, setIsVerifyingQuiz] = useState(false);
 
   // In-Module Quiz Player state
   const [modQuizQIdx, setModQuizQIdx] = useState(0);
@@ -507,40 +509,48 @@ export default function CoursePlayerPage() {
     setQuizScore(0);
     setIsAnswerSubmitted(false);
     setUserAnswers({});
+    setRevealedAnswers({});
+    setIsVerifyingQuiz(false);
     setShowQuizModal(true);
   };
 
   const handleAnswerSelect = (optionIndex: number) => {
-    if (!isAnswerSubmitted) {
+    if (!isAnswerSubmitted && !isVerifyingQuiz) {
       setSelectedAnswer(optionIndex);
     }
   };
 
-  const handleVerifyAnswer = () => {
-    if (selectedAnswer === null || selectedAnswer === "" || isAnswerSubmitted) return;
+  const handleVerifyAnswer = async () => {
+    if (selectedAnswer === null || selectedAnswer === "" || isAnswerSubmitted || isVerifyingQuiz || !activeQuiz) return;
+    setIsVerifyingQuiz(true);
+    try {
+      const currentQuestion = activeQuiz.questions[currentQuestionIndex];
+      const result = await verifyLearnerAnswer(
+        activeQuiz.id,
+        currentQuestion.id || String(currentQuestionIndex),
+        selectedAnswer,
+      );
 
-    const currentQuestion = activeQuiz.questions[currentQuestionIndex];
-    const isTextType = currentQuestion.questionType === "text" || !currentQuestion.options || currentQuestion.options.length === 0;
+      if (result.isCorrect) {
+        setQuizScore((prev) => prev + 1);
+      }
 
-    let isCorrect = false;
-    if (isTextType) {
-      const userTyped = String(selectedAnswer).trim().toLowerCase();
-      const targetAnswer = String(currentQuestion.correctAnswer || "").trim().toLowerCase();
-      isCorrect = userTyped === targetAnswer && userTyped.length > 0;
-    } else {
-      isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+      setRevealedAnswers((prev) => ({
+        ...prev,
+        [currentQuestionIndex]: result.correctAnswer,
+      }));
+
+      setUserAnswers((prev) => ({
+        ...prev,
+        [currentQuestionIndex]: selectedAnswer,
+      }));
+
+      setIsAnswerSubmitted(true);
+    } catch (err) {
+      console.error("Unable to verify quiz answer:", err);
+    } finally {
+      setIsVerifyingQuiz(false);
     }
-
-    if (isCorrect) {
-      setQuizScore((prev) => prev + 1);
-    }
-
-    setUserAnswers((prev) => ({
-      ...prev,
-      [currentQuestionIndex]: selectedAnswer,
-    }));
-
-    setIsAnswerSubmitted(true);
   };
 
   const handleNextQuestion = () => {
@@ -584,6 +594,8 @@ export default function CoursePlayerPage() {
     setQuizScore(0);
     setIsAnswerSubmitted(false);
     setUserAnswers({});
+    setRevealedAnswers({});
+    setIsVerifyingQuiz(false);
   };
 
   const loadCourseData = async () => {
@@ -3153,11 +3165,11 @@ export default function CoursePlayerPage() {
                           placeholder="Type your answer here..."
                           value={String(selectedAnswer ?? "")}
                           onChange={(e) => setSelectedAnswer(e.target.value)}
-                          disabled={isAnswerSubmitted}
+                          disabled={isAnswerSubmitted || isVerifyingQuiz}
                           className={`w-full p-4 sm:p-5 rounded-2xl border-2 text-base font-medium focus:outline-none transition-all ${
                             isAnswerSubmitted
                               ? String(selectedAnswer || "").trim().toLowerCase() ===
-                                String(activeQuiz.questions[currentQuestionIndex].correctAnswer || "").trim().toLowerCase()
+                                String(revealedAnswers[currentQuestionIndex] || "").trim().toLowerCase()
                                 ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-semibold"
                                 : "border-red-500 bg-red-50 text-red-900 font-semibold"
                               : "border-gray-200 focus:border-brand-heading focus:bg-blue-50/30 text-gray-900"
@@ -3166,7 +3178,7 @@ export default function CoursePlayerPage() {
                         {isAnswerSubmitted && (
                           <div className="text-xs font-semibold mt-2">
                             {String(selectedAnswer || "").trim().toLowerCase() ===
-                            String(activeQuiz.questions[currentQuestionIndex].correctAnswer || "").trim().toLowerCase() ? (
+                            String(revealedAnswers[currentQuestionIndex] || "").trim().toLowerCase() ? (
                               <span className="text-emerald-700 flex items-center gap-1 font-bold">
                                 <Check size={14} /> Correct answer!
                               </span>
@@ -3174,7 +3186,7 @@ export default function CoursePlayerPage() {
                               <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-800">
                                 <span className="font-bold">Incorrect.</span> Correct answer:{" "}
                                 <strong className="text-gray-900 underline font-bold">
-                                  {String(activeQuiz.questions[currentQuestionIndex].correctAnswer)}
+                                  {String(revealedAnswers[currentQuestionIndex] || "")}
                                 </strong>
                               </div>
                             )}
@@ -3187,8 +3199,7 @@ export default function CoursePlayerPage() {
                           (option: string, idx: number) => {
                             const isSelected = selectedAnswer === idx;
                             const isCorrectAnswer =
-                              activeQuiz.questions[currentQuestionIndex]
-                                .correctAnswer === idx;
+                              revealedAnswers[currentQuestionIndex] === idx;
 
                             let optionClass =
                               "border-gray-200 hover:border-brand-heading hover:bg-blue-50/50";
@@ -3212,7 +3223,7 @@ export default function CoursePlayerPage() {
                               <button
                                 key={idx}
                                 onClick={() => handleAnswerSelect(idx)}
-                                disabled={isAnswerSubmitted}
+                                disabled={isAnswerSubmitted || isVerifyingQuiz}
                                 className={`w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-start gap-3 sm:gap-4 ${optionClass}`}
                               >
                                 <div
@@ -3274,10 +3285,10 @@ export default function CoursePlayerPage() {
                       {!isAnswerSubmitted ? (
                         <Button
                           onClick={handleVerifyAnswer}
-                          disabled={selectedAnswer === null}
+                          disabled={selectedAnswer === null || isVerifyingQuiz}
                           className="px-8 py-6 rounded-xl bg-brand-heading hover:bg-brand-heading-hover text-white font-bold"
                         >
-                          Submit Answer
+                          {isVerifyingQuiz ? "Verifying..." : "Submit Answer"}
                         </Button>
                       ) : currentQuestionIndex <
                         activeQuiz.questions.length - 1 ? (

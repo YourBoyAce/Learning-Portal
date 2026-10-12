@@ -60,9 +60,15 @@ export async function POST(request: Request) {
     },
   });
 
+  // Strip any attempts to forge metadata delimiters
+  const sanitizedTopic = String(topic)
+    .replace(/Student ID:\s*[^\n]*/gi, "")
+    .replace(/Requested by:\s*[^\n]*/gi, "")
+    .trim();
+
   // Construct compact tag and formatted description containing student details
   const tag = `status:pending|dur:${duration}`;
-  const formattedDescription = `${topic}
+  const formattedDescription = `${sanitizedTopic}
 
 ---
 Requested by: ${studentName} (${studentEmail})

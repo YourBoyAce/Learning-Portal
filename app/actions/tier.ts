@@ -4,12 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 
 import { UserTier } from "@/app/lib/tier.constants";
 
-const DEMO_PREMIUM_EMAILS = [
-  "premium@gmail.com",
-  "demouser@gmail.com",
-  "user@example.com",
-];
-
 function getAuthUserPlanFromMetadata(
   user: {
     user_metadata?: Record<string, unknown>;
@@ -57,10 +51,6 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
 
   const role = profile?.role?.toLowerCase() ?? "";
   if (role === "admin" || role === "instructor") return "Premium";
-
-  if (DEMO_PREMIUM_EMAILS.includes((user.email ?? "").toLowerCase())) {
-    return "Premium";
-  }
 
   const authPlan = getAuthUserPlanFromMetadata(user);
   let resolvedTier: UserTier = null;

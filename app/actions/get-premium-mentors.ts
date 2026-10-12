@@ -121,7 +121,7 @@ export async function getPremiumMentors(accessToken: string) {
       const formatted = data.map((item: any) => ({
         id: item.id,
         full_name: item.full_name || "Instructor",
-        email: item.email || "",
+        email: "",
         role: item.role === "admin" ? "Lead Mentor" : "Cohort Mentor",
         cal_link: item.cal_link || "",
         mentor_bio: item.mentor_bio || "Experienced technical educator ready to help you master your curriculum journey.",
