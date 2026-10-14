@@ -411,8 +411,12 @@ export default function UpgradePage() {
       if (landingSiteUrl) {
         const handoffRes = await fetch("/api/upgrade/request-handoff", {
           method:  "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          body:    JSON.stringify({}),
+          headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            courseIds: [...selected],
+            courseSlug: preselectedCourse || [...selected][0],
+            targetTier: "Pro",
+          }),
         });
         const handoffData = await handoffRes.json();
         if (handoffRes.ok && handoffData.redirectUrl) {

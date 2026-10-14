@@ -107,21 +107,66 @@ export async function activateProForCourse(
   }
 
   // ── 3. Upsert fallback ────────────────────────────────────────────────────
+  let orderId: number | null = null;
+  const { data: existingOrder } = await (db as any)
+    .schema("phase2")
+    .from("orders")
+    .select("id")
+    .eq("user_id", phase2UserId)
+    .eq("course_id", courseId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingOrder?.id) {
+    orderId = existingOrder.id;
+  } else {
+    try {
+      const { data: newOrder } = await (db as any)
+        .schema("phase2")
+        .from("orders")
+        .insert({
+          user_id: phase2UserId,
+          course_id: courseId,
+          bundle_id: proBundleId,
+          amount: 6000,
+          status: "paid",
+          razorpay_order_id: `upg_order_${Date.now()}`,
+          razorpay_payment_id: paymentRef,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select("id")
+        .maybeSingle();
+      if (newOrder?.id) orderId = newOrder.id;
+    } catch (ordErr) {
+      console.warn("[activate-pro] order insert warning:", ordErr);
+    }
+  }
+
+  const { data: courseData } = await db
+    .from("maincourses")
+    .select("product_id")
+    .eq("id", courseId)
+    .maybeSingle();
+
   const { error: upsertErr } = await (db as any)
     .schema("phase2")
     .from("enrollments")
     .upsert(
       {
         user_id:          phase2UserId,
+        order_id:         orderId,
         course_id:        courseId,
         bundle_id:        proBundleId,
+        product_id:       (courseData as any)?.product_id ?? null,
+        batch_type:       "recorded",
         status:           "active",
         access_start_date: new Date().toISOString(),
         access_end_date:   oneYearFromNow,
       },
       // Conflict key: every (user_id, course_id) pair should be unique per
-      // active enrollment.  If your schema has a different unique constraint,
-      // adjust the onConflict value accordingly.
+      // active enrollment.
       { onConflict: "user_id,course_id", ignoreDuplicates: false },
     );
 

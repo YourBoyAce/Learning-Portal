@@ -132,7 +132,7 @@ export async function getUpgradeEligibleCourses(
   const phase2UserId: string = (p2User as any)?.id ?? user.id;
 
   // Fetch all active enrollments with bundle info
-  const { data: enrollments, error: enrollErr } = await db
+  let { data: enrollments, error: enrollErr } = await db
     .schema("phase2")
     .from("enrollments")
     .select("id, course_id, bundle_id, bundles(bundle_name)")
@@ -142,6 +142,83 @@ export async function getUpgradeEligibleCourses(
   if (enrollErr) {
     console.error("getUpgradeEligibleCourses enrollment error:", enrollErr.message);
     return { success: false, error: "Failed to fetch enrollments." };
+  }
+
+  // If no phase2 enrollments found, check course_members to auto-heal
+  if (!enrollments || enrollments.length === 0) {
+    const userEmail = user.email?.trim().toLowerCase();
+    if (userEmail) {
+      const { data: memberRows } = await db
+        .from("course_members")
+        .select("maincourse_id")
+        .ilike("email", userEmail)
+        .eq("status", "active");
+
+      if (memberRows && memberRows.length > 0) {
+        const { data: starterBundle } = await db
+          .schema("phase2")
+          .from("bundles")
+          .select("id, price")
+          .ilike("bundle_name", "%starter%")
+          .limit(1)
+          .maybeSingle();
+
+        const sBundleId = (starterBundle as any)?.id ?? null;
+        const sBundlePrice = (starterBundle as any)?.price ?? 0;
+
+        for (const m of memberRows as any[]) {
+          const cid = m.maincourse_id;
+          if (!cid) continue;
+
+          const { data: crs } = await db.from("maincourses").select("product_id").eq("id", cid).maybeSingle();
+
+          let orderId: number | null = null;
+          try {
+            const { data: ord } = await (db as any)
+              .schema("phase2")
+              .from("orders")
+              .insert({
+                user_id: phase2UserId,
+                course_id: cid,
+                bundle_id: sBundleId,
+                amount: sBundlePrice,
+                status: "paid",
+                razorpay_order_id: `auto_heal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                razorpay_payment_id: `auto_heal_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              })
+              .select("id")
+              .maybeSingle();
+            if (ord?.id) orderId = ord.id;
+          } catch (e) {}
+
+          await (db as any)
+            .schema("phase2")
+            .from("enrollments")
+            .insert({
+              user_id: phase2UserId,
+              order_id: orderId,
+              course_id: cid,
+              bundle_id: sBundleId,
+              product_id: (crs as any)?.product_id ?? null,
+              batch_type: "recorded",
+              status: "active",
+              access_start_date: new Date().toISOString(),
+              access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+            });
+        }
+
+        const { data: healedEnrollments } = await db
+          .schema("phase2")
+          .from("enrollments")
+          .select("id, course_id, bundle_id, bundles(bundle_name)")
+          .eq("user_id", phase2UserId)
+          .eq("status", "active");
+
+        if (healedEnrollments && healedEnrollments.length > 0) {
+          enrollments = healedEnrollments;
+        }
+      }
+    }
   }
 
   if (!enrollments || enrollments.length === 0) {
@@ -266,7 +343,7 @@ export async function validateUpgradeRequest(
   const deduped = [...new Set(selectedCourseIds.map((id) => String(id).trim()))].slice(0, 50);
 
   // Fetch enrollments for these courses
-  const { data: enrollments, error: enrollErr } = await db
+  let { data: enrollments, error: enrollErr } = await db
     .schema("phase2")
     .from("enrollments")
     .select("id, course_id, bundle_id, bundles(bundle_name)")
@@ -277,6 +354,83 @@ export async function validateUpgradeRequest(
   if (enrollErr) {
     console.error("validateUpgradeRequest enrollment error:", enrollErr.message);
     return { success: false, error: "Failed to validate enrollment." };
+  }
+
+  // If any selected courses are missing from phase2.enrollments, check course_members to auto-heal
+  const enrolledCourseIds = new Set(((enrollments ?? []) as any[]).map((e) => String(e.course_id)));
+  const missingInPhase2 = deduped.filter((id) => !enrolledCourseIds.has(id));
+
+  if (missingInPhase2.length > 0 && user.email) {
+    const { data: memberRows } = await db
+      .from("course_members")
+      .select("maincourse_id")
+      .ilike("email", user.email.trim().toLowerCase())
+      .in("maincourse_id", missingInPhase2)
+      .eq("status", "active");
+
+    if (memberRows && memberRows.length > 0) {
+      const { data: starterBundle } = await db
+        .schema("phase2")
+        .from("bundles")
+        .select("id, price")
+        .ilike("bundle_name", "%starter%")
+        .limit(1)
+        .maybeSingle();
+
+      const sBundleId = (starterBundle as any)?.id ?? null;
+      const sBundlePrice = (starterBundle as any)?.price ?? 0;
+
+      for (const m of memberRows as any[]) {
+        const cid = m.maincourse_id;
+        const { data: crs } = await db.from("maincourses").select("product_id").eq("id", cid).maybeSingle();
+
+        let orderId: number | null = null;
+        try {
+          const { data: ord } = await (db as any)
+            .schema("phase2")
+            .from("orders")
+            .insert({
+              user_id: phase2UserId,
+              course_id: cid,
+              bundle_id: sBundleId,
+              amount: sBundlePrice,
+              status: "paid",
+              razorpay_order_id: `auto_heal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              razorpay_payment_id: `auto_heal_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            })
+            .select("id")
+            .maybeSingle();
+          if (ord?.id) orderId = ord.id;
+        } catch (e) {}
+
+        await (db as any)
+          .schema("phase2")
+          .from("enrollments")
+          .insert({
+            user_id: phase2UserId,
+            order_id: orderId,
+            course_id: cid,
+            bundle_id: sBundleId,
+            product_id: (crs as any)?.product_id ?? null,
+            batch_type: "recorded",
+            status: "active",
+            access_start_date: new Date().toISOString(),
+            access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          });
+      }
+
+      const { data: refetched } = await db
+        .schema("phase2")
+        .from("enrollments")
+        .select("id, course_id, bundle_id, bundles(bundle_name)")
+        .eq("user_id", phase2UserId)
+        .eq("status", "active")
+        .in("course_id", deduped);
+
+      if (refetched) {
+        enrollments = refetched;
+      }
+    }
   }
 
   // Build courseId → best enrollment map

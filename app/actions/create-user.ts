@@ -215,26 +215,43 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
       // 2b. Wire to phase2.users table
       let phase2UserId: string | null = null;
       try {
-        const { data: p2UpsertData, error: phase2UserError } = await supabaseAdmin
+        const { data: existingP2User } = await supabaseAdmin
           .schema("phase2" as any)
           .from("users")
-          .upsert(
-            {
+          .select("id")
+          .or(`auth_user_id.eq.${authData.user.id},email.eq.${email}`)
+          .maybeSingle();
+
+        if (existingP2User?.id) {
+          phase2UserId = existingP2User.id;
+          await supabaseAdmin
+            .schema("phase2" as any)
+            .from("users")
+            .update({
+              auth_user_id: authData.user.id,
+              username: username,
+              email: email,
+              role: role,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", phase2UserId);
+        } else {
+          const { data: p2UpsertData, error: phase2UserError } = await supabaseAdmin
+            .schema("phase2" as any)
+            .from("users")
+            .insert({
               auth_user_id: authData.user.id,
               username: username,
               email: email,
               role: role,
               created_at: new Date().toISOString(),
-            },
-            { onConflict: "auth_user_id" }
-          )
-          .select("id")
-          .maybeSingle();
+            })
+            .select("id")
+            .maybeSingle();
 
-        if (phase2UserError) {
-          console.error("Phase 2 User sync error:", phase2UserError.message);
-        } else if (p2UpsertData?.id) {
-          phase2UserId = p2UpsertData.id;
+          if (!phase2UserError && p2UpsertData?.id) {
+            phase2UserId = p2UpsertData.id;
+          }
         }
       } catch (p2Err) {
         console.error("Phase 2 User creation exception:", p2Err);
@@ -245,7 +262,7 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
         try {
           const { data: latestCourse } = await supabaseAdmin
             .from("maincourses")
-            .select("id, title")
+            .select("id, title, product_id")
             .eq("product_id", productId)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -258,7 +275,7 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
             let bundleQuery = supabaseAdmin
               .schema("phase2" as any)
               .from("bundles")
-              .select("id, bundle_name");
+              .select("id, bundle_name, price");
 
             if (normalizedPlan === "premium") {
               bundleQuery = bundleQuery.ilike("bundle_name", "%premium%");
@@ -272,8 +289,38 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
 
             const { data: bundleData } = await bundleQuery.limit(1).maybeSingle();
             const targetBundleId = (bundleData as any)?.id ?? null;
+            const targetPrice = (bundleData as any)?.price ?? 0;
 
             const enrollUserId = phase2UserId || authData.user.id;
+
+            // Create order in phase2.orders to satisfy enrollments.order_id NOT-NULL constraint
+            let orderId: number | null = null;
+            try {
+              const { data: newOrder, error: orderErr } = await supabaseAdmin
+                .schema("phase2" as any)
+                .from("orders")
+                .insert({
+                  user_id: enrollUserId,
+                  course_id: latestCourse.id,
+                  bundle_id: targetBundleId,
+                  amount: targetPrice,
+                  status: "paid",
+                  razorpay_order_id: `admin_order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                  razorpay_payment_id: `admin_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .select("id")
+                .maybeSingle();
+
+              if (orderErr) {
+                console.error("phase2.orders insertion error:", orderErr.message);
+              } else if (newOrder?.id) {
+                orderId = newOrder.id;
+              }
+            } catch (orderEx) {
+              console.error("phase2.orders exception:", orderEx);
+            }
 
             // Insert into phase2.enrollments
             const { error: enrollError } = await supabaseAdmin
@@ -281,8 +328,11 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
               .from("enrollments")
               .insert({
                 user_id: enrollUserId,
+                order_id: orderId,
                 course_id: latestCourse.id,
                 bundle_id: targetBundleId,
+                product_id: latestCourse.product_id || productId,
+                batch_type: "recorded",
                 status: "active",
                 access_start_date: new Date().toISOString(),
                 access_end_date: new Date(
@@ -300,6 +350,7 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
               .insert({
                 maincourse_id: latestCourse.id,
                 email: email,
+                status: "active",
               });
 
             if (cmError) {
@@ -478,5 +529,71 @@ export async function deleteUser(userId: string, adminAccessToken?: string) {
       success: false,
       error: logError(error).message, errorId: logError(error).id,
     };
+  }
+}
+
+export async function updateUserPlan(userId: string, newPlan: string, adminAccessToken?: string) {
+  const callerAuth = await verifyAdminCaller(adminAccessToken);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
+
+  const normalizedPlan = ["starter", "pro", "premium"].includes(newPlan.toLowerCase())
+    ? newPlan.toLowerCase()
+    : "starter";
+
+  try {
+    // 1. Update user_metadata in auth.users
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { plan: normalizedPlan },
+    });
+
+    // 2. Find phase2 user id
+    const { data: p2User } = await supabaseAdmin
+      .schema("phase2" as any)
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+
+    const targetUserId = p2User?.id || userId;
+
+    // 3. Resolve target bundle
+    let bundleQuery = supabaseAdmin
+      .schema("phase2" as any)
+      .from("bundles")
+      .select("id, bundle_name, price");
+
+    if (normalizedPlan === "premium") {
+      bundleQuery = bundleQuery.ilike("bundle_name", "%premium%");
+    } else if (normalizedPlan === "pro") {
+      bundleQuery = bundleQuery
+        .ilike("bundle_name", "%pro%")
+        .not("bundle_name", "ilike", "%premium%");
+    } else {
+      bundleQuery = bundleQuery.ilike("bundle_name", "%starter%");
+    }
+
+    const { data: bundleData } = await bundleQuery.limit(1).maybeSingle();
+    const targetBundleId = (bundleData as any)?.id ?? null;
+
+    if (targetBundleId) {
+      // 4. Update all active enrollments for this user
+      await supabaseAdmin
+        .schema("phase2" as any)
+        .from("enrollments")
+        .update({
+          bundle_id: targetBundleId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", targetUserId)
+        .eq("status", "active");
+    }
+
+    revalidatePath("/admin/users");
+    return { success: true, message: `Plan updated to ${normalizedPlan.toUpperCase()}.` };
+  } catch (error: any) {
+    console.error("[updateUserPlan] error:", error);
+    return { success: false, error: error.message || "Failed to update user plan." };
   }
 }

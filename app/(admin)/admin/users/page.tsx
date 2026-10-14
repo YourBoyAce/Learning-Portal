@@ -10,6 +10,7 @@ import Image from "next/image";
 import {
   createUser,
   updateUserRole,
+  updateUserPlan,
   deleteUser,
 } from "@/app/actions/create-user";
 import {
@@ -42,6 +43,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  plan?: string;
   todaySessions: LoginSession[];
   todayTimeSpentSeconds: number;
 }
@@ -157,19 +159,43 @@ export default function AdminUsers() {
     }
 
     let phase2UserMap = new Map<string, string>();
+    let phase2PlanMap = new Map<string, string>();
     try {
       const { data: p2Users } = await supabase
         .schema("phase2" as any)
         .from("users")
-        .select("auth_user_id, email, username");
+        .select("id, auth_user_id, email, username");
+
+      const p2IdToAuthId = new Map<string, string>();
       if (p2Users) {
         for (const u of p2Users) {
           if (u.auth_user_id && u.username) phase2UserMap.set(u.auth_user_id, u.username.trim());
           if (u.email && u.username) phase2UserMap.set(u.email.toLowerCase(), u.username.trim());
+          if (u.auth_user_id && u.id) p2IdToAuthId.set(u.id, u.auth_user_id);
+        }
+      }
+
+      const { data: p2Enrollments } = await supabase
+        .schema("phase2" as any)
+        .from("enrollments")
+        .select("user_id, bundles(bundle_name)")
+        .eq("status", "active");
+
+      if (p2Enrollments) {
+        for (const e of p2Enrollments as any[]) {
+          const bn = (Array.isArray(e.bundles) ? e.bundles[0]?.bundle_name : e.bundles?.bundle_name) || "";
+          const lower = bn.toLowerCase();
+          const planStr = lower.includes("premium") ? "premium" : lower.includes("pro") ? "pro" : "starter";
+          const authId = p2IdToAuthId.get(e.user_id) || e.user_id;
+
+          const curr = phase2PlanMap.get(authId);
+          if (!curr || (curr === "starter" && planStr !== "starter") || (curr === "pro" && planStr === "premium")) {
+            phase2PlanMap.set(authId, planStr);
+          }
         }
       }
     } catch (p2Err) {
-      console.warn("Could not fetch phase2.users:", p2Err);
+      console.warn("Could not fetch phase2.users/enrollments:", p2Err);
     }
 
     if (!error && profiles) {
@@ -180,14 +206,15 @@ export default function AdminUsers() {
         const resolvedName = (isFromLanding && p2Name)
           ? p2Name
           : (profile.created_at && profile.full_name)
-          ? profile.full_name
-          : (p2Name || profile.full_name || profile.email?.split("@")[0] || "Unknown");
+            ? profile.full_name
+            : (p2Name || profile.full_name || profile.email?.split("@")[0] || "Unknown");
 
         return {
           id: profile.id,
           name: resolvedName,
           email: profile.email || "No Email",
           role: profile.role?.toLowerCase() || "user",
+          plan: phase2PlanMap.get(profile.id) || "starter",
           todaySessions: userLogs?.sessions || [],
           todayTimeSpentSeconds: userLogs?.totalSec || 0,
         };
@@ -352,6 +379,19 @@ export default function AdminUsers() {
     setOpenActionMenuId(null);
     showToast("Role updated successfully.");
     fetchUsers();
+  };
+
+  const handleChangePlan = async (userId: string, newPlan: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || "";
+    const res = await updateUserPlan(userId, newPlan, token);
+    setOpenActionMenuId(null);
+    if (res.success) {
+      showToast(res.message || "Plan updated successfully.");
+      fetchUsers();
+    } else {
+      showToast(res.error || "Failed to update plan.");
+    }
   };
 
   const handleDeleteClick = (user: User) => {
@@ -593,13 +633,12 @@ export default function AdminUsers() {
 
               {formFeedback.message && (
                 <div
-                  className={`p-3 rounded-lg text-sm font-medium ${
-                    formFeedback.type === "error"
+                  className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === "error"
                       ? "bg-red-50 text-red-600"
                       : formFeedback.type === "warning"
                         ? "bg-amber-50 text-amber-700"
                         : "bg-green-50 text-green-700"
-                  }`}
+                    }`}
                 >
                   {formFeedback.message}
                 </div>
@@ -664,20 +703,18 @@ export default function AdminUsers() {
                       setActiveTab("users");
                       setCurrentPage(1);
                     }}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      activeTab === "users"
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "users"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     <Users size={14} />
                     Users
                     <span
-                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                        activeTab === "users"
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "users"
                           ? "bg-brand-primary/10 text-brand-primary font-bold"
                           : "bg-gray-200/70 text-gray-600"
-                      }`}
+                        }`}
                     >
                       {usersCategory.length}
                     </span>
@@ -688,20 +725,18 @@ export default function AdminUsers() {
                       setActiveTab("mentors");
                       setCurrentPage(1);
                     }}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      activeTab === "mentors"
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "mentors"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     <GraduationCap size={14} />
                     Mentors
                     <span
-                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                        activeTab === "mentors"
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "mentors"
                           ? "bg-purple-500/10 text-purple-600 font-bold"
                           : "bg-gray-200/70 text-gray-600"
-                      }`}
+                        }`}
                     >
                       {mentorsCategory.length}
                     </span>
@@ -712,20 +747,18 @@ export default function AdminUsers() {
                       setActiveTab("admins");
                       setCurrentPage(1);
                     }}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      activeTab === "admins"
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "admins"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     <ShieldCheck size={14} />
                     Admins
                     <span
-                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                        activeTab === "admins"
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "admins"
                           ? "bg-red-500/10 text-red-600 font-bold"
                           : "bg-gray-200/70 text-gray-600"
-                      }`}
+                        }`}
                     >
                       {adminsCategory.length}
                     </span>
@@ -863,6 +896,32 @@ export default function AdminUsers() {
                               {r.label}
                             </button>
                           ))}
+                          {user.role === "user" && (
+                            <>
+                              <div className="border-t border-gray-100 mt-1 pt-1">
+                                <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                                  Upgrade / Change Plan:
+                                </div>
+                                {[
+                                  { value: "starter", label: "Starter" },
+                                  { value: "pro", label: "Pro" },
+                                  { value: "premium", label: "Premium" },
+                                ].map((p) => (
+                                  <button
+                                    key={p.value}
+                                    onClick={() => handleChangePlan(user.id, p.value)}
+                                    className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
+                                        ? "text-brand-primary font-bold bg-brand-primary/5"
+                                        : "text-gray-700"
+                                      }`}
+                                  >
+                                    <span>{p.label} Plan</span>
+                                    {user.plan === p.value && <CheckCircle2 size={12} className="text-brand-primary" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                           <div className="border-t border-gray-100 mt-1 pt-1">
                             <button
                               onClick={() => handleDeleteClick(user)}
@@ -981,18 +1040,32 @@ export default function AdminUsers() {
                           </div>
                         </td>
 
-                        {/* Role */}
+                        {/* Role & Plan */}
                         <td className="py-4 px-4">
-                          <span
-                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border capitalize ${user.role?.toLowerCase() === "admin"
-                              ? "bg-red-500/10 text-red-600 border-red-500/20"
-                              : user.role?.toLowerCase() === "instructor"
-                                ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
-                                : "bg-brand-success/10 text-[#174778] border-brand-success/20"
-                              }`}
-                          >
-                            {user.role || "User"}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border capitalize ${user.role?.toLowerCase() === "admin"
+                                ? "bg-red-500/10 text-red-600 border-red-500/20"
+                                : user.role?.toLowerCase() === "instructor"
+                                  ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+                                  : "bg-brand-success/10 text-[#174778] border-brand-success/20"
+                                }`}
+                            >
+                              {user.role || "User"}
+                            </span>
+                            {user.role === "user" && (
+                              <span
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-md border capitalize ${user.plan === "premium"
+                                    ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                                    : user.plan === "pro"
+                                      ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                                      : "bg-gray-100 text-gray-700 border-gray-200"
+                                  }`}
+                              >
+                                {user.plan ? `${user.plan} Plan` : "Starter Plan"}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Today's Sessions */}
@@ -1062,6 +1135,32 @@ export default function AdminUsers() {
                                   {r.label}
                                 </button>
                               ))}
+                              {user.role === "user" && (
+                                <>
+                                  <div className="border-t border-gray-100 mt-1 pt-1">
+                                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                                      Upgrade / Change Plan:
+                                    </div>
+                                    {[
+                                      { value: "starter", label: "Starter" },
+                                      { value: "pro", label: "Pro" },
+                                      { value: "premium", label: "Premium" },
+                                    ].map((p) => (
+                                      <button
+                                        key={p.value}
+                                        onClick={() => handleChangePlan(user.id, p.value)}
+                                        className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
+                                            ? "text-brand-primary font-bold bg-brand-primary/5"
+                                            : "text-gray-700"
+                                          }`}
+                                      >
+                                        <span>{p.label} Plan</span>
+                                        {user.plan === p.value && <CheckCircle2 size={12} className="text-brand-primary" />}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
                               <div className="border-t border-gray-100 mt-1 pt-1">
                                 <button
                                   onClick={() => handleDeleteClick(user)}
@@ -1131,11 +1230,10 @@ export default function AdminUsers() {
                           )}
                           <button
                             onClick={() => setCurrentPage(page)}
-                            className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
-                              currentPage === page
+                            className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${currentPage === page
                                 ? "bg-brand-primary text-white shadow-sm"
                                 : "text-gray-600 border border-gray-200 hover:bg-white"
-                            }`}
+                              }`}
                           >
                             {page}
                           </button>

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const studentEmail = profile?.email || student.email || "";
 
   const body = await request.json().catch(() => null);
-  const { mentorId, date, time, duration, topic } = body || {};
+  const { mentorId, date, time, duration, topic, timeZone } = body || {};
 
   if (!mentorId || !date || !time || !duration || !topic) {
     return NextResponse.json(
@@ -51,6 +51,8 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  const effectiveTz = timeZone || "Asia/Calcutta";
 
   // Create supabaseAdmin client to bypass RLS and insert for mentor
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -66,8 +68,8 @@ export async function POST(request: Request) {
     .replace(/Requested by:\s*[^\n]*/gi, "")
     .trim();
 
-  // Construct compact tag and formatted description containing student details
-  const tag = `status:pending|dur:${duration}`;
+  // Construct compact tag and formatted description containing student details and timezone
+  const tag = `status:pending|dur:${duration}|tz:${effectiveTz}`;
   const formattedDescription = `${sanitizedTopic}
 
 ---

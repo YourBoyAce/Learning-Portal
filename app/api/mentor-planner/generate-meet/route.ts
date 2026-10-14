@@ -52,27 +52,71 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden: Mentor only feature." }, { status: 403 });
   }
 
-  if (!mentorProfile?.cal_event_type_id) {
-    return NextResponse.json({ error: "Cal.com Event Type ID is not configured on your profile." }, { status: 400 });
+  const body = await request.json().catch(() => ({}));
+  const { eventId, meetLink: customMeetLink } = body || {};
+
+  // Case 1: Mentor provides a custom / manual Google Meet link directly
+  if (eventId && customMeetLink) {
+    const trimmed = String(customMeetLink).trim();
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+      return NextResponse.json({ error: "Please enter a valid URL starting with https://" }, { status: 400 });
+    }
+
+    const { data: updatedEvent, error: updateError } = await supabaseAdmin
+      .from("calendar_events")
+      .update({ meet_link: trimmed })
+      .eq("id", eventId)
+      .eq("user_id", currentUser.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return apiErrorResponse(updateError, undefined, 500);
+    }
+
+    return NextResponse.json({
+      success: true,
+      eventId,
+      meetUrl: trimmed,
+      message: "Meeting link saved successfully.",
+    });
   }
 
-  // Find all calendar_events owned by the mentor where meet_link IS NULL AND tag contains status:accepted
-  const { data: events, error: fetchError } = await supabaseAdmin
+  // Case 2: Generating via Cal.com
+  if (!mentorProfile?.cal_event_type_id) {
+    return NextResponse.json(
+      { error: "Cal.com Event Type ID is not configured on your profile. Please visit /profile to configure it." },
+      { status: 400 }
+    );
+  }
+
+  // Find targeted event or all accepted sessions missing meet_link
+  let eventsQuery = supabaseAdmin
     .from("calendar_events")
     .select("*")
-    .eq("user_id", currentUser.id)
-    .is("meet_link", null)
-    .like("tag", "%status:accepted%");
+    .eq("user_id", currentUser.id);
+
+  if (eventId) {
+    eventsQuery = eventsQuery.eq("id", eventId);
+  } else {
+    eventsQuery = eventsQuery.like("tag", "%status:accepted%").is("meet_link", null);
+  }
+
+  const { data: events, error: fetchError } = await eventsQuery;
 
   if (fetchError) {
     return apiErrorResponse(fetchError, undefined, 500);
   }
 
   if (!events || events.length === 0) {
-    return NextResponse.json({ success: true, message: "No pending sessions require meeting generation." });
+    return NextResponse.json({
+      success: true,
+      message: "No pending sessions require meeting generation.",
+    });
   }
 
   const results = [];
+  let singleError: string | null = null;
 
   for (const event of events) {
     // Parse student details
@@ -86,14 +130,22 @@ export async function POST(request: Request) {
       studentEmail = requestedByMatch[2].trim();
     }
 
-    const startDateTimeStr = `${event.event_date}T${event.event_time}`;
+    let eventTimeZone = "Asia/Calcutta";
+    const tzMatch = (event.tag || "").match(/tz:([^|]+)/);
+    if (tzMatch && tzMatch[1]) {
+      eventTimeZone = tzMatch[1].trim();
+    }
+
     const bookingResult = await createCalcomBooking({
       eventTypeId: Number(mentorProfile.cal_event_type_id),
-      startDateTimeStr,
+      date: event.event_date,
+      time: event.event_time,
+      timeZone: eventTimeZone,
       attendee: {
         name: studentName,
         email: studentEmail,
-      }
+        timeZone: eventTimeZone,
+      },
     });
 
     if (bookingResult.success && bookingResult.meetingUrl) {
@@ -109,9 +161,29 @@ export async function POST(request: Request) {
         results.push({ eventId: event.id, success: true, meetingUrl: bookingResult.meetingUrl });
       }
     } else {
-      results.push({ eventId: event.id, success: false, error: bookingResult.error || "Failed to create booking." });
+      const err = bookingResult.error || "Failed to create Cal.com booking.";
+      singleError = err;
+      results.push({ eventId: event.id, success: false, error: err });
     }
   }
 
-  return NextResponse.json({ success: true, results });
+  const anySuccess = results.some((r) => r.success);
+
+  // If a single event was requested and failed, return an error status so UI can report it
+  if (eventId && !anySuccess) {
+    return NextResponse.json(
+      { success: false, error: singleError || "Cal.com was unable to generate a meeting link for this time slot.", results },
+      { status: 400 }
+    );
+  }
+
+  const firstSuccessUrl = results.find((r) => r.success)?.meetingUrl;
+
+  return NextResponse.json({
+    success: anySuccess || results.length === 0,
+    meetUrl: firstSuccessUrl,
+    results,
+    count: results.filter((r) => r.success).length,
+    total: results.length,
+  });
 }

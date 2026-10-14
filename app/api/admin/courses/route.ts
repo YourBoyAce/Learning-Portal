@@ -586,7 +586,7 @@ export async function POST(request: Request) {
       ...(productId !== null && { product_id: productId }),
       whatsapp_community_link: body?.whatsapp_community_link || null,
     })
-    .select("id")
+    .select("id, product_id")
     .single();
 
   if (insertError) {
@@ -727,11 +727,12 @@ export async function POST(request: Request) {
     const { data: starterBundle } = await authContext.supabaseAdmin
       .schema("phase2")
       .from("bundles")
-      .select("id")
+      .select("id, price")
       .ilike("bundle_name", "%starter%")
       .limit(1)
       .maybeSingle();
     const starterBundleId: string | null = (starterBundle as any)?.id ?? null;
+    const starterBundlePrice: number = (starterBundle as any)?.price ?? 0;
 
     // Batch query phase2.users matching assigned scholars
     const { data: p2Users } = await authContext.supabaseAdmin
@@ -773,16 +774,45 @@ export async function POST(request: Request) {
         ((existing ?? []) as any[]).map((e) => e.user_id),
       );
 
-      const newEnrollments = userIdsToEnroll
-        .filter((id) => !existingUserIds.has(id))
-        .map((id) => ({
-           user_id: id,
-           course_id: newCourse.id,
-           bundle_id: starterBundleId,
-           status: "active",
-           access_start_date: new Date().toISOString(),
-           access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        }));
+      const newEnrollments = [];
+      for (const uid of userIdsToEnroll) {
+        if (existingUserIds.has(uid)) continue;
+
+        let orderId: number | null = null;
+        try {
+          const { data: ord } = await authContext.supabaseAdmin
+            .schema("phase2")
+            .from("orders")
+            .insert({
+              user_id: uid,
+              course_id: newCourse.id,
+              bundle_id: starterBundleId,
+              amount: starterBundlePrice,
+              status: "paid",
+              razorpay_order_id: `admin_course_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              razorpay_payment_id: `admin_course_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select("id")
+            .maybeSingle();
+          if (ord?.id) orderId = ord.id;
+        } catch (oErr) {
+          console.warn("[POST course] order creation warning:", oErr);
+        }
+
+        newEnrollments.push({
+          user_id: uid,
+          order_id: orderId,
+          course_id: newCourse.id,
+          bundle_id: starterBundleId,
+          product_id: (newCourse as any)?.product_id || productId,
+          batch_type: "recorded",
+          status: "active",
+          access_start_date: new Date().toISOString(),
+          access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+        });
+      }
 
       if (newEnrollments.length > 0) {
         const { error: enrollError } = await authContext.supabaseAdmin
@@ -1248,13 +1278,21 @@ export async function PUT(request: Request) {
     const { data: starterBundlePut } = await authContext.supabaseAdmin
       .schema("phase2")
       .from("bundles")
-      .select("id")
+      .select("id, price")
       .ilike("bundle_name", "%starter%")
       .limit(1)
       .maybeSingle();
     const starterBundleIdPut: string | null = (starterBundlePut as any)?.id ?? null;
+    const starterBundlePricePut: number = (starterBundlePut as any)?.price ?? 0;
 
     if (assignedScholars.length > 0) {
+      // Get course product_id
+      const { data: crsData } = await authContext.supabaseAdmin
+        .from("maincourses")
+        .select("product_id")
+        .eq("id", id)
+        .maybeSingle();
+
       // Batch query phase2.users matching assigned scholars
       const { data: p2Users } = await authContext.supabaseAdmin
         .schema("phase2")
@@ -1295,16 +1333,45 @@ export async function PUT(request: Request) {
           ((existing ?? []) as any[]).map((e) => e.user_id),
         );
 
-        const newEnrollments = userIdsToEnroll
-          .filter((uid) => !existingUserIds.has(uid))
-          .map((uid) => ({
-             user_id: uid,
-             course_id: id,
-             bundle_id: starterBundleIdPut,
-             status: "active",
-             access_start_date: new Date().toISOString(),
-             access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-          }));
+        const newEnrollments = [];
+        for (const uid of userIdsToEnroll) {
+          if (existingUserIds.has(uid)) continue;
+
+          let orderId: number | null = null;
+          try {
+            const { data: ord } = await authContext.supabaseAdmin
+              .schema("phase2")
+              .from("orders")
+              .insert({
+                user_id: uid,
+                course_id: id,
+                bundle_id: starterBundleIdPut,
+                amount: starterBundlePricePut,
+                status: "paid",
+                razorpay_order_id: `admin_course_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                razorpay_payment_id: `admin_course_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select("id")
+              .maybeSingle();
+            if (ord?.id) orderId = ord.id;
+          } catch (oErr) {
+            console.warn("[PUT course] order creation warning:", oErr);
+          }
+
+          newEnrollments.push({
+            user_id: uid,
+            order_id: orderId,
+            course_id: id,
+            bundle_id: starterBundleIdPut,
+            product_id: (crsData as any)?.product_id ?? null,
+            batch_type: "recorded",
+            status: "active",
+            access_start_date: new Date().toISOString(),
+            access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          });
+        }
 
         if (newEnrollments.length > 0) {
           const { error: enrollError } = await authContext.supabaseAdmin
@@ -1339,14 +1406,31 @@ export async function DELETE(request: Request) {
 
   // â”€â”€ Upcoming â†’ delete from products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (source === "product") {
-    const { error: productDeleteError } = await authContext.supabaseAdmin
+    const admin = authContext.supabaseAdmin;
+
+    // Clear dependents that reference this product so the delete cannot be blocked.
+    await admin.from("maincourses").update({ product_id: null }).eq("product_id", id);
+    await admin.from("batches").delete().eq("product_id", id);
+    await admin.from("course_ratings").delete().eq("product_id", id);
+    await admin.schema("phase2").from("enrollments").delete().eq("product_id", id);
+
+    const { data: deletedProducts, error: productDeleteError } = await admin
       .from("products")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
 
     if (productDeleteError) {
       return apiErrorResponse(productDeleteError, undefined, 500);
     }
+
+    if (!deletedProducts || deletedProducts.length === 0) {
+      return NextResponse.json(
+        { error: "Upcoming course not found or already deleted." },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({ success: true });
   }
 

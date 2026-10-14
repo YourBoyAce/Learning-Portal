@@ -102,6 +102,12 @@ export default function MentorConnectPage() {
   const [requestTopic, setRequestTopic] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isGeneratingMeet, setIsGeneratingMeet] = useState(false);
+  const [manualMeetLink, setManualMeetLink] = useState("");
+  const [isSavingManualMeet, setIsSavingManualMeet] = useState(false);
+  const [meetActionFeedback, setMeetActionFeedback] = useState<{ type: "success" | "error" | ""; text: string }>({
+    type: "",
+    text: "",
+  });
   const [requestMessage, setRequestMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
     type: "",
     text: "",
@@ -380,6 +386,7 @@ export default function MentorConnectPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Authentication token not found. Please log in again.");
 
+      const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Calcutta";
       const res = await fetch("/api/mentor-planner/request", {
         method: "POST",
         headers: {
@@ -392,6 +399,7 @@ export default function MentorConnectPage() {
           time: requestTime,
           duration: requestDuration,
           topic: requestTopic,
+          timeZone: clientTz,
         }),
       });
 
@@ -586,29 +594,104 @@ export default function MentorConnectPage() {
   };
 
   // Generate meet link on-demand for accepted sessions missing a meet_link
-  const handleGenerateMeet = async () => {
+  const handleGenerateMeet = async (targetEventId?: string) => {
+    const idToGenerate = targetEventId || selectedEvent?.id;
     setIsGeneratingMeet(true);
+    setMeetActionFeedback({ type: "", text: "" });
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
+
       const res = await fetch("/api/mentor-planner/generate-meet", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
+        body: JSON.stringify({
+          eventId: idToGenerate,
+        }),
       });
+
       const result = await res.json().catch(() => null);
-      if (res.ok && result?.success) {
-        if (currentUserId) {
-          await loadCalendarEvents(currentUserId);
-        }
-        setIsDetailsModalOpen(false);
+
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to generate meet link via Cal.com.");
       }
-    } catch (err) {
+
+      const generatedUrl = result.meetUrl || (result.results?.[0]?.meetingUrl);
+
+      if (currentUserId) {
+        await loadCalendarEvents(currentUserId);
+      }
+
+      if (idToGenerate && generatedUrl) {
+        setSelectedEvent((prev) => (prev && prev.id === idToGenerate ? { ...prev, meet_link: generatedUrl } : prev));
+        setEvents((prev) =>
+          prev.map((e) => (e.id === idToGenerate ? { ...e, meet_link: generatedUrl } : e))
+        );
+      }
+
+      setMeetActionFeedback({
+        type: "success",
+        text: "Google Meet link generated successfully!",
+      });
+    } catch (err: any) {
       console.error("Failed to generate meet link:", err);
+      setMeetActionFeedback({
+        type: "error",
+        text: err.message || "Failed to generate meet link.",
+      });
     } finally {
       setIsGeneratingMeet(false);
+    }
+  };
+
+  const handleSaveManualMeetLink = async () => {
+    if (!selectedEvent || !manualMeetLink.trim()) return;
+    setIsSavingManualMeet(true);
+    setMeetActionFeedback({ type: "", text: "" });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const res = await fetch("/api/mentor-planner/generate-meet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          eventId: selectedEvent.id,
+          meetLink: manualMeetLink.trim(),
+        }),
+      });
+
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error || "Failed to save meeting link.");
+      }
+
+      const savedUrl = manualMeetLink.trim();
+      setSelectedEvent((prev) => (prev ? { ...prev, meet_link: savedUrl } : null));
+      setEvents((prev) =>
+        prev.map((e) => (e.id === selectedEvent.id ? { ...e, meet_link: savedUrl } : e))
+      );
+      setMeetActionFeedback({
+        type: "success",
+        text: "Meeting link saved successfully!",
+      });
+      setManualMeetLink("");
+    } catch (err: any) {
+      console.error("Failed to save manual meet link:", err);
+      setMeetActionFeedback({
+        type: "error",
+        text: err.message || "Failed to save meeting link.",
+      });
+    } finally {
+      setIsSavingManualMeet(false);
     }
   };
 
@@ -971,6 +1054,8 @@ export default function MentorConnectPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedEvent(event);
+                              setManualMeetLink("");
+                              setMeetActionFeedback({ type: "", text: "" });
                               setIsDetailsModalOpen(true);
                             }}
                             className={`absolute left-1 right-1 rounded-xl border overflow-hidden shadow-sm flex hover:shadow transition-all text-left cursor-pointer z-10 ${
@@ -1229,42 +1314,85 @@ export default function MentorConnectPage() {
                   <div className="space-y-1.5 pt-1">
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Meeting Link</p>
                     {selectedEvent.meet_link ? (
-                      <Button
-                        onClick={() => window.open(selectedEvent.meet_link!, "_blank")}
-                        className="w-full py-2.5 rounded-xl text-xs font-bold bg-brand-primary text-white flex items-center justify-center gap-1.5"
-                      >
-                        <Video size={14} /> Join Meeting
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          onClick={() => window.open(selectedEvent.meet_link!, "_blank")}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold bg-brand-primary text-white flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <Video size={14} /> Join Meeting
+                        </Button>
+                        <p className="text-[10px] text-slate-400 break-all text-center">
+                          {selectedEvent.meet_link}
+                        </p>
+                      </div>
                     ) : (
                       currentUserRole?.toLowerCase() === "instructor" || currentUserRole?.toLowerCase() === "admin" ? (
-                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2 text-[11px] text-amber-805 leading-relaxed">
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2.5 text-[11px] text-amber-900 leading-relaxed">
                           <div className="flex gap-1.5 items-start">
                             <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
                             <p className="font-bold">Meet link not yet generated</p>
                           </div>
-                          <p>A Google Meet link has not been generated for this session yet.</p>
+                          <p className="text-[10px] text-amber-700">
+                            A Google Meet link has not been generated for this session yet.
+                          </p>
+
+                          {meetActionFeedback.text && (
+                            <div className={`p-2 rounded-lg text-[10px] font-semibold border ${
+                              meetActionFeedback.type === "success"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : "bg-red-50 text-red-800 border-red-200"
+                            }`}>
+                              {meetActionFeedback.text}
+                            </div>
+                          )}
+
                           <Button
-                            onClick={handleGenerateMeet}
-                            disabled={isGeneratingMeet}
+                            onClick={() => handleGenerateMeet(selectedEvent.id)}
+                            disabled={isGeneratingMeet || isSavingManualMeet}
                             className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white text-[11px] py-2 h-auto rounded-lg font-bold flex items-center justify-center gap-1.5"
                           >
                             {isGeneratingMeet ? (
-                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Meet Link...</>
+                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating via Cal.com...</>
                             ) : (
                               <><Video size={13} /> Generate Google Meet Link</>
                             )}
                           </Button>
+
+                          {/* Manual fallback input */}
+                          <div className="pt-2 border-t border-amber-200/60 space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-amber-800 block">
+                              Or Enter / Paste Google Meet Link Manually:
+                            </label>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="url"
+                                value={manualMeetLink}
+                                onChange={(e) => setManualMeetLink(e.target.value)}
+                                placeholder="https://meet.google.com/abc-defg-hij"
+                                className="flex-1 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-800 focus:outline-none focus:border-brand-primary font-mono"
+                              />
+                              <Button
+                                type="button"
+                                disabled={!manualMeetLink.trim() || isSavingManualMeet}
+                                onClick={handleSaveManualMeetLink}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-[10px] h-auto rounded-lg font-bold shrink-0"
+                              >
+                                {isSavingManualMeet ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                              </Button>
+                            </div>
+                          </div>
+
                           <Button
                             onClick={() => window.location.href = "/profile"}
                             variant="outline"
-                            className="w-full text-slate-600 border-slate-200 text-[10px] py-1.5 h-auto rounded-lg font-semibold"
+                            className="w-full text-slate-600 border-slate-200 text-[10px] py-1.5 h-auto rounded-lg font-semibold bg-white"
                           >
                             Cal.com Profile Settings
                           </Button>
                         </div>
                       ) : (
                         <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex gap-2 items-center text-[11px] text-slate-500 font-semibold">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
                           <span>Waiting for mentor to generate Google Meet link.</span>
                         </div>
                       )

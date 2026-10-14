@@ -102,15 +102,23 @@ export async function POST(request: Request) {
     if (mentorProfile?.cal_event_type_id) {
       const eventTypeIdNum = Number(mentorProfile.cal_event_type_id);
       if (!isNaN(eventTypeIdNum) && eventTypeIdNum > 0) {
-        const startDateTimeStr = `${event.event_date}T${event.event_time}`;
+        let eventTimeZone = "Asia/Calcutta";
+        const tzMatch = (event.tag || "").match(/tz:([^|]+)/);
+        if (tzMatch && tzMatch[1]) {
+          eventTimeZone = tzMatch[1].trim();
+        }
+
         const { createCalcomBooking } = await import("@/app/lib/calcom");
         const bookingResult = await createCalcomBooking({
           eventTypeId: eventTypeIdNum,
-          startDateTimeStr,
+          date: event.event_date,
+          time: event.event_time,
+          timeZone: eventTimeZone,
           attendee: {
             name: studentName,
             email: studentEmail,
-          }
+            timeZone: eventTimeZone,
+          },
         });
         if (bookingResult.success && bookingResult.meetingUrl) {
           meetLink = bookingResult.meetingUrl;

@@ -1531,12 +1531,12 @@ export default function CoursePlayerPage() {
     return (
       <>
         {/* Header */}
-        <div className="p-6 border-b border-gray-50 bg-gray-50/10 text-left flex items-start justify-between gap-4">
+        <div className="p-4 sm:p-6 border-b border-gray-50 bg-gray-50/10 text-left flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
           <div>
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
               Curriculum Outline
             </h3>
-            <div className="flex items-center gap-4 text-xs text-gray-400 font-bold">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 font-bold">
               <span className="flex items-center gap-1.5">
                 <BookOpen size={14} /> {totalModuleCount} Modules
               </span>
@@ -1555,7 +1555,7 @@ export default function CoursePlayerPage() {
               }
               setShowFeedbackModal(true);
             }}
-            className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-xs font-bold flex items-center gap-2 transition-all shadow-sm shrink-0 cursor-pointer hover:shadow-md"
+            className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm shrink-0 cursor-pointer hover:shadow-md w-full sm:w-auto"
             title="Leave feedback for this course"
           >
             <MessageSquare size={14} className="text-amber-600" />
@@ -1572,7 +1572,7 @@ export default function CoursePlayerPage() {
         {/* No content at all */}
         
         {/* Modules List */}
-        <div className="flex flex-col gap-3 sm:gap-4 mt-6">
+        <div className="flex flex-col gap-3 sm:gap-4 mt-4 sm:mt-6 px-3 sm:px-4 pb-4">
           {videoModules.length === 0 ? (
             <div className="text-center py-10 bg-white border border-gray-100 rounded-3xl">
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1629,7 +1629,7 @@ export default function CoursePlayerPage() {
                           [sectionId]: !prev[sectionId],
                         }))
                       }
-                      className={`w-full flex items-center justify-between px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left rounded-t-2xl ${
+                      className={`w-full flex items-center justify-between gap-2 px-3 sm:px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left rounded-t-2xl ${
                         isCollapsed ? "rounded-b-2xl" : ""
                       }`}
                     >
@@ -1680,7 +1680,7 @@ export default function CoursePlayerPage() {
                                     selectModule(moduleKey);
                                   }
                                 }}
-                                className={`relative w-full cursor-pointer text-left px-5 py-3 transition-all flex items-start gap-4 group border-b border-gray-50 last:border-b-0 ${
+                                className={`relative w-full cursor-pointer text-left px-3 sm:px-5 py-3 transition-all flex items-start gap-3 sm:gap-4 group border-b border-gray-50 last:border-b-0 ${
                                   idx === sectionModules.length - 1 ? "rounded-b-2xl" : ""
                                 } ${
                                   isActive
@@ -1705,7 +1705,7 @@ export default function CoursePlayerPage() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
                                     <h4
-                                      className={`text-sm font-bold leading-snug transition-colors ${
+                                      className={`text-sm font-bold leading-snug break-words min-w-0 transition-colors ${
                                         isActive
                                           ? "text-brand-heading"
                                           : "text-gray-900 group-hover:text-brand-heading"
@@ -1791,7 +1791,7 @@ export default function CoursePlayerPage() {
                 if (ungrouped.length === 0) return null;
                 return (
                   <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
-                    <div className="px-5 py-3 bg-gray-50/80">
+                    <div className="px-3 sm:px-5 py-3 bg-gray-50/80">
                       <h4 className="text-sm font-bold text-gray-600">General</h4>
                       <span className="text-[10px] font-semibold text-gray-400">
                         {ungrouped.filter((m) => !!userProgress[getModuleKey(m)]).length}/{ungrouped.length} completed
@@ -1815,7 +1815,7 @@ export default function CoursePlayerPage() {
                                 selectModule(moduleKey);
                               }
                             }}
-                            className={`relative w-full cursor-pointer text-left px-5 py-3 transition-all flex items-start gap-4 group border-b border-gray-50 last:border-b-0 ${
+                            className={`relative w-full cursor-pointer text-left px-3 sm:px-5 py-3 transition-all flex items-start gap-3 sm:gap-4 group border-b border-gray-50 last:border-b-0 ${
                               isActive
                                 ? "bg-blue-50/50"
                                 : "hover:bg-gray-50"
@@ -1836,7 +1836,7 @@ export default function CoursePlayerPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                <h4 className={`text-sm font-bold leading-snug transition-colors ${
+                                <h4 className={`text-sm font-bold leading-snug break-words min-w-0 transition-colors ${
                                   isActive ? "text-brand-heading" : "text-gray-900 group-hover:text-brand-heading"
                                 }`}>
                                   {mod.title}
@@ -1875,7 +1875,7 @@ export default function CoursePlayerPage() {
                       selectModule(moduleKey);
                     }
                   }}
-                  className={`relative w-full cursor-pointer text-left px-5 py-3.5 transition-all flex items-start gap-4 group rounded-xl border border-gray-100 ${
+                  className={`relative w-full cursor-pointer text-left px-3 sm:px-5 py-3.5 transition-all flex items-start gap-3 sm:gap-4 group rounded-xl border border-gray-100 ${
                     isActive
                       ? "bg-blue-50/50 border-brand-heading"
                       : "hover:bg-gray-50 bg-white"
@@ -1895,7 +1895,7 @@ export default function CoursePlayerPage() {
 
                   <div className="flex-1 min-w-0">
                     <h4
-                      className={`text-sm font-bold mb-0.5 leading-snug transition-colors ${
+                      className={`text-sm font-bold mb-0.5 leading-snug break-words transition-colors ${
                         isActive
                           ? "text-brand-heading"
                           : "text-gray-900 group-hover:text-brand-heading"
@@ -2939,10 +2939,10 @@ export default function CoursePlayerPage() {
 
             {/* Mobile Tab Selector & Tab Content */}
             <div className="xl:hidden">
-              <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-6">
+              <div className="flex border-b border-gray-100 bg-gray-50/50 rounded-xl overflow-hidden mb-4 sm:mb-6 w-full">
                 <button
                   onClick={() => handleTabChange("overview")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "overview"
+                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block ${activeTab === "overview"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                     }`}
@@ -2952,7 +2952,7 @@ export default function CoursePlayerPage() {
                 </button>
                 <button
                   onClick={() => handleTabChange("modules")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules"
+                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block ${activeTab === "modules"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                     }`}
@@ -2962,7 +2962,7 @@ export default function CoursePlayerPage() {
                 </button>
                 <button
                   onClick={() => handleTabChange("quizzes")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
+                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block relative ${activeTab === "quizzes"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                     }`}
@@ -2978,7 +2978,7 @@ export default function CoursePlayerPage() {
                 </button>
                 <button
                   onClick={() => handleTabChange("artifacts")}
-                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
+                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block relative ${activeTab === "artifacts"
                     ? "border-brand-heading text-brand-heading bg-white"
                     : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
                     }`}
