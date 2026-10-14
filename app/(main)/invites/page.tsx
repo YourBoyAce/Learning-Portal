@@ -152,17 +152,18 @@ export default function InvitesPage() {
       });
 
       const result = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(result?.error || "Failed to submit RSVP response.");
-
-      if (result?.warning) {
+      if (action === "accept") {
+        const hasMeet = Boolean(result?.event?.meet_link);
         setPageMessage({
-          type: "error",
-          text: `Invitation accepted, but meet link generation had an issue: ${result.warning}`,
+          type: "success",
+          text: hasMeet
+            ? "Invitation accepted! Google Meet link has been generated and added to your planner."
+            : "Invitation accepted! Slot has been added to your planner.",
         });
       } else {
         setPageMessage({
           type: "success",
-          text: action === "accept" ? "Invitation accepted! slot has been added to your planner." : "Invitation declined successfully.",
+          text: "Invitation declined successfully.",
         });
       }
 

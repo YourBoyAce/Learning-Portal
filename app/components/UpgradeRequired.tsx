@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Lock, Sparkles, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/app/lib/supabase";
+import { initiateUpgradeFlow } from "@/app/lib/upgrade-handoff";
 
 interface UpgradeRequiredProps {
   title?: string;
@@ -81,43 +82,18 @@ export function UpgradeRequired({
 
   const handleUpgradeClick = async () => {
     setError("");
-
-    if (!useLandingHandoff) {
-      // No landing site configured — use internal /upgrade page
-      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-
     setBusy(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        // Not logged in — redirect to login then back to upgrade
-        window.location.href = "/login?next=/upgrade?mode=upgrade";
-        return;
-      }
-
-      const res = await fetch("/api/upgrade/request-handoff", {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ courseSlug, targetTier: requiredTier }),
+      await initiateUpgradeFlow({
+        targetTier: requiredTier,
+        courseSlug,
+        userEmail: email,
+        userName: name,
+        userPhone: phone,
       });
-      const data = await res.json();
-
-      if (!res.ok || !data.redirectUrl) {
-        console.error("[UpgradeRequired] handoff failed:", data.error);
-        // Graceful fallback to internal upgrade page
-        window.open(fallbackUrl, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      // Redirect to landing-site checkout in the same tab
-      window.location.href = data.redirectUrl;
-    } catch (err) {
+    } catch (err: any) {
       console.error("[UpgradeRequired] handoff error:", err);
       setError("Could not start the upgrade. Please try again.");
-      // Still fall back so the user is not stuck
-      window.open(fallbackUrl, "_blank", "noopener,noreferrer");
     } finally {
       setBusy(false);
     }

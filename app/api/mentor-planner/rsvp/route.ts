@@ -120,13 +120,18 @@ export async function POST(request: Request) {
             timeZone: eventTimeZone,
           },
         });
-        if (bookingResult.success && bookingResult.meetingUrl) {
+        if (bookingResult.meetingUrl) {
           meetLink = bookingResult.meetingUrl;
-        } else if (!bookingResult.success) {
-          bookingWarning = bookingResult.error || "Cal.com schedule error";
-          console.warn("[mentor-planner/rsvp] Cal.com booking notice:", bookingResult.error);
+        }
+        if (bookingResult.warning) {
+          bookingWarning = bookingResult.warning;
         }
       }
+    }
+
+    if (!meetLink && !event.meet_link) {
+      const { generateGoogleMeetLink } = await import("@/app/lib/calcom");
+      meetLink = generateGoogleMeetLink();
     }
 
     // Update status:pending to status:accepted in the tag and store meet_link

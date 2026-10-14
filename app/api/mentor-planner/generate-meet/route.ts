@@ -82,14 +82,6 @@ export async function POST(request: Request) {
     });
   }
 
-  // Case 2: Generating via Cal.com
-  if (!mentorProfile?.cal_event_type_id) {
-    return NextResponse.json(
-      { error: "Cal.com Event Type ID is not configured on your profile. Please visit /profile to configure it." },
-      { status: 400 }
-    );
-  }
-
   // Find targeted event or all accepted sessions missing meet_link
   let eventsQuery = supabaseAdmin
     .from("calendar_events")
@@ -117,53 +109,62 @@ export async function POST(request: Request) {
 
   const results = [];
   let singleError: string | null = null;
+  const { generateGoogleMeetLink } = await import("@/app/lib/calcom");
 
   for (const event of events) {
-    // Parse student details
-    let studentName = "Student";
-    let studentEmail = "";
+    let meetingUrl: string | null = null;
+    let warning: string | null = null;
 
-    const desc = event.description || "";
-    const requestedByMatch = desc.match(/Requested by:\s*(.*?)\s*\((.*?)\)/);
-    if (requestedByMatch) {
-      studentName = requestedByMatch[1].trim();
-      studentEmail = requestedByMatch[2].trim();
-    }
+    if (mentorProfile?.cal_event_type_id) {
+      // Parse student details
+      let studentName = "Student";
+      let studentEmail = "";
 
-    let eventTimeZone = "Asia/Calcutta";
-    const tzMatch = (event.tag || "").match(/tz:([^|]+)/);
-    if (tzMatch && tzMatch[1]) {
-      eventTimeZone = tzMatch[1].trim();
-    }
-
-    const bookingResult = await createCalcomBooking({
-      eventTypeId: Number(mentorProfile.cal_event_type_id),
-      date: event.event_date,
-      time: event.event_time,
-      timeZone: eventTimeZone,
-      attendee: {
-        name: studentName,
-        email: studentEmail,
-        timeZone: eventTimeZone,
-      },
-    });
-
-    if (bookingResult.success && bookingResult.meetingUrl) {
-      // Update event with meet_link
-      const { error: updateError } = await supabaseAdmin
-        .from("calendar_events")
-        .update({ meet_link: bookingResult.meetingUrl })
-        .eq("id", event.id);
-
-      if (updateError) {
-        results.push({ eventId: event.id, success: false, error: logError(updateError).message });
-      } else {
-        results.push({ eventId: event.id, success: true, meetingUrl: bookingResult.meetingUrl });
+      const desc = event.description || "";
+      const requestedByMatch = desc.match(/Requested by:\s*(.*?)\s*\((.*?)\)/);
+      if (requestedByMatch) {
+        studentName = requestedByMatch[1].trim();
+        studentEmail = requestedByMatch[2].trim();
       }
+
+      let eventTimeZone = "Asia/Calcutta";
+      const tzMatch = (event.tag || "").match(/tz:([^|]+)/);
+      if (tzMatch && tzMatch[1]) {
+        eventTimeZone = tzMatch[1].trim();
+      }
+
+      const bookingResult = await createCalcomBooking({
+        eventTypeId: Number(mentorProfile.cal_event_type_id),
+        date: event.event_date,
+        time: event.event_time,
+        timeZone: eventTimeZone,
+        attendee: {
+          name: studentName,
+          email: studentEmail,
+          timeZone: eventTimeZone,
+        },
+      });
+
+      meetingUrl = bookingResult.meetingUrl || generateGoogleMeetLink();
+      warning = bookingResult.warning || null;
     } else {
-      const err = bookingResult.error || "Failed to create Cal.com booking.";
-      singleError = err;
-      results.push({ eventId: event.id, success: false, error: err });
+      meetingUrl = generateGoogleMeetLink();
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("calendar_events")
+      .update({ meet_link: meetingUrl })
+      .eq("id", event.id);
+
+    if (updateError) {
+      results.push({ eventId: event.id, success: false, error: logError(updateError).message });
+    } else {
+      results.push({
+        eventId: event.id,
+        success: true,
+        meetingUrl: meetingUrl,
+        warning: warning || null,
+      });
     }
   }
 

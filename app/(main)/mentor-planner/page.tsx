@@ -6,6 +6,7 @@ import { useLoading } from "@/app/context/LoadingContext";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
+import { initiateUpgradeFlow } from "@/app/lib/upgrade-handoff";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import UserAvatar from "@/app/components/UserAvatar";
 import { getPremiumMentors } from "@/app/actions/get-premium-mentors";
@@ -39,6 +40,7 @@ interface Mentor {
   cal_link: string;
   mentor_bio: string;
   mentor_expertise: string[];
+  cal_event_type_id?: string | number | null;
 }
 
 interface CalendarEvent {
@@ -114,6 +116,9 @@ export default function MentorConnectPage() {
     type: "",
     text: "",
   });
+  const [availableSlots, setAvailableSlots] = useState<Array<{ value: string; label: string }>>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [hasAttemptedSlotFetch, setHasAttemptedSlotFetch] = useState(false);
 
   // Availability settings
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]); // Monday to Friday (1-5) by default
@@ -371,10 +376,69 @@ export default function MentorConnectPage() {
     })();
   }, []);
 
+  const [upgradingMentorId, setUpgradingMentorId] = useState<string | null>(null);
+
   // Open booking embed modal for students
   const handleOpenBooking = (mentor: Mentor) => {
     setSelectedMentor(mentor);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setRequestDate(formatLocalDateStr(tomorrow));
     setIsCalModalOpen(true);
+  };
+
+  // Fetch real-time available slots for the selected mentor and date
+  useEffect(() => {
+    if (!isCalModalOpen || !selectedMentor?.cal_event_type_id || !requestDate) {
+      setAvailableSlots([]);
+      setHasAttemptedSlotFetch(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingSlots(true);
+    setHasAttemptedSlotFetch(true);
+
+    const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Calcutta";
+    fetch(`/api/mentor-planner/slots?eventTypeId=${encodeURIComponent(selectedMentor.cal_event_type_id)}&date=${encodeURIComponent(requestDate)}&timeZone=${encodeURIComponent(clientTz)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data?.slots && Array.isArray(data.slots) && data.slots.length > 0) {
+          setAvailableSlots(data.slots);
+          setRequestTime(data.slots[0].value.slice(0, 5));
+        } else {
+          setAvailableSlots([]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to load mentor slots:", err);
+        if (isMounted) setAvailableSlots([]);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingSlots(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isCalModalOpen, selectedMentor?.cal_event_type_id, requestDate]);
+
+  // Follow the exact same Upgrade to Pro flow when student clicks Upgrade to Schedule
+  const handleUpgradeToSchedule = async (mentorId: string) => {
+    setUpgradingMentorId(mentorId);
+    try {
+      await initiateUpgradeFlow({
+        targetTier: "Pro",
+        userEmail: currentUserEmail,
+        userName: currentUserName,
+        userPhone: currentUserPhone,
+      });
+    } catch (err) {
+      console.error("Upgrade to schedule error:", err);
+    } finally {
+      setUpgradingMentorId(null);
+    }
   };
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
@@ -1549,11 +1613,21 @@ export default function MentorConnectPage() {
                     </Button>
                   ) : (
                     <Button
-                      onClick={() => router.push("/upgrade")}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                      onClick={() => handleUpgradeToSchedule(mentor.id)}
+                      disabled={upgradingMentorId === mentor.id}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-brand-heading to-brand-primary hover:from-brand-heading-hover hover:to-brand-primary/95 text-white shadow-md cursor-pointer disabled:opacity-60"
                     >
-                      <Lock size={14} />
-                      Upgrade to Schedule
+                      {upgradingMentorId === mentor.id ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Starting Upgrade…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} className="text-amber-300" />
+                          Upgrade to Schedule
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>
@@ -1602,17 +1676,51 @@ export default function MentorConnectPage() {
               {/* Time & Duration */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Propose Start Time</label>
-                  <select
-                    value={requestTime}
-                    onChange={(e) => setRequestTime(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
-                  >
-                    {Array.from({ length: 13 }, (_, i) => 9 + i).map((h) => {
-                      const str = `${String(h).padStart(2, "0")}:00`;
-                      return <option key={str} value={str}>{h === 12 ? "12:00 PM" : h > 12 ? `${h-12}:00 PM` : `${h}:00 AM`}</option>;
-                    })}
-                  </select>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Propose Start Time
+                    {isLoadingSlots && <span className="ml-2 text-brand-primary animate-pulse font-normal lowercase">(checking available slots...)</span>}
+                  </label>
+                  {isLoadingSlots ? (
+                    <div className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-semibold flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-primary" />
+                      <span>Checking calendar availability...</span>
+                    </div>
+                  ) : availableSlots.length > 0 ? (
+                    <div>
+                      <select
+                        value={requestTime}
+                        onChange={(e) => setRequestTime(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
+                      >
+                        {availableSlots.map((slot) => (
+                          <option key={slot.value} value={slot.value.slice(0, 5)}>
+                            {slot.label} (Open)
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium flex items-center gap-1">
+                        ✓ Showing available slots directly from mentor&apos;s live calendar
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <select
+                        value={requestTime}
+                        onChange={(e) => setRequestTime(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
+                      >
+                        {Array.from({ length: 13 }, (_, i) => 9 + i).map((h) => {
+                          const str = `${String(h).padStart(2, "0")}:00`;
+                          return <option key={str} value={str}>{h === 12 ? "12:00 PM" : h > 12 ? `${h-12}:00 PM` : `${h}:00 AM`}</option>;
+                        })}
+                      </select>
+                      {hasAttemptedSlotFetch && requestDate && (
+                        <p className="text-[10px] text-amber-600 mt-1 font-medium">
+                          No direct calendar open slots on this date. You may propose a time or pick another day.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Duration</label>
