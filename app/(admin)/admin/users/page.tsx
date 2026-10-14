@@ -12,6 +12,7 @@ import {
   updateUserRole,
   updateUserPlan,
   deleteUser,
+  getAdminUsers,
 } from "@/app/actions/create-user";
 import {
   MoreVertical,
@@ -120,109 +121,26 @@ export default function AdminUsers() {
 
   async function fetchUsers() {
     setLoading(true);
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const { data: loginLogs } = await supabase
-      .from("user_login_logs")
-      .select("user_id, logged_in_at, last_heartbeat_at, session_duration_seconds")
-      .gte("logged_in_at", todayStart.toISOString())
-      .order("logged_in_at", { ascending: true });
-
-    const logsByUser = new Map<string, { sessions: LoginSession[]; totalSec: number }>();
-    if (loginLogs) {
-      for (const log of loginLogs) {
-        if (!logsByUser.has(log.user_id)) {
-          logsByUser.set(log.user_id, { sessions: [], totalSec: 0 });
-        }
-        const g = logsByUser.get(log.user_id)!;
-        const duration = log.session_duration_seconds || 0;
-        const loginMs = new Date(log.logged_in_at).getTime();
-        const logoutMs =
-          duration > 0
-            ? loginMs + duration * 1000
-            : log.last_heartbeat_at
-              ? new Date(log.last_heartbeat_at).getTime()
-              : loginMs;
-
-        g.sessions.push({
-          loginAt: log.logged_in_at,
-          logoutAt: new Date(logoutMs).toISOString(),
-          durationSeconds: duration,
-        });
-        g.totalSec += duration;
-      }
-    }
-
-    let phase2UserMap = new Map<string, string>();
-    let phase2PlanMap = new Map<string, string>();
     try {
-      const { data: p2Users } = await supabase
-        .schema("phase2" as any)
-        .from("users")
-        .select("id, auth_user_id, email, username");
-
-      const p2IdToAuthId = new Map<string, string>();
-      if (p2Users) {
-        for (const u of p2Users) {
-          if (u.auth_user_id && u.username) phase2UserMap.set(u.auth_user_id, u.username.trim());
-          if (u.email && u.username) phase2UserMap.set(u.email.toLowerCase(), u.username.trim());
-          if (u.auth_user_id && u.id) p2IdToAuthId.set(u.id, u.auth_user_id);
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+      if (!token) {
+        setLoading(false);
+        return;
       }
 
-      const { data: p2Enrollments } = await supabase
-        .schema("phase2" as any)
-        .from("enrollments")
-        .select("user_id, bundles(bundle_name)")
-        .eq("status", "active");
-
-      if (p2Enrollments) {
-        for (const e of p2Enrollments as any[]) {
-          const bn = (Array.isArray(e.bundles) ? e.bundles[0]?.bundle_name : e.bundles?.bundle_name) || "";
-          const lower = bn.toLowerCase();
-          const planStr = lower.includes("premium") ? "premium" : lower.includes("pro") ? "pro" : "starter";
-          const authId = p2IdToAuthId.get(e.user_id) || e.user_id;
-
-          const curr = phase2PlanMap.get(authId);
-          if (!curr || (curr === "starter" && planStr !== "starter") || (curr === "pro" && planStr === "premium")) {
-            phase2PlanMap.set(authId, planStr);
-          }
-        }
+      const res = await getAdminUsers(token);
+      if (res.success && res.users) {
+        setUsers(res.users);
+        setActiveUsersCount(res.users.filter((u) => u.todaySessions.length > 0).length);
+      } else {
+        console.warn("getAdminUsers error:", res.error);
       }
-    } catch (p2Err) {
-      console.warn("Could not fetch phase2.users/enrollments:", p2Err);
+    } catch (err) {
+      console.error("fetchUsers error:", err);
+    } finally {
+      setLoading(false);
     }
-
-    if (!error && profiles) {
-      const transformed = (profiles as ProfileRow[]).map((profile) => {
-        const userLogs = logsByUser.get(profile.id);
-        const p2Name = phase2UserMap.get(profile.id) || phase2UserMap.get(profile.email?.toLowerCase() || "");
-        const isFromLanding = !profile.created_at && Boolean(p2Name);
-        const resolvedName = (isFromLanding && p2Name)
-          ? p2Name
-          : (profile.created_at && profile.full_name)
-            ? profile.full_name
-            : (p2Name || profile.full_name || profile.email?.split("@")[0] || "Unknown");
-
-        return {
-          id: profile.id,
-          name: resolvedName,
-          email: profile.email || "No Email",
-          role: profile.role?.toLowerCase() || "user",
-          plan: phase2PlanMap.get(profile.id) || "starter",
-          todaySessions: userLogs?.sessions || [],
-          todayTimeSpentSeconds: userLogs?.totalSec || 0,
-        };
-      });
-      setUsers(transformed);
-      setActiveUsersCount(transformed.filter((u) => u.todaySessions.length > 0).length);
-    }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -634,10 +552,10 @@ export default function AdminUsers() {
               {formFeedback.message && (
                 <div
                   className={`p-3 rounded-lg text-sm font-medium ${formFeedback.type === "error"
-                      ? "bg-red-50 text-red-600"
-                      : formFeedback.type === "warning"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-green-50 text-green-700"
+                    ? "bg-red-50 text-red-600"
+                    : formFeedback.type === "warning"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-green-50 text-green-700"
                     }`}
                 >
                   {formFeedback.message}
@@ -704,16 +622,16 @@ export default function AdminUsers() {
                       setCurrentPage(1);
                     }}
                     className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "users"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-900"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
                       }`}
                   >
                     <Users size={14} />
                     Users
                     <span
                       className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "users"
-                          ? "bg-brand-primary/10 text-brand-primary font-bold"
-                          : "bg-gray-200/70 text-gray-600"
+                        ? "bg-brand-primary/10 text-brand-primary font-bold"
+                        : "bg-gray-200/70 text-gray-600"
                         }`}
                     >
                       {usersCategory.length}
@@ -726,16 +644,16 @@ export default function AdminUsers() {
                       setCurrentPage(1);
                     }}
                     className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "mentors"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-900"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
                       }`}
                   >
                     <GraduationCap size={14} />
                     Mentors
                     <span
                       className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "mentors"
-                          ? "bg-purple-500/10 text-purple-600 font-bold"
-                          : "bg-gray-200/70 text-gray-600"
+                        ? "bg-purple-500/10 text-purple-600 font-bold"
+                        : "bg-gray-200/70 text-gray-600"
                         }`}
                     >
                       {mentorsCategory.length}
@@ -748,16 +666,16 @@ export default function AdminUsers() {
                       setCurrentPage(1);
                     }}
                     className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === "admins"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-900"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
                       }`}
                   >
                     <ShieldCheck size={14} />
                     Admins
                     <span
                       className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "admins"
-                          ? "bg-red-500/10 text-red-600 font-bold"
-                          : "bg-gray-200/70 text-gray-600"
+                        ? "bg-red-500/10 text-red-600 font-bold"
+                        : "bg-gray-200/70 text-gray-600"
                         }`}
                     >
                       {adminsCategory.length}
@@ -911,8 +829,8 @@ export default function AdminUsers() {
                                     key={p.value}
                                     onClick={() => handleChangePlan(user.id, p.value)}
                                     className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
-                                        ? "text-brand-primary font-bold bg-brand-primary/5"
-                                        : "text-gray-700"
+                                      ? "text-brand-primary font-bold bg-brand-primary/5"
+                                      : "text-gray-700"
                                       }`}
                                   >
                                     <span>{p.label} Plan</span>
@@ -1056,10 +974,10 @@ export default function AdminUsers() {
                             {user.role === "user" && (
                               <span
                                 className={`px-2 py-0.5 text-[10px] font-bold rounded-md border capitalize ${user.plan === "premium"
-                                    ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
-                                    : user.plan === "pro"
-                                      ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
-                                      : "bg-gray-100 text-gray-700 border-gray-200"
+                                  ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                                  : user.plan === "pro"
+                                    ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                                    : "bg-gray-100 text-gray-700 border-gray-200"
                                   }`}
                               >
                                 {user.plan ? `${user.plan} Plan` : "Starter Plan"}
@@ -1150,8 +1068,8 @@ export default function AdminUsers() {
                                         key={p.value}
                                         onClick={() => handleChangePlan(user.id, p.value)}
                                         className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
-                                            ? "text-brand-primary font-bold bg-brand-primary/5"
-                                            : "text-gray-700"
+                                          ? "text-brand-primary font-bold bg-brand-primary/5"
+                                          : "text-gray-700"
                                           }`}
                                       >
                                         <span>{p.label} Plan</span>
@@ -1231,8 +1149,8 @@ export default function AdminUsers() {
                           <button
                             onClick={() => setCurrentPage(page)}
                             className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${currentPage === page
-                                ? "bg-brand-primary text-white shadow-sm"
-                                : "text-gray-600 border border-gray-200 hover:bg-white"
+                              ? "bg-brand-primary text-white shadow-sm"
+                              : "text-gray-600 border border-gray-200 hover:bg-white"
                               }`}
                           >
                             {page}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
@@ -61,6 +62,7 @@ export default function MentorConnectPage() {
   };
 
   const { setLoading: setGlobalLoading } = useLoading();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -1437,7 +1439,7 @@ export default function MentorConnectPage() {
             </p>
           </div>
 
-          {!isCurrentlyLoading && canAccess("Mentorship") && (
+          {!isCurrentlyLoading && (
             <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
               <Sparkles className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-bold text-gray-700">
@@ -1448,94 +1450,96 @@ export default function MentorConnectPage() {
         </div>
 
         {/* Content Section */}
-        {!isTierLoading && !canAccess("Mentorship") ? (
-          <div className="py-6">
+        {!isTierLoading && !canAccess("Mentorship") && (
+          <div className="mb-6">
             <UpgradeRequired 
               title="1-on-1 Mentorship Locked" 
-              description="1-on-1 mentor booking sessions are exclusively available to Pro and Premium tier members. Upgrade today to consult directly with instructors, schedule study reviews, and unblock challenges." 
+              description="1-on-1 mentor booking sessions are exclusively available to Pro and Premium tier members. Upgrade today to schedule live sessions with your assigned instructors." 
               requiredTier="Pro" 
               userEmail={currentUserEmail}
               userName={currentUserName}
               userPhone={currentUserPhone}
+              compact={true}
             />
           </div>
+        )}
+
+        {/* Mentors Grid */}
+        {mentors.length === 0 ? (
+          <div className="py-16 px-4 bg-white border border-gray-100 rounded-3xl text-center shadow-sm max-w-3xl mx-auto my-8">
+            <div className="mx-auto w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mb-4">
+              <CalendarDays className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No Mentors Assigned</h3>
+            <p className="text-gray-500 text-sm max-w-md mx-auto">
+              There are no mentors currently assigned to your courses. If you believe this is a mistake, please reach out to support.
+            </p>
+          </div>
         ) : (
-          <>
-            {/* Mentors Grid */}
-            {mentors.length === 0 ? (
-              <div className="py-16 px-4 bg-white border border-gray-100 rounded-3xl text-center shadow-sm max-w-3xl mx-auto my-8">
-                <div className="mx-auto w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mb-4">
-                  <CalendarDays className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">No Mentors Assigned</h3>
-                <p className="text-gray-500 text-sm max-w-md mx-auto">
-                  There are no mentors currently assigned to your Pro or Premium courses. If you believe this is a mistake, please reach out to support.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mentors.map((mentor) => (
-                  <div
-                    key={mentor.id}
-                  className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-gray-200 transition-all group min-h-[340px] text-left relative overflow-hidden"
-                >
-                  <div className="space-y-5">
-                    {/* Header: Avatar + Role Badge */}
-                    <div className="flex items-start justify-between gap-2">
-                      <UserAvatar
-                        name={mentor.full_name}
-                        email={mentor.email || ""}
-                        size={60}
-                        textSize="text-xl"
-                      />
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                        mentor.role === "Lead Mentor"
-                          ? "bg-purple-50 text-purple-700 border-purple-100"
-                          : "bg-blue-50 text-blue-700 border-blue-100"
-                      }`}>
-                        {mentor.role}
-                      </span>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {mentors.map((mentor) => (
+              <div
+                key={mentor.id}
+                className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-gray-200 transition-all group min-h-[340px] text-left relative overflow-hidden"
+              >
+                <div className="space-y-5">
+                  {/* Header: Avatar + Role Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <UserAvatar
+                      name={mentor.full_name}
+                      email={mentor.email || ""}
+                      size={60}
+                      textSize="text-xl"
+                    />
+                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      mentor.role === "Lead Mentor"
+                        ? "bg-purple-50 text-purple-700 border-purple-100"
+                        : "bg-blue-50 text-blue-700 border-blue-100"
+                    }`}>
+                      {mentor.role}
+                    </span>
+                  </div>
 
-                    {/* Profile Information */}
-                    <div>
-                      <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-brand-primary transition-colors">
-                        {mentor.full_name}
-                      </h3>
-                      {mentor.email && (
-                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5 truncate flex items-center gap-1">
-                          <Mail size={10} /> {mentor.email}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Bio */}
-                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 bg-gray-50 p-3 rounded-2xl border border-gray-50">
-                      {mentor.mentor_bio}
-                    </p>
-
-                    {/* Expertise Tags */}
-                    {mentor.mentor_expertise.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {mentor.mentor_expertise.slice(0, 3).map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[9px] font-bold text-gray-500 bg-gray-100/70 border border-gray-100 rounded px-1.5 py-0.5"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {mentor.mentor_expertise.length > 3 && (
-                          <span className="text-[9px] font-bold text-brand-primary bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5">
-                            +{mentor.mentor_expertise.length - 3} More
-                          </span>
-                        )}
-                      </div>
+                  {/* Profile Information */}
+                  <div>
+                    <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-brand-primary transition-colors">
+                      {mentor.full_name}
+                    </h3>
+                    {mentor.email && (
+                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5 truncate flex items-center gap-1">
+                        <Mail size={10} /> {mentor.email}
+                      </p>
                     )}
                   </div>
 
-                  {/* CTA button */}
-                  <div className="pt-5 border-t border-gray-50 mt-5">
+                  {/* Bio */}
+                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 bg-gray-50 p-3 rounded-2xl border border-gray-50">
+                    {mentor.mentor_bio}
+                  </p>
+
+                  {/* Expertise Tags */}
+                  {mentor.mentor_expertise.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {mentor.mentor_expertise.slice(0, 3).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[9px] font-bold text-gray-500 bg-gray-100/70 border border-gray-100 rounded px-1.5 py-0.5"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {mentor.mentor_expertise.length > 3 && (
+                        <span className="text-[9px] font-bold text-brand-primary bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5">
+                          +{mentor.mentor_expertise.length - 3} More
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* CTA button */}
+                <div className="pt-5 border-t border-gray-50 mt-5">
+                  {canAccess("Mentorship") ? (
                     <Button
                       onClick={() => handleOpenBooking(mentor)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-brand-primary hover:bg-brand-primary/95 text-white"
@@ -1543,12 +1547,19 @@ export default function MentorConnectPage() {
                       <CalendarIcon size={14} />
                       Schedule 1-on-1
                     </Button>
-                  </div>
+                  ) : (
+                    <Button
+                      onClick={() => router.push("/upgrade")}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                    >
+                      <Lock size={14} />
+                      Upgrade to Schedule
+                    </Button>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-          </>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

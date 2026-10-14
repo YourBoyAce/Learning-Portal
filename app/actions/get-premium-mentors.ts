@@ -19,6 +19,7 @@ export async function getPremiumMentors(accessToken: string) {
     if (!user) return { mentors: [], error: "Unauthorized" };
 
     const authUserId = user.id;
+    const userEmail = user.email?.trim().toLowerCase();
 
     // 2. Admin client to bypass RLS
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -35,102 +36,88 @@ export async function getPremiumMentors(accessToken: string) {
 
     const targetUserId = phase2User?.id || authUserId;
 
-    // 4. Find all active enrollments for this user and their bundles
+    // 4. Collect all course IDs for this user from both phase2.enrollments AND course_members
+    const userCourseIds = new Set<string | number>();
+
+    // From phase2.enrollments
     const { data: enrollments } = await supabaseAdmin
       .schema("phase2")
       .from("enrollments")
-      .select("course_id, bundles(bundle_name)")
+      .select("course_id")
       .eq("user_id", targetUserId)
       .eq("status", "active");
 
-    // Check user_metadata plan as a fallback (covers admin-created users who have
-    // a plan set in metadata but no phase2 enrollment row yet).
-    const metadataPlan = (
-      user.user_metadata?.plan ??
-      user.app_metadata?.plan ??
-      user.user_metadata?.tier ??
-      user.app_metadata?.tier ??
-      ""
-    ).toString().trim().toLowerCase();
-    const hasMetadataPremiumPlan =
-      metadataPlan === "pro" || metadataPlan === "premium";
+    if (enrollments) {
+      for (const e of enrollments) {
+        if (e.course_id) userCourseIds.add(e.course_id);
+      }
+    }
 
-    // Build premium course IDs from enrollments
-    const premiumCourseIds: (string | number)[] = [];
-    if (enrollments && enrollments.length > 0) {
-      for (const enrollment of enrollments) {
-        const bundleName = (enrollment.bundles as any)?.bundle_name || "Starter";
-        const lower = bundleName.toLowerCase();
-        if (lower.includes("premium") || lower.includes("pro")) {
-          if (enrollment.course_id) {
-            premiumCourseIds.push(enrollment.course_id);
-          }
+    // From course_members
+    if (userEmail) {
+      const { data: memberships } = await supabaseAdmin
+        .from("course_members")
+        .select("maincourse_id")
+        .ilike("email", userEmail);
+
+      if (memberships) {
+        for (const m of memberships) {
+          if (m.maincourse_id) userCourseIds.add(m.maincourse_id);
         }
       }
     }
 
-    // If no qualifying enrollments from phase2, try the metadata-plan fallback:
-    // look up the courses this user is a member of via their email in course_members.
-    if (premiumCourseIds.length === 0) {
-      if (!hasMetadataPremiumPlan) {
-        return { mentors: [], error: null };
-      }
-
-      // Resolve user's email to find which courses they belong to.
-      const userEmail = user.email?.trim().toLowerCase();
-      if (!userEmail) return { mentors: [], error: null };
-
-      const { data: userMemberships } = await supabaseAdmin
+    // 5. Query sibling course members to find mentors assigned to user's courses
+    let mentorEmails: string[] = [];
+    if (userCourseIds.size > 0) {
+      const { data: siblingCourseMembers } = await supabaseAdmin
         .from("course_members")
-        .select("maincourse_id")
-        .eq("email", userEmail);
+        .select("email")
+        .in("maincourse_id", Array.from(userCourseIds));
 
-      const userCourseIds = (userMemberships ?? [])
-        .map((m: any) => m.maincourse_id)
-        .filter(Boolean);
-
-      if (userCourseIds.length === 0) return { mentors: [], error: null };
-
-      premiumCourseIds.push(...userCourseIds);
+      if (siblingCourseMembers) {
+        mentorEmails = siblingCourseMembers
+          .map((cm: any) => cm.email?.trim().toLowerCase())
+          .filter((em: string) => Boolean(em) && em !== userEmail);
+      }
     }
 
-    // 5. Find mentor emails scoped to the user's enrolled/member courses.
-    const { data: siblingCourseMembers, error: siblingError } = await supabaseAdmin
-      .from("course_members")
-      .select("email")
-      .in("maincourse_id", premiumCourseIds);
+    let mentorsData: any[] = [];
+    if (mentorEmails.length > 0) {
+      const { data } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email, role, cal_link, mentor_bio, mentor_expertise, cal_event_type_id")
+        .in("role", ["instructor", "admin"])
+        .in("email", mentorEmails);
 
-    if (siblingError) throw siblingError;
-
-    const mentorEmails = (siblingCourseMembers ?? [])
-      .map((cm: any) => cm.email?.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (mentorEmails.length === 0) return { mentors: [], error: null };
-
-    // 6. Query profiles filtered to mentor emails and instructor/admin roles only.
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email, role, cal_link, mentor_bio, mentor_expertise")
-      .in("role", ["instructor", "admin"])
-      .in("email", mentorEmails);
-
-    if (error) throw error;
-
-    if (data) {
-      const formatted = data.map((item: any) => ({
-        id: item.id,
-        full_name: item.full_name || "Instructor",
-        email: "",
-        role: item.role === "admin" ? "Lead Mentor" : "Cohort Mentor",
-        cal_link: item.cal_link || "",
-        mentor_bio: item.mentor_bio || "Experienced technical educator ready to help you master your curriculum journey.",
-        mentor_expertise: Array.isArray(item.mentor_expertise) ? item.mentor_expertise : [],
-      }));
-      return { mentors: formatted, error: null };
+      if (data && data.length > 0) {
+        mentorsData = data;
+      }
     }
 
-    return { mentors: [], error: null };
+    // Fallback: If no mentors are explicitly assigned in the course yet, load active platform mentors
+    if (mentorsData.length === 0) {
+      const { data: allMentors } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email, role, cal_link, mentor_bio, mentor_expertise, cal_event_type_id")
+        .in("role", ["instructor", "admin"])
+        .limit(10);
+
+      mentorsData = allMentors || [];
+    }
+
+    const formatted = mentorsData.map((item: any) => ({
+      id: item.id,
+      full_name: item.full_name || "Instructor",
+      email: item.email || "",
+      role: item.role === "admin" ? "Lead Mentor" : "Cohort Mentor",
+      cal_link: item.cal_link || "",
+      cal_event_type_id: item.cal_event_type_id || null,
+      mentor_bio: item.mentor_bio || "Experienced technical educator ready to help you master your curriculum journey.",
+      mentor_expertise: Array.isArray(item.mentor_expertise) ? item.mentor_expertise : [],
+    }));
+
+    return { mentors: formatted, error: null };
   } catch (err: any) {
     console.error("Error fetching premium mentors:", err);
     return { mentors: [], error: logError(err).message };

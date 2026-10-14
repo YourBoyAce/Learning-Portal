@@ -543,9 +543,11 @@ export async function updateUserPlan(userId: string, newPlan: string, adminAcces
     : "starter";
 
   try {
-    // 1. Update user_metadata in auth.users
+    // 1. Update user_metadata in auth.users, preserving existing metadata
+    const { data: authUserData } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const existingMeta = authUserData?.user?.user_metadata || {};
     await supabaseAdmin.auth.admin.updateUserById(userId, {
-      user_metadata: { plan: normalizedPlan },
+      user_metadata: { ...existingMeta, plan: normalizedPlan },
     });
 
     // 2. Find phase2 user id
@@ -579,15 +581,70 @@ export async function updateUserPlan(userId: string, newPlan: string, adminAcces
 
     if (targetBundleId) {
       // 4. Update all active enrollments for this user
-      await supabaseAdmin
+      const { data: existingEnrollments } = await supabaseAdmin
         .schema("phase2" as any)
         .from("enrollments")
-        .update({
-          bundle_id: targetBundleId,
-          updated_at: new Date().toISOString(),
-        })
+        .select("id")
         .eq("user_id", targetUserId)
         .eq("status", "active");
+
+      if (existingEnrollments && existingEnrollments.length > 0) {
+        await supabaseAdmin
+          .schema("phase2" as any)
+          .from("enrollments")
+          .update({
+            bundle_id: targetBundleId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", targetUserId)
+          .eq("status", "active");
+      } else {
+        // If no active enrollment exists in phase2, check if user is in course_members
+        const userEmail = authUserData?.user?.email?.trim().toLowerCase();
+        if (userEmail) {
+          const { data: cmRow } = await supabaseAdmin
+            .from("course_members")
+            .select("maincourse_id")
+            .ilike("email", userEmail)
+            .limit(1)
+            .maybeSingle();
+
+          if (cmRow?.maincourse_id) {
+            const { data: newOrder } = await supabaseAdmin
+              .schema("phase2" as any)
+              .from("orders")
+              .insert({
+                user_id: targetUserId,
+                course_id: cmRow.maincourse_id,
+                bundle_id: targetBundleId,
+                amount: (bundleData as any)?.price ?? 0,
+                status: "paid",
+                razorpay_order_id: `admin_plan_change_${Date.now()}`,
+                razorpay_payment_id: `admin_plan_change_pay_${Date.now()}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select("id")
+              .maybeSingle();
+
+            await supabaseAdmin
+              .schema("phase2" as any)
+              .from("enrollments")
+              .insert({
+                user_id: targetUserId,
+                order_id: newOrder?.id ?? null,
+                course_id: cmRow.maincourse_id,
+                bundle_id: targetBundleId,
+                batch_type: "recorded",
+                status: "active",
+                access_start_date: new Date().toISOString(),
+                access_end_date: new Date(
+                  new Date().setFullYear(new Date().getFullYear() + 1)
+                ).toISOString(),
+              });
+          }
+        }
+      }
     }
 
     revalidatePath("/admin/users");
@@ -595,5 +652,171 @@ export async function updateUserPlan(userId: string, newPlan: string, adminAcces
   } catch (error: any) {
     console.error("[updateUserPlan] error:", error);
     return { success: false, error: error.message || "Failed to update user plan." };
+  }
+}
+
+export interface AdminUserData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  plan: string;
+  todaySessions: { loginAt: string; logoutAt: string; durationSeconds: number }[];
+  todayTimeSpentSeconds: number;
+}
+
+export async function getAdminUsers(adminAccessToken: string): Promise<{ success: boolean; users?: AdminUserData[]; error?: string }> {
+  const callerAuth = await verifyAdminCaller(adminAccessToken);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
+
+  try {
+    // 1. Fetch profiles
+    const { data: profiles, error: profError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (profError) throw profError;
+
+    // 2. Fetch login logs for today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data: loginLogs } = await supabaseAdmin
+      .from("user_login_logs")
+      .select("user_id, logged_in_at, last_heartbeat_at, session_duration_seconds")
+      .gte("logged_in_at", todayStart.toISOString())
+      .order("logged_in_at", { ascending: true });
+
+    const logsByUser = new Map<string, { sessions: { loginAt: string; logoutAt: string; durationSeconds: number }[]; totalSec: number }>();
+    if (loginLogs) {
+      for (const log of loginLogs) {
+        if (!logsByUser.has(log.user_id)) {
+          logsByUser.set(log.user_id, { sessions: [], totalSec: 0 });
+        }
+        const g = logsByUser.get(log.user_id)!;
+        const duration = log.session_duration_seconds || 0;
+        const loginMs = new Date(log.logged_in_at).getTime();
+        const logoutMs =
+          duration > 0
+            ? loginMs + duration * 1000
+            : log.last_heartbeat_at
+              ? new Date(log.last_heartbeat_at).getTime()
+              : loginMs;
+
+        g.sessions.push({
+          loginAt: log.logged_in_at,
+          logoutAt: new Date(logoutMs).toISOString(),
+          durationSeconds: duration,
+        });
+        g.totalSec += duration;
+      }
+    }
+
+    // 3. Fetch auth users to get user_metadata.plan
+    const authMetadataPlanMap = new Map<string, string>();
+    try {
+      const { data: authUsersData } = await supabaseAdmin.auth.admin.listUsers({
+        perPage: 1000,
+      });
+      if (authUsersData?.users) {
+        for (const u of authUsersData.users) {
+          const plan = (
+            u.user_metadata?.plan ??
+            u.app_metadata?.plan ??
+            u.user_metadata?.tier ??
+            u.app_metadata?.tier ??
+            ""
+          ).toString().trim().toLowerCase();
+          if (["starter", "pro", "premium"].includes(plan)) {
+            authMetadataPlanMap.set(u.id, plan);
+          }
+        }
+      }
+    } catch (authListErr) {
+      console.warn("Could not list auth users for metadata plan:", authListErr);
+    }
+
+    // 4. Fetch phase2 users and enrollments
+    const phase2UserMap = new Map<string, string>();
+    const phase2PlanMap = new Map<string, string>();
+    try {
+      const { data: p2Users } = await supabaseAdmin
+        .schema("phase2" as any)
+        .from("users")
+        .select("id, auth_user_id, email, username");
+
+      const p2IdToAuthId = new Map<string, string>();
+      if (p2Users) {
+        for (const u of p2Users) {
+          if (u.auth_user_id && u.username) phase2UserMap.set(u.auth_user_id, u.username.trim());
+          if (u.email && u.username) phase2UserMap.set(u.email.toLowerCase(), u.username.trim());
+          if (u.auth_user_id && u.id) p2IdToAuthId.set(u.id, u.auth_user_id);
+        }
+      }
+
+      const { data: p2Enrollments } = await supabaseAdmin
+        .schema("phase2" as any)
+        .from("enrollments")
+        .select("user_id, bundles(bundle_name)")
+        .eq("status", "active");
+
+      if (p2Enrollments) {
+        for (const e of p2Enrollments as any[]) {
+          const bn = (Array.isArray(e.bundles) ? e.bundles[0]?.bundle_name : e.bundles?.bundle_name) || "";
+          const lower = bn.toLowerCase();
+          const planStr = lower.includes("premium") ? "premium" : lower.includes("pro") ? "pro" : "starter";
+          const authId = p2IdToAuthId.get(e.user_id) || e.user_id;
+
+          const curr = phase2PlanMap.get(authId);
+          if (!curr || (curr === "starter" && planStr !== "starter") || (curr === "pro" && planStr === "premium")) {
+            phase2PlanMap.set(authId, planStr);
+          }
+        }
+      }
+    } catch (p2Err) {
+      console.warn("Could not fetch phase2.users/enrollments in getAdminUsers:", p2Err);
+    }
+
+    // 5. Transform profiles
+    const transformed: AdminUserData[] = (profiles || []).map((profile) => {
+      const userLogs = logsByUser.get(profile.id);
+      const p2Name = phase2UserMap.get(profile.id) || phase2UserMap.get(profile.email?.toLowerCase() || "");
+      const isFromLanding = !profile.created_at && Boolean(p2Name);
+      const resolvedName = (isFromLanding && p2Name)
+        ? p2Name
+        : (profile.created_at && profile.full_name)
+          ? profile.full_name
+          : (p2Name || profile.full_name || profile.email?.split("@")[0] || "Unknown");
+
+      const enrollmentPlan = phase2PlanMap.get(profile.id);
+      const metadataPlan = authMetadataPlanMap.get(profile.id);
+
+      // Resolve plan prioritizing the highest/active tier between enrollment and metadata
+      let resolvedPlan = "starter";
+      if (enrollmentPlan === "premium" || metadataPlan === "premium") {
+        resolvedPlan = "premium";
+      } else if (enrollmentPlan === "pro" || metadataPlan === "pro") {
+        resolvedPlan = "pro";
+      } else if (enrollmentPlan === "starter" || metadataPlan === "starter") {
+        resolvedPlan = "starter";
+      }
+
+      return {
+        id: profile.id,
+        name: resolvedName,
+        email: profile.email || "No Email",
+        role: profile.role?.toLowerCase() || "user",
+        plan: resolvedPlan,
+        todaySessions: userLogs?.sessions || [],
+        todayTimeSpentSeconds: userLogs?.totalSec || 0,
+      };
+    });
+
+    return { success: true, users: transformed };
+  } catch (err: any) {
+    console.error("getAdminUsers error:", err);
+    return { success: false, error: err.message || "Failed to load users" };
   }
 }
