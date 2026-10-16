@@ -283,14 +283,14 @@ export default function AdminCourses() {
   const handleEdit = useCallback(async (course: Course) => {
     setIsEditing(true);
     setEditingCourseId(course.id);
-    setCourseTitle(course.title);
+    setCourseTitle(course.title || "");
     setCourseDescription(course.description || "");
     setModules([]);
     setCourseSections([]);
     setThumbnailFile(null);
     setThumbnailPreview(course.thumbnail_url || "");
     setModalMessage(null);
-    resetActiveFields();
+    setStartDateField("");
     setSelectedScholars([]);
     setSelectedMentors([]);
     setScholarSelectOptions([]);
