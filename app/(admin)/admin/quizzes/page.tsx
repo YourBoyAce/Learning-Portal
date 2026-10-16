@@ -40,11 +40,6 @@ interface Quiz {
   questions: Question[];
 }
 
-interface Product {
-  id: number | string;
-  title: string;
-}
-
 interface DatabaseQuiz {
   id: string;
   course_id: string | number;
@@ -114,9 +109,7 @@ export default function AdminQuizzes() {
   const [questions, setQuestions] = useState<Question[]>(() =>
     createEmptyQuestions(DEFAULT_QUESTION_COUNT),
   );
-  const [selectedProductId, setSelectedProductId] = useState<string | number>("");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string; product_id?: number | string | null }[]>([]);
+  const [dbCourses, setDbCourses] = useState<{ id: string | number; title: string }[]>([]);
 
   // AI Assist question count — drives how many question slots appear below
   const [qCount, setQCount] = useState(DEFAULT_QUESTION_COUNT);
@@ -152,7 +145,7 @@ export default function AdminQuizzes() {
       try {
         const { data, error } = await supabase
           .from("maincourses")
-          .select("id, title, product_id")
+          .select("id, title")
           .order("title", { ascending: true });
         if (data && !error) setDbCourses(data);
       } catch (err) {
@@ -160,19 +153,6 @@ export default function AdminQuizzes() {
       }
     };
     loadCourses();
-
-    const loadProducts = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("id, title")
-          .order("title", { ascending: true });
-        if (data && !error) setProducts(data);
-      } catch (err) {
-        console.error("Failed to load products:", err);
-      }
-    };
-    loadProducts();
 
     void loadQuizzes();
     // The API is intentionally loaded once when the admin page opens.
@@ -185,7 +165,6 @@ export default function AdminQuizzes() {
     setQuizTitle("");
     setCourseName("");
     setCourseId("");
-    setSelectedProductId("");
     setPassingScore(80);
     setStatus("Active");
     setQCount(DEFAULT_QUESTION_COUNT);
@@ -222,14 +201,6 @@ export default function AdminQuizzes() {
     setQuizTitle(quiz.title);
     setCourseName(quiz.courseName);
     setCourseId(quiz.courseId || "");
-
-    if (quiz.courseId) {
-      const match = dbCourses.find(c => String(c.id) === String(quiz.courseId));
-      if (match && match.product_id) setSelectedProductId(String(match.product_id));
-      else setSelectedProductId("");
-    } else {
-      setSelectedProductId("");
-    }
 
     setPassingScore(quiz.passingScore);
     setStatus(quiz.status);
@@ -740,42 +711,23 @@ export default function AdminQuizzes() {
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   />
                 </div>
-                {/* Product */}
+                {/* Associated Course */}
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Product</label>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
                   <select
-                    value={selectedProductId}
+                    value={courseId || courseName}
                     onChange={(e) => {
-                      setSelectedProductId(e.target.value);
-                      setCourseId("");
-                      setCourseName("");
+                      const val = e.target.value;
+                      const match = dbCourses.find((c) => String(c.id) === String(val) || c.title === val);
+                      if (match) { setCourseId(match.id); setCourseName(match.title); }
+                      else { setCourseId(""); setCourseName(val); }
                     }}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
                   >
-                    <option value="">— Select Product —</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    <option value="">— Select Course —</option>
+                    {dbCourses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                   </select>
                 </div>
-              </div>
-
-              {/* Associated Course — full row */}
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">Associated Course</label>
-                <select
-                  value={courseId || courseName}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const match = dbCourses.find((c) => String(c.id) === String(val) || c.title === val);
-                    if (match) { setCourseId(match.id); setCourseName(match.title); }
-                    else { setCourseId(""); setCourseName(val); }
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-gray-50/50"
-                >
-                  <option value="">— Select Course —</option>
-                  {dbCourses
-                    .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
-                    .map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                </select>
               </div>
 
               {/* Passing Score & Status — side by side */}

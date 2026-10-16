@@ -161,12 +161,26 @@ export async function getCourseUserTier(
 
   const targetUserId = phase2User?.id || authUserId;
 
+  let matchingProductId: string | null = null;
+  const { data: crsRow } = await supabaseAdmin
+    .from("maincourses")
+    .select("product_id")
+    .eq("id", courseId)
+    .maybeSingle();
+  if (crsRow?.product_id) {
+    matchingProductId = crsRow.product_id;
+  }
+
+  const orClause = matchingProductId
+    ? `course_id.eq.${courseId},product_id.eq.${courseId},product_id.eq.${matchingProductId}`
+    : `course_id.eq.${courseId},product_id.eq.${courseId}`;
+
   const { data: enrollments } = await supabaseAdmin
     .schema("phase2")
     .from("enrollments")
     .select("*, bundles(bundle_name)")
     .eq("user_id", targetUserId)
-    .or(`course_id.eq.${courseId},product_id.eq.${courseId}`)
+    .or(orClause)
     .eq("status", "active")
     .order("created_at", { ascending: false });
 

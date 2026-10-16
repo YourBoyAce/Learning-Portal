@@ -158,47 +158,20 @@ export async function GET(request: Request) {
   const includeMembers = searchParams.get("includeMembers") === "true";
   const courseIdParam = searchParams.get("courseId");
 
-  // Fetch active maincourses
+  // Fetch all standard courses
   const { data: maincoursesData, error: maincoursesError } = await authContext.supabaseAdmin
     .from("maincourses")
-    .select("*");
+    .select("*")
+    .order("created_at", { ascending: false });
 
   if (maincoursesError) {
     return apiErrorResponse(maincoursesError, undefined, 500);
   }
 
-  // Fetch products (represent "upcoming" planned offerings)
-  const { data: productsData, error: productsError } = await authContext.supabaseAdmin
-    .from("products")
-    .select("id, title, description, thumbnail_url, created_at")
-    .order("created_at", { ascending: false });
-
-  if (productsError) {
-    return apiErrorResponse(productsError, undefined, 500);
-  }
-
-  // Products that already have a linked maincourse are "active" â€” don't show them in upcoming.
-  const linkedProductIds = new Set(
-    ((maincoursesData ?? []) as any[])
-      .map((c) => c.product_id)
-      .filter(Boolean)
-      .map(String),
-  );
-
-  // Products with no linked maincourse = upcoming (planned, not yet built)
-  const upcomingProducts = ((productsData ?? []) as any[])
-    .filter((p) => !linkedProductIds.has(String(p.id)))
-    .map((p) => ({
-      ...p,
-      course_type: "upcoming",
-      _source: "product",
-    }));
-
-  // Return merged: active maincourses + upcoming products
-  const courses = [
-    ...((maincoursesData ?? []) as any[]).map((c) => ({ ...c, _source: "maincourse" })),
-    ...upcomingProducts,
-  ];
+  const courses = ((maincoursesData ?? []) as any[]).map((c) => ({
+    ...c,
+    _source: "maincourse",
+  }));
 
   // â”€â”€ Fetch mentors for active courses â”€â”€
   const { data: allMembers } = await authContext.supabaseAdmin
@@ -512,81 +485,26 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const courseType: string = body?.course_type ?? "active";
+  const title = typeof body?.title === "string" ? body.title.trim() : "";
+  const description = typeof body?.description === "string" ? body.description.trim() : "";
   const thumbnailUrl =
     typeof body?.thumbnail_url === "string" ? body.thumbnail_url.trim() : null;
 
-  // â”€â”€ WORKFLOW 1: Upcoming â†’ insert into products only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (courseType === "upcoming") {
-    const title = typeof body?.title === "string" ? body.title.trim() : "";
-    const description = typeof body?.description === "string" ? body.description.trim() : "";
-    if (!title) return NextResponse.json({ error: "Title is required." }, { status: 400 });
-
-    const { error: productError } = await authContext.supabaseAdmin
-      .from("products")
-      .insert({ title, description: description || null, thumbnail_url: thumbnailUrl || null });
-
-    if (productError) return apiErrorResponse(productError, undefined, 500);
-    return NextResponse.json({ success: true });
+  if (!title) {
+    return NextResponse.json({ error: "Course title is required." }, { status: 400 });
   }
 
-  // â”€â”€ WORKFLOW 2: Active â†’ product + maincourse + modules + members â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const description = typeof body?.description === "string" ? body.description.trim() : "";
-  if (!description) {
-    return NextResponse.json({ error: "Description is required for active courses." }, { status: 400 });
-  }
-
-  // Step 1: Resolve or create product
-  let productId: number | string | null = null;
-  const existingProductId = body?.product_id ?? null;
-  const newProductTitle = typeof body?.new_product_title === "string" ? body.new_product_title.trim() : "";
-  const newProductDescription = typeof body?.new_product_description === "string" ? body.new_product_description.trim() : "";
-  const newProductThumbnail = typeof body?.new_product_thumbnail === "string" ? body.new_product_thumbnail.trim() : null;
-
-  if (existingProductId) {
-    productId = existingProductId;
-  } else if (newProductTitle) {
-    const { data: createdProduct, error: productInsertError } = await authContext.supabaseAdmin
-      .from("products")
-      .insert({
-        title: newProductTitle,
-        description: newProductDescription || null,
-        thumbnail_url: newProductThumbnail || null,
-      })
-      .select("id")
-      .single();
-
-    if (productInsertError) {
-      return apiErrorResponse(productInsertError, undefined, 500);
-    }
-    productId = createdProduct.id;
-  }
-
-  // Step 2: Build internal maincourse title from product + month
-  let internalTitle: string;
-  const productTitle = body?.product_title as string | undefined;
-  const month = typeof body?.month === "string" ? body.month.trim() : "";
-
-  if (productTitle && month) {
-    internalTitle = `${productTitle} - ${month}`;
-  } else if (typeof body?.title === "string" && body.title.trim()) {
-    internalTitle = body.title.trim();
-  } else {
-    return NextResponse.json({ error: "Product and month are required to generate the course title." }, { status: 400 });
-  }
-
-  // Step 3: Insert maincourse
+  // Insert standard course
   const { data: newCourse, error: insertError } = await authContext.supabaseAdmin
     .from("maincourses")
     .insert({
-      title: internalTitle,
-      description,
+      title,
+      description: description || null,
       thumbnail_url: thumbnailUrl || null,
       course_type: "active",
-      ...(productId !== null && { product_id: productId }),
       whatsapp_community_link: body?.whatsapp_community_link || null,
     })
-    .select("id, product_id")
+    .select("id")
     .single();
 
   if (insertError) {
@@ -806,7 +724,7 @@ export async function POST(request: Request) {
           order_id: orderId,
           course_id: newCourse.id,
           bundle_id: starterBundleId,
-          product_id: (newCourse as any)?.product_id || productId,
+          product_id: (newCourse as any)?.product_id || null,
           batch_type: "recorded",
           status: "active",
           access_start_date: new Date().toISOString(),
@@ -845,60 +763,19 @@ export async function PUT(request: Request) {
     ? thumbnailUrl
     : hasThumbnailField ? null : undefined;
 
-  // â”€â”€ Upcoming: edit product record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (courseType === "upcoming") {
-    const productId = body?.id;
-    const title = typeof body?.title === "string" ? body.title.trim() : "";
-    const description = typeof body?.description === "string" ? body.description.trim() : "";
-    if (!productId || !title) {
-      return NextResponse.json({ error: "id and title are required." }, { status: 400 });
-    }
-    const { error: productUpdateError } = await authContext.supabaseAdmin
-      .from("products")
-      .update({
-        title,
-        description: description || null,
-        ...(resolvedThumbnailUrl !== undefined && { thumbnail_url: resolvedThumbnailUrl }),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", productId);
-
-    if (productUpdateError) {
-      return apiErrorResponse(productUpdateError, undefined, 500);
-    }
-    return NextResponse.json({ success: true });
-  }
-
-  // â”€â”€ Active: edit maincourse record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const id = normalizeId(body?.id);
   const description = typeof body?.description === "string" ? body.description.trim() : "";
+  const title = typeof body?.title === "string" ? body.title.trim() : undefined;
 
   if (id === null) {
     return NextResponse.json({ error: "id is required." }, { status: 400 });
   }
-  if (!description) {
-    return NextResponse.json({ error: "Description is required for active courses." }, { status: 400 });
-  }
-
-  // Build the internal title if product + month provided
-  let titleUpdate: string | undefined;
-  const productTitle = body?.product_title as string | undefined;
-  const month = typeof body?.month === "string" ? body.month.trim() : "";
-
-  if (productTitle && month) {
-    titleUpdate = `${productTitle} - ${month}`;
-  } else if (typeof body?.title === "string" && body.title.trim()) {
-    // Direct title provided (e.g. edit where product/month were not re-selected)
-    titleUpdate = body.title.trim();
-  }
-  // If titleUpdate remains undefined, the existing title in the DB is preserved.
 
   const updatePayload: Record<string, unknown> = {
-    description,
     course_type: "active",
-    ...(titleUpdate && { title: titleUpdate }),
+    ...(title && { title }),
+    ...(description !== undefined && { description }),
     ...(resolvedThumbnailUrl !== undefined && { thumbnail_url: resolvedThumbnailUrl }),
-    ...(body?.product_id !== undefined && body?.product_id !== "" && { product_id: body.product_id }),
     ...(body?.whatsapp_community_link !== undefined && { whatsapp_community_link: body.whatsapp_community_link || null }),
   };
 
@@ -1404,50 +1281,10 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Valid id is required." }, { status: 400 });
   }
 
-  // â”€â”€ Upcoming â†’ delete from products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (source === "product") {
-    const admin = authContext.supabaseAdmin;
-
-    // Clear dependents that reference this product so the delete cannot be blocked.
-    await admin.from("maincourses").update({ product_id: null }).eq("product_id", id);
-    await admin.from("batches").delete().eq("product_id", id);
-    await admin.from("course_ratings").delete().eq("product_id", id);
-    await admin.schema("phase2").from("enrollments").delete().eq("product_id", id);
-
-    const { data: deletedProducts, error: productDeleteError } = await admin
-      .from("products")
-      .delete()
-      .eq("id", id)
-      .select("id");
-
-    if (productDeleteError) {
-      return apiErrorResponse(productDeleteError, undefined, 500);
-    }
-
-    if (!deletedProducts || deletedProducts.length === 0) {
-      return NextResponse.json(
-        { error: "Upcoming course not found or already deleted." },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  }
-
-  // â”€â”€ Active â†’ delete maincourse and all related data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  // Fetch the product_id linked to this maincourse before deleting it
-  const { data: courseRow } = await authContext.supabaseAdmin
-    .from("maincourses")
-    .select("product_id")
-    .eq("id", id)
-    .maybeSingle();
-
-  const linkedProductId = (courseRow as any)?.product_id ?? null;
-
   await authContext.supabaseAdmin.from("course_members").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("batches").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("coursemodules").delete().eq("maincourse_id", id);
+  await authContext.supabaseAdmin.from("course_sections").delete().eq("maincourse_id", id);
   await authContext.supabaseAdmin.from("user_video_progress").delete().eq("course_id", id);
   await authContext.supabaseAdmin.schema("phase2").from("enrollments").delete().eq("course_id", id);
   await authContext.supabaseAdmin.from("course_ratings").delete().eq("course_id", id);
@@ -1461,11 +1298,6 @@ export async function DELETE(request: Request) {
 
   if (deleteError) {
     return apiErrorResponse(deleteError, undefined, 500);
-  }
-
-  // Delete the linked product so it doesn't reappear as an "upcoming" course
-  if (linkedProductId !== null) {
-    await authContext.supabaseAdmin.from("products").delete().eq("id", linkedProductId);
   }
 
   return NextResponse.json({ success: true });

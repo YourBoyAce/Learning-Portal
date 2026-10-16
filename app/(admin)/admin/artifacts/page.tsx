@@ -43,13 +43,6 @@ interface Artifact {
   filePath?: string;
 }
 
-interface Product {
-  id: number | string;
-  title: string;
-}
-
-
-
 export default function AdminArtifacts() {
   const getArtifactBucketCandidates = () =>
     Array.from(
@@ -123,8 +116,7 @@ export default function AdminArtifacts() {
   const [deletingArtifact, setDeletingArtifact] =
     useState<Artifact | null>(null);
 
-  const [selectedProductId, setSelectedProductId] = useState<string | number>("");
-  const [products, setProducts] = useState<Product[]>([]);
+
 
   const handleDownload = (art: Artifact) => {
     if (!art.fileUrl) {
@@ -136,7 +128,7 @@ export default function AdminArtifacts() {
 
   // Courses
   const [dbCourses, setDbCourses] = useState<
-    { id: string | number; title: string; product_id?: number | string | null }[]
+    { id: string | number; title: string }[]
   >([]);
 
   /* =========================================================
@@ -146,26 +138,13 @@ export default function AdminArtifacts() {
   useEffect(() => {
     loadCourses();
     loadArtifacts();
-    loadProducts();
   }, []);
-
-  const loadProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, title")
-        .order("title", { ascending: true });
-      if (data && !error) setProducts(data);
-    } catch (err) {
-      console.error("Failed to load products:", err);
-    }
-  };
 
   const loadCourses = async () => {
     try {
       const { data, error } = await supabase
         .from("maincourses")
-        .select("id, title, product_id")
+        .select("id, title")
         .order("title", { ascending: true });
 
       if (error) {
@@ -267,7 +246,6 @@ export default function AdminArtifacts() {
     setArtType("PDF");
     setCourseId("");
     setCourseName("");
-    setSelectedProductId("");
     setArtSize("1.0 MB");
     setStatus("Published");
     setDescription("");
@@ -286,14 +264,6 @@ export default function AdminArtifacts() {
     setArtType(art.type);
     setCourseName(art.courseName);
     setCourseId(art.courseId || "");
-    
-    if (art.courseId) {
-      const match = dbCourses.find(c => String(c.id) === String(art.courseId));
-      if (match && match.product_id) setSelectedProductId(String(match.product_id));
-      else setSelectedProductId("");
-    } else {
-      setSelectedProductId("");
-    }
 
     setArtSize(art.size);
     setStatus(art.status);
@@ -1068,58 +1038,30 @@ export default function AdminArtifacts() {
                 />
               </div>
 
-              {/* Product and Course */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Product */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Product
-                  </label>
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => {
-                      setSelectedProductId(e.target.value);
-                      setCourseId("");
-                      setCourseName("");
-                    }}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
-                  >
-                    <option value="">— Select Product —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Course Selection */}
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Associated Course
-                  </label>
-                  <select
-                    value={courseId}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      setCourseId(selectedId);
-                      const courseObj = dbCourses.find((c) => String(c.id) === String(selectedId));
-                      if (courseObj) {
-                        setCourseName(courseObj.title);
-                      }
-                    }}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
-                  >
-                    <option value="">— Select Course —</option>
-                    {dbCourses
-                      .filter((c) => !selectedProductId || String(c.product_id) === String(selectedProductId))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.title}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+              {/* Course Selection */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Associated Course
+                </label>
+                <select
+                  value={courseId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setCourseId(selectedId);
+                    const courseObj = dbCourses.find((c) => String(c.id) === String(selectedId));
+                    if (courseObj) {
+                      setCourseName(courseObj.title);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-gray-50/50 focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                >
+                  <option value="">— Select Course —</option>
+                  {dbCourses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Type & Status */}

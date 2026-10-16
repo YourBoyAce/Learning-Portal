@@ -353,7 +353,7 @@ export default function MyLearningDashboard() {
       const { data: enrollmentsData } = await supabase
         .schema("phase2")
         .from("enrollments")
-        .select("course_id, users!inner(auth_user_id)")
+        .select("course_id, product_id, users!inner(auth_user_id)")
         .eq("users.auth_user_id", session.user.id)
         .eq("status", "active");
 
@@ -363,14 +363,15 @@ export default function MyLearningDashboard() {
         .eq("email", userEmail)
         .eq("status", "active");
 
-      const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id) || [];
-      const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id) || [];
+      const enrollmentCourseIds = enrollmentsData?.map((e: any) => e.course_id).filter(Boolean) || [];
+      const enrollmentProductIds = enrollmentsData?.map((e: any) => e.product_id).filter(Boolean) || [];
+      const memberCourseIds = courseMembersData?.map((m: any) => m.maincourse_id).filter(Boolean) || [];
       
-      const allCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+      const directCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
 
       let validEnrollments: any[] = [];
-      if (allCourseIds.length > 0) {
-        const { data: maincoursesData } = await supabase
+      if (directCourseIds.length > 0 || enrollmentProductIds.length > 0) {
+        let courseQuery = supabase
           .from("maincourses")
           .select(`
             id,
@@ -381,9 +382,19 @@ export default function MyLearningDashboard() {
             product_id,
             whatsapp_community_link,
             coursemodules (*)
-          `)
-          .in("id", allCourseIds);
+          `);
 
+        if (directCourseIds.length > 0 && enrollmentProductIds.length > 0) {
+          courseQuery = courseQuery.or(
+            `id.in.(${directCourseIds.join(",")}),product_id.in.(${enrollmentProductIds.join(",")})`
+          );
+        } else if (directCourseIds.length > 0) {
+          courseQuery = courseQuery.in("id", directCourseIds);
+        } else {
+          courseQuery = courseQuery.in("product_id", enrollmentProductIds);
+        }
+
+        const { data: maincoursesData } = await courseQuery;
         if (maincoursesData) {
           validEnrollments = maincoursesData.map(mc => ({ maincourses: mc }));
         }

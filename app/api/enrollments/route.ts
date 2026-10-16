@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   const { data: memberRows, error: memberError } = await authContext.supabaseAdmin
     .schema("phase2")
     .from("enrollments")
-    .select("course_id, users!inner(auth_user_id)")
+    .select("course_id, product_id, users!inner(auth_user_id)")
     .eq("users.auth_user_id", authContext.user.id)
     .eq("status", "active");
 
@@ -100,21 +100,33 @@ export async function GET(request: Request) {
     .map((row) => row.course_id)
     .filter((value) => value !== null && value !== undefined);
 
+  const enrollmentProductIds = ((memberRows ?? []) as any[])
+    .map((row) => row.product_id)
+    .filter((value) => value !== null && value !== undefined);
+
   const memberCourseIds = ((courseMembersData ?? []) as any[])
     .map((row) => row.maincourse_id)
     .filter((value) => value !== null && value !== undefined);
 
-  const courseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
+  const directCourseIds = Array.from(new Set([...enrollmentCourseIds, ...memberCourseIds]));
 
-  if (courseIds.length === 0) {
+  let courseQuery = authContext.supabaseAdmin
+    .from("maincourses")
+    .select("id, title, description, category, thumbnail_url, created_at, product_id");
+
+  if (directCourseIds.length > 0 && enrollmentProductIds.length > 0) {
+    courseQuery = courseQuery.or(
+      `id.in.(${directCourseIds.join(",")}),product_id.in.(${enrollmentProductIds.join(",")})`
+    );
+  } else if (directCourseIds.length > 0) {
+    courseQuery = courseQuery.in("id", directCourseIds);
+  } else if (enrollmentProductIds.length > 0) {
+    courseQuery = courseQuery.in("product_id", enrollmentProductIds);
+  } else {
     return NextResponse.json({ success: true, enrollments: [] });
   }
 
-  const { data: courseRows, error: courseError } = await authContext.supabaseAdmin
-    .from("maincourses")
-    .select("id, title, description, category, thumbnail_url, created_at")
-    .in("id", courseIds)
-    .order("created_at", { ascending: false });
+  const { data: courseRows, error: courseError } = await courseQuery.order("created_at", { ascending: false });
 
   if (courseError) {
     return apiErrorResponse(courseError, undefined, 500);
@@ -122,7 +134,9 @@ export async function GET(request: Request) {
 
   const enrollments = ((courseRows ?? []) as any[]).map((course) => {
     // Find the matching enrollment row
-    const matchingEnrollment = memberRows?.find(r => r.course_id === course.id);
+    const matchingEnrollment = memberRows?.find(
+      (r) => r.course_id === course.id || (course.product_id && r.product_id === course.product_id)
+    );
     const isMentorAssignment = !matchingEnrollment && memberCourseIds.includes(course.id);
     const batchName = isMentorAssignment ? "Mentor Assignment" : (matchingEnrollment ? course.title : "");
 

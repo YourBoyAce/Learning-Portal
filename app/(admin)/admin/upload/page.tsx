@@ -26,12 +26,6 @@ type Course = {
   created_at?: string | undefined;
   batch_name?: string | null;
   course_type?: string;
-  product_id?: string | number | null;
-};
-
-type Product = {
-  id: string | number;
-  title: string;
 };
 
 type Module = {
@@ -58,12 +52,10 @@ export default function UploadPage() {
 
   const [userId, setUserId] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
 
   const [selectedCurriculum, setSelectedCurriculum] =
     useState(preselectedCourseId);
-  const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedModuleId, setSelectedModuleId] = useState("");
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
   const [newModuleTitle, setNewModuleTitle] = useState("");
@@ -141,16 +133,6 @@ export default function UploadPage() {
         : [];
       setCourses(loadedCourses);
 
-      const productsRes = await fetch("/api/admin/products", {
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-      const productsResult = await productsRes.json().catch(() => null);
-      if (productsRes.ok && Array.isArray(productsResult?.products)) {
-        setProducts(productsResult.products);
-      }
-
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch courses.");
@@ -176,23 +158,6 @@ export default function UploadPage() {
 
     void init();
   }, []);
-
-  // Filter courses by selected product
-  const filteredCourses = useMemo(() => {
-    if (!selectedProductId) return [];
-    return activeCourses.filter(
-      (c) => String(c.product_id) === String(selectedProductId),
-    );
-  }, [activeCourses, selectedProductId]);
-
-  // Reset course, section, and module when product changes
-  useEffect(() => {
-    setSelectedCurriculum("");
-    setSelectedModuleId("");
-    setSelectedSectionId("");
-    setModules([]);
-    setSections([]);
-  }, [selectedProductId]);
 
   // When course changes, load its sections and modules
   useEffect(() => {
@@ -485,13 +450,12 @@ export default function UploadPage() {
 
     if (
       !selectedCurriculum ||
-      !selectedProductId ||
       !selectedModuleId ||
       !effectiveVideoTitle ||
       !selectedFile
     ) {
       setError(
-        "Please select a course, a batch, a module, and choose a video file.",
+        "Please select a course, a module, and choose a video file.",
       );
       return;
     }
@@ -802,51 +766,17 @@ export default function UploadPage() {
               </h3>
 
               <form onSubmit={handleUploadVideo} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Select Product */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Select Product
-                    </label>
-                    <select
-                      value={selectedProductId}
-                      onChange={(e) => setSelectedProductId(e.target.value)}
-                      className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
-                        !selectedProductId ? "!text-gray-400" : "!text-gray-900"
-                      } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
-                      style={{
-                        fontSize: TYPOGRAPHY.CAPTION.fontSize,
-                        lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
-                        fontWeight: TYPOGRAPHY.CAPTION.fontWeight,
-                      }}
-                    >
-                      <option value="" className="text-gray-400">
-                        Select product...
-                      </option>
-                      {products.map((product) => (
-                        <option
-                          key={product.id}
-                          value={String(product.id)}
-                          className="text-gray-900"
-                        >
-                          {product.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Select Course */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Select Course
-                    </label>
+                {/* Select Course */}
+                <div>
+                  <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                    Select Course
+                  </label>
                   <select
                     value={selectedCurriculum}
                     onChange={(e) => setSelectedCurriculum(e.target.value)}
-                    disabled={!selectedProductId}
                     className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
                       !selectedCurriculum ? "!text-gray-400" : "!text-gray-900"
-                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer disabled:opacity-50`}
+                    } w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer`}
                     style={{
                       fontSize: TYPOGRAPHY.CAPTION.fontSize,
                       lineHeight: TYPOGRAPHY.CAPTION.lineHeight,
@@ -854,13 +784,9 @@ export default function UploadPage() {
                     }}
                   >
                     <option value="" className="text-gray-400">
-                      {!selectedProductId
-                        ? "Select a product first..."
-                        : filteredCourses.length === 0
-                          ? "No courses found for this product"
-                          : "Select course..."}
+                      Select course...
                     </option>
-                    {filteredCourses.map((course) => (
+                    {activeCourses.map((course) => (
                       <option
                         key={course.id}
                         value={String(course.id)}
@@ -870,7 +796,6 @@ export default function UploadPage() {
                       </option>
                     ))}
                   </select>
-                </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

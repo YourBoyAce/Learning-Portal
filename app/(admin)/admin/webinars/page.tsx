@@ -35,11 +35,6 @@ interface Webinar {
   batch_id?: number | string | null;
 }
 
-interface Product {
-  id: number | string;
-  title: string;
-}
-
 export default function AdminWebinarsPage() {
   const [webinars, setWebinars] = useState<Webinar[]>([]);
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
@@ -67,15 +62,13 @@ export default function AdminWebinarsPage() {
   const [status, setStatus] = useState("streaming");
   const [linkText, setLinkText] = useState("");
   const [attendeesCount, setAttendeesCount] = useState(0);
-  const [selectedProductId, setSelectedProductId] = useState<string | number>(
+  const [selectedCourseId, setSelectedCourseId] = useState<string | number>(
     "",
   );
-  const [products, setProducts] = useState<Product[]>([]);
   const [dbCourses, setDbCourses] = useState<
     {
       id: string | number;
       title: string;
-      product_id?: number | string | null;
     }[]
   >([]);
   const [batchSchedule, setBatchSchedule] = useState("all");
@@ -84,27 +77,14 @@ export default function AdminWebinarsPage() {
   useEffect(() => {
     /* eslint-disable */
     fetchWebinars();
-    fetchProducts();
     fetchCourses();
   }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, title")
-        .order("title", { ascending: true });
-      if (data && !error) setProducts(data);
-    } catch (err) {
-      console.error("Failed to fetch products:", err);
-    }
-  };
 
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
         .from("maincourses")
-        .select("id, title, product_id")
+        .select("id, title")
         .order("title", { ascending: true });
       if (data && !error) setDbCourses(data);
     } catch (err) {
@@ -141,7 +121,7 @@ export default function AdminWebinarsPage() {
       setStatus(webinar.status || "streaming");
       setLinkText(webinar.link_text || "");
       setAttendeesCount(webinar.attendees_count || 0);
-      setSelectedProductId("");
+      setSelectedCourseId("");
       setBatchSchedule("all");
       setInvitePremiumOnly(true);
     } else {
@@ -155,7 +135,7 @@ export default function AdminWebinarsPage() {
       setStatus("streaming");
       setLinkText("");
       setAttendeesCount(0);
-      setSelectedProductId("");
+      setSelectedCourseId("");
       setBatchSchedule("all");
       setInvitePremiumOnly(true);
     }
@@ -809,22 +789,22 @@ export default function AdminWebinarsPage() {
                     </select>
                   </div>
 
-                  {/* Product */}
+                  {/* Course */}
                   <div>
                     <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                      Product
+                      Course
                     </label>
                     <select
-                      value={selectedProductId}
+                      value={selectedCourseId}
                       onChange={(e) => {
-                        setSelectedProductId(e.target.value);
+                        setSelectedCourseId(e.target.value);
                       }}
                       className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all appearance-none text-gray-700"
                     >
-                      <option value="">— Select Product —</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.title}
+                      <option value="">— Select Course —</option>
+                      {dbCourses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
                         </option>
                       ))}
                     </select>

@@ -144,7 +144,8 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
   const plan = String(formData.get("plan") || "starter")
     .trim()
     .toLowerCase();
-  const productId = String(formData.get("productId") || "").trim();
+  const courseId = String(formData.get("courseId") || formData.get("productId") || "").trim();
+  const productId = courseId;
   const phoneInput = String(formData.get("phone") || "").trim();
   const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
   const normalizedPlan = ["starter", "pro", "premium"].includes(plan)
@@ -257,16 +258,25 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
         console.error("Phase 2 User creation exception:", p2Err);
       }
 
-      // 2c. If productId is provided, assign the latest course of that product with the chosen plan
-      if (productId) {
+      // 2c. If courseId/productId is provided, assign the course with the chosen plan
+      if (courseId) {
         try {
-          const { data: latestCourse } = await supabaseAdmin
+          let { data: latestCourse } = await supabaseAdmin
             .from("maincourses")
             .select("id, title, product_id")
-            .eq("product_id", productId)
-            .order("created_at", { ascending: false })
-            .limit(1)
+            .eq("id", courseId)
             .maybeSingle();
+
+          if (!latestCourse) {
+            const { data: fallbackCourse } = await supabaseAdmin
+              .from("maincourses")
+              .select("id, title, product_id")
+              .eq("product_id", courseId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            latestCourse = fallbackCourse;
+          }
 
           if (latestCourse?.id) {
             assignedCourseTitle = latestCourse.title;

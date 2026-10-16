@@ -42,9 +42,7 @@ interface Course {
   created_at?: string;
   category?: string;
   course_type?: string;
-  product_id?: number | string | null;
   whatsapp_community_link?: string | null;
-  _source?: "maincourse" | "product"; // sentinel from API
   assigned_mentors?: { full_name: string }[];
 }
 
@@ -106,19 +104,18 @@ function buildSelectedOptions(emails: string[], options: SelectOption[]): Select
 }
 
 export default function AdminCourses() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [courseType, setCourseType] = useState<"active" | "upcoming">("active");
-  const router = useRouter();
-  const searchParams = useSearchParams();
   // Create/Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState<
     number | string | null
   >(null);
-  const [courseTitle, setCourseTitle] = useState(""); // used for upcoming (product title) and legacy
+  const [courseTitle, setCourseTitle] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
   interface ModuleQuestion {
     questionType?: "mc" | "text";
@@ -182,60 +179,13 @@ export default function AdminCourses() {
     setPreviewFinished(false);
   };
 
-  // â”€â”€ Product-layer state (Active workflow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  interface Product {
-    id: number | string;
-    title: string;
-    description?: string;
-    thumbnail_url?: string | null;
-  }
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productMode, setProductMode] = useState<"existing" | "new">(
-    "existing",
-  );
-  const [selectedProductId, setSelectedProductId] = useState<string>("");
-  const [selectedProductName, setSelectedProductName] = useState<string>("");
-  const [newProductTitle, setNewProductTitle] = useState("");
-  const [newProductDescription, setNewProductDescription] = useState("");
-  const [newProductThumbnailFile, setNewProductThumbnailFile] =
-    useState<File | null>(null);
-  const [newProductThumbnailPreview, setNewProductThumbnailPreview] =
-    useState<string>("");
-  const [batchMonth, setBatchMonth] = useState(""); // e.g. "June"
-  const [batchYear, setBatchYear] = useState(() =>
-    String(new Date().getFullYear()),
-  );
-
-  const [startDateField, setStartDateField] = useState("");
   const [whatsappLink, setWhatsappLink] = useState("");
-  // Generated internal title preview
-  const generatedTitle = (() => {
-    const productTitle =
-      productMode === "existing"
-        ? (products.find((p) => String(p.id) === selectedProductId)?.title ??
-          "")
-        : newProductTitle.trim();
-    if (!productTitle || !batchMonth) return "";
-    return `${productTitle} - ${batchMonth} ${batchYear}`;
-  })();
+  const [startDateField, setStartDateField] = useState("");
 
   // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
-
-  // Custom product dropdown state
-  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
-
-  // Product delete confirmation modal state
-  const [showProductDeleteConfirm, setShowProductDeleteConfirm] = useState(false);
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-
-  // Product inline-edit state
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [editingProductTitle, setEditingProductTitle] = useState("");
-  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // â”€â”€ Member/Mentor assignment state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [profileUsers, setProfileUsers] = useState<Profile[]>([]);
@@ -269,17 +219,6 @@ export default function AdminCourses() {
       if (response.ok && Array.isArray(result?.courses)) {
         setCourses(result.courses);
       }
-
-      // Also fetch products for the active-course modal dropdown
-      const productsRes = await fetch("/api/admin/products", {
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-      const productsResult = await productsRes.json().catch(() => null);
-      if (productsRes.ok && Array.isArray(productsResult?.products)) {
-        setProducts(productsResult.products);
-      }
     } catch (error) {
       console.error("Failed to fetch courses:", error);
     } finally {
@@ -292,15 +231,10 @@ export default function AdminCourses() {
   }, [fetchCourses]);
 
   const resetActiveFields = () => {
-    setProductMode("existing");
-    setSelectedProductId("");
-    setSelectedProductName("");
-    setNewProductTitle("");
-    setNewProductDescription("");
-    setNewProductThumbnailFile(null);
-    setNewProductThumbnailPreview("");
-    setBatchMonth("");
-    setBatchYear(String(new Date().getFullYear()));
+    setCourseTitle("");
+    setCourseDescription("");
+    setThumbnailFile(null);
+    setThumbnailPreview("");
     setStartDateField("");
     setWhatsappLink("");
     setSelectedScholars([]);
@@ -313,7 +247,6 @@ export default function AdminCourses() {
   const handleCreateNew = () => {
     setIsEditing(false);
     setEditingCourseId(null);
-    setCourseType("active");
     setCourseTitle("");
     setCourseDescription("");
     setModules([]);
@@ -363,44 +296,6 @@ export default function AdminCourses() {
     setScholarSelectOptions([]);
     setMentorSelectOptions([]);
     setIsLoadingMembers(true);
-
-    // Detect if this is an upcoming product or an active maincourse
-    if (course._source === "product" || course.course_type === "upcoming") {
-      setCourseType("upcoming");
-      setShowModal(true);
-      return;
-    }
-
-    // Active maincourse â€” pre-fill product + month from title
-    setCourseType("active");
-    if (course.product_id) {
-      setSelectedProductId(String(course.product_id));
-      setProductMode("existing");
-      // Store the product name directly so the edit field shows it immediately
-      // even before the products array renders. Try from loaded products first,
-      // then fall back to parsing from the internal title.
-      const loadedProduct = products.find((p) => String(p.id) === String(course.product_id));
-      if (loadedProduct) {
-        setSelectedProductName(loadedProduct.title);
-      } else {
-        // Parse from title like "Playwright - June 2026 Weekday" â†’ "Playwright"
-        const nameFromTitle = course.title.split(" - ")[0]?.trim() ?? "";
-        setSelectedProductName(nameFromTitle);
-      }
-    }
-    // Parse month and year from internal title (e.g. "Playwright - June 2026 Weekday")
-    const titleMatch = course.title.match(/- (\w+)(?:\s+(\d{4}))?/);
-    if (titleMatch) {
-      setBatchMonth(titleMatch[1]);
-      const parsedYear = titleMatch[2] ? Number(titleMatch[2]) : null;
-      const currentYear = new Date().getFullYear();
-      // Clamp: if the year from the title is in the past, use current year
-      if (parsedYear && parsedYear >= currentYear) {
-        setBatchYear(String(parsedYear));
-      } else {
-        setBatchYear(String(currentYear));
-      }
-    }
 
     setWhatsappLink(course.whatsapp_community_link || "");
     setShowModal(true);
@@ -729,15 +624,6 @@ export default function AdminCourses() {
     }
   };
 
-  const handleNewProductThumbnailChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setNewProductThumbnailFile(file);
-      setNewProductThumbnailPreview(URL.createObjectURL(file));
-    }
-  };
 
   const uploadThumbnail = async (file: File): Promise<string | null> => {
     const fileExt = file.name.split(".").pop();
@@ -779,117 +665,18 @@ export default function AdminCourses() {
         thumbnailUrl = undefined;
       }
 
-      // â”€â”€ WORKFLOW 1: Upcoming â†’ save/update product only â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      if (courseType === "upcoming") {
-        if (!courseTitle.trim()) {
-          setModalMessage({
-            type: "error",
-            text: "Please add a product title.",
-          });
-          setIsSaving(false);
-          return;
-        }
-
-        const payload = {
-          ...(isEditing ? { id: editingCourseId } : {}),
-          title: courseTitle.trim(),
-          description: courseDescription.trim() || null,
-          ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
-        };
-
-        const res = await fetch("/api/admin/products", {
-          method: isEditing ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const result = await res.json().catch(() => null);
-        if (!res.ok)
-          throw new Error(result?.error || `Request failed (${res.status}).`);
-
-        await fetchCourses();
-        setShowModal(false);
-        setCourseTitle("");
-        setCourseDescription("");
-        setThumbnailFile(null);
-        setThumbnailPreview("");
-        return;
-      }
-
-      // â”€â”€ WORKFLOW 2: Active â†’ product + maincourse + modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      if (!isEditing && !batchMonth) {
-        setModalMessage({ type: "error", text: "Please select a month." });
+      if (!courseTitle.trim()) {
+        setModalMessage({ type: "error", text: "Please enter a course title." });
         setIsSaving(false);
         return;
-      }
-      if (!courseDescription.trim()) {
-        setModalMessage({ type: "error", text: "Please add a description." });
-        setIsSaving(false);
-        return;
-      }
-      if (!isEditing && productMode === "existing" && !selectedProductId) {
-        setModalMessage({ type: "error", text: "Please select a product." });
-        setIsSaving(false);
-        return;
-      }
-      if (productMode === "new" && !newProductTitle.trim()) {
-        setModalMessage({
-          type: "error",
-          text: "Please enter the new product title.",
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      // Upload new-product thumbnail separately if provided
-      let newProductThumbnailUrl: string | null = null;
-      if (productMode === "new" && newProductThumbnailFile) {
-        newProductThumbnailUrl = await uploadThumbnail(newProductThumbnailFile);
-      }
-
-      const selectedProduct = products.find(
-        (p) => String(p.id) === selectedProductId,
-      );
-      const productTitle =
-        productMode === "existing"
-          ? (selectedProduct?.title ?? "")
-          : newProductTitle.trim();
-
-      let finalCourseThumbnailUrl = thumbnailUrl;
-      if (!isEditing && thumbnailUrl === undefined) {
-        finalCourseThumbnailUrl = productMode === "new" ? newProductThumbnailUrl : (selectedProduct?.thumbnail_url || null);
-      } else if (isEditing && thumbnailUrl === null) {
-        finalCourseThumbnailUrl = productMode === "new" ? newProductThumbnailUrl : (selectedProduct?.thumbnail_url || null);
       }
 
       const body = {
         ...(isEditing && editingCourseId ? { id: editingCourseId } : {}),
-        course_type: "active",
-        // For edits, always send the current title as a direct fallback
-        // so the API can update it even if product+month aren't re-selected
-        ...(isEditing && courseTitle.trim() ? { title: courseTitle.trim() } : {}),
-        // Product resolution
-        ...(productMode === "existing"
-          ? { product_id: selectedProductId, product_title: productTitle }
-          : {}),
-        ...(productMode === "new"
-          ? {
-            new_product_title: newProductTitle.trim(),
-            new_product_description: newProductDescription.trim(),
-            ...(newProductThumbnailUrl && {
-              new_product_thumbnail: newProductThumbnailUrl,
-            }),
-            product_title: newProductTitle.trim(),
-          }
-          : {}),
-        // Batch fields
-        month: batchMonth ? `${batchMonth} ${batchYear}` : "",
-        start_date: startDateField || null,
-        whatsapp_community_link: whatsappLink.trim() || null,
+        title: courseTitle.trim(),
         description: courseDescription.trim(),
-        ...(finalCourseThumbnailUrl !== undefined && { thumbnail_url: finalCourseThumbnailUrl }),
+        whatsapp_community_link: whatsappLink.trim() || null,
+        ...(thumbnailUrl !== undefined && { thumbnail_url: thumbnailUrl }),
         // Send sections with nested modules if sections exist
         ...(courseSections.length > 0
           ? {
@@ -966,112 +753,7 @@ export default function AdminCourses() {
     }
   };
 
-  const handleDeleteProduct = async (product: Product) => {
-    // Show styled confirmation modal instead of window.confirm
-    setDeletingProduct(product);
-    setShowProductDeleteConfirm(true);
-  };
 
-  const handleConfirmDeleteProduct = async () => {
-    if (!deletingProduct) return;
-
-    try {
-      setIsDeletingProduct(true);
-      setModalMessage(null);
-
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("Please log in again to continue.");
-      }
-
-      const response = await fetch(
-        `/api/admin/products?id=${encodeURIComponent(String(deletingProduct.id))}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
-        },
-      );
-
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(result?.error || "Failed to delete product.");
-      }
-
-      if (selectedProductId === String(deletingProduct.id)) {
-        setSelectedProductId("");
-      }
-
-      await fetchCourses();
-      setModalMessage({
-        type: "success",
-        text: `Removed "${deletingProduct.title}" from products.`,
-      });
-      setShowProductDeleteConfirm(false);
-      setDeletingProduct(null);
-    } catch (error) {
-      setModalMessage({
-        type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to delete product. Please try again.",
-      });
-    } finally {
-      setIsDeletingProduct(false);
-    }
-  };
-
-  const handleSaveProductEdit = async (productId: string | number) => {
-    if (!editingProductTitle.trim()) {
-      setEditingProductId(null);
-      return;
-    }
-    try {
-      setIsSavingProduct(true);
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        throw new Error("Please log in again to continue.");
-      }
-
-      const res = await fetch("/api/admin/products", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-        body: JSON.stringify({
-          id: productId,
-          title: editingProductTitle.trim(),
-        }),
-      });
-
-      if (!res.ok) {
-        const result = await res.json().catch(() => null);
-        throw new Error(result?.error || "Failed to update product.");
-      }
-
-      setProducts(
-        products.map((p) =>
-          p.id === productId ? { ...p, title: editingProductTitle.trim() } : p
-        )
-      );
-      setEditingProductId(null);
-    } catch (error) {
-      setModalMessage({
-        type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to update product.",
-      });
-    } finally {
-      setIsSavingProduct(false);
-    }
-  };
 
   const handleDeleteClick = (course: Course) => {
     setModalMessage(null);
@@ -1114,14 +796,7 @@ export default function AdminCourses() {
         throw new Error("Please log in again to continue.");
       }
 
-      const isProduct =
-        deletingCourse._source === "product" ||
-        deletingCourse.course_type === "upcoming";
-      const url = isProduct
-        ? `/api/admin/courses?id=${deletingCourse.id}&source=product`
-        : `/api/admin/courses?id=${deletingCourse.id}&source=maincourse`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`/api/admin/courses?id=${deletingCourse.id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1129,7 +804,6 @@ export default function AdminCourses() {
         },
         body: JSON.stringify({
           id: deletingCourse.id,
-          source: isProduct ? "product" : "maincourse",
         }),
       });
 
@@ -1165,9 +839,6 @@ export default function AdminCourses() {
       return dateB - dateA; // Descending order (newest first)
     });
 
-  const activeCoursesCount = courses.filter((c) => c.course_type !== "upcoming").length;
-  const upcomingCoursesCount = courses.filter((c) => c.course_type === "upcoming").length;
-
   const stats = [
     {
       label: "Total Courses",
@@ -1175,14 +846,9 @@ export default function AdminCourses() {
       icon: ICONS.BOOK,
     },
     {
-      label: "Active Courses",
-      value: activeCoursesCount.toString(),
+      label: "Active Cohorts",
+      value: courses.length.toString(),
       icon: ICONS.GLOBE,
-    },
-    {
-      label: "Upcoming Courses",
-      value: upcomingCoursesCount.toString(),
-      icon: ICONS.CLOCK,
     },
   ];
 
@@ -1381,133 +1047,50 @@ export default function AdminCourses() {
           </div>
         )}
 
-        {/* Derive our split lists right in the JSX */}
-        {!loading && filteredCourses.length > 0 && (() => {
-          // Split the courses based on course_type
-          const activeCourses = filteredCourses.filter(
-            (c) => c.course_type !== "upcoming",
-          );
-          const upcomingCourses = filteredCourses.filter(
-            (c) => c.course_type === "upcoming",
-          );
-
-          return (
-            <>
-              {/* --- 1. ACTIVE COURSES SECTION --- */}
-              <div className="relative">
-                {!loading && activeCourses.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <BookOpen className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-lg text-gray-900 font-bold mb-2">
-                      No active courses found
-                    </p>
-                    <p className="text-sm text-gray-500 mb-6 max-w-md">
-                      Get started by creating your first active course to
-                      populate this section.
-                    </p>
-                  </div>
-                ) : (
-                  <Carousel
-                    opts={{
-                      align: "start",
-                      loop: false,
-                      dragFree: true,
-                    }}
-                    className="w-full"
+        {/* Course Cards Grid / Carousel */}
+        {!loading && filteredCourses.length > 0 && (
+          <div className="relative">
+            <Carousel
+              opts={{
+                align: "start",
+                loop: false,
+                dragFree: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
+                {filteredCourses.map((course) => (
+                  <CarouselItem
+                    key={course.id}
+                    className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/2 xl:basis-1/3"
                   >
-                    <CarouselContent className="-ml-4 sm:-ml-6 pb-6">
-                      {activeCourses.map((course) => (
-                        <CarouselItem
-                          key={course.id}
-                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-1/2 lg:basis-1/2 xl:basis-1/3"
-                        >
-                          <CourseCard
-                            id={course.id}
-                            title={course.title}
-                            description={course.description}
-                            thumbnail={course.thumbnail_url}
-                            courseStatus="active"
-                            variant="admin"
-                            onClick={() =>
-                              router.push(`/admin/courses/${course.id}`)
-                            }
-                            onEdit={() => handleEdit(course)}
-                            onDelete={() => handleDeleteClick(course)}
-                            assignedMentors={course.assigned_mentors}
-                          />
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
+                    <CourseCard
+                      id={course.id}
+                      title={course.title}
+                      description={course.description}
+                      thumbnail={course.thumbnail_url}
+                      courseStatus="active"
+                      variant="admin"
+                      onClick={() =>
+                        router.push(`/admin/courses/${course.id}`)
+                      }
+                      onEdit={() => handleEdit(course)}
+                      onDelete={() => handleDeleteClick(course)}
+                      assignedMentors={course.assigned_mentors}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
 
-                    <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                    <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                  </Carousel>
-                )}
-              </div>
-
-              {/* --- 2. UPCOMING COURSES SECTION --- */}
-              <div className="flex items-center justify-between flex-wrap gap-4 mt-16 mb-6">
-                <h2 className={TYPOGRAPHY_CLASSES.SUBHEADING}>
-                  Upcoming Courses
-                </h2>
-              </div>
-
-              <div className="relative">
-                {!loading && upcomingCourses.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm text-center px-4">
-                    <p className="text-gray-500 font-medium">
-                      No upcoming courses scheduled.
-                    </p>
-                  </div>
-                ) : (
-                  <Carousel
-                    opts={{
-                      align: "start",
-                      loop: false,
-                      dragFree: true,
-                    }}
-                    className="w-full"
-                  >
-                    <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
-                      {upcomingCourses.map((course) => (
-                        <CarouselItem
-                          key={course.id}
-                          className="pl-4 sm:pl-6 basis-[85vw] sm:basis-[45%] lg:basis-[23%]"
-                        >
-                          <CueCard
-                            title={course.title}
-                            thumbnail={course.thumbnail_url}
-                            isAdmin={true}
-                            onClick={() =>
-                              router.push(`/admin/courses/${course.id}`)
-                            }
-                            onEdit={(e) => {
-                              e.stopPropagation();
-                              handleEdit(course);
-                            }}
-                            onDelete={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(course);
-                            }}
-                          />
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-
-                    {upcomingCourses.length > 3 && (
-                      <>
-                        <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                        <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
-                      </>
-                    )}
-                  </Carousel>
-                )}
-              </div>
-            </>
-          );
-        })()}
+              {filteredCourses.length > 3 && (
+                <>
+                  <CarouselPrevious className="flex left-2 lg:-left-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                  <CarouselNext className="flex right-2 lg:-right-5 bg-white shadow-lg border border-gray-100 text-brand-primary hover:bg-gray-50 h-8 w-8 lg:h-10 lg:w-10 z-10" />
+                </>
+              )}
+            </Carousel>
+          </div>
+        )}
       </div>
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ CREATE / EDIT MODAL Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -1529,622 +1112,185 @@ export default function AdminCourses() {
 
             {/* Modal Body - Scrollable */}
             <div className="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto flex-1">
-              {/* Course type radio â€” only shown when creating */}
-              {!isEditing && (
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input
-                      type="radio"
-                      checked={courseType === "active"}
-                      onChange={() => setCourseType("active")}
-                      className="accent-brand-primary"
+              {/* Course Title */}
+              <div>
+                <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                  Course Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Playwright"
+                  value={courseTitle}
+                  onChange={(e) => setCourseTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 placeholder:text-gray-400 placeholder:font-normal font-medium"
+                />
+              </div>
+
+              {/* Course Description */}
+              <div>
+                <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                  Description
+                </label>
+                <textarea
+                  value={courseDescription}
+                  onChange={(e) => setCourseDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Describe what students will learn in this course..."
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
+                />
+              </div>
+
+              {/* Assign Scholars */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
+                  <Users size={14} /> Assign Scholars
+                </label>
+                <Select
+                  isMulti
+                  options={scholarSelectOptions}
+                  value={selectedScholars}
+                  onChange={(v) => setSelectedScholars((v ?? []) as readonly SelectOption[])}
+                  placeholder="Select scholars..."
+                  isLoading={isLoadingMembers}
+                  isDisabled={isLoadingMembers}
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      minHeight: "42px",
+                      boxShadow: "none",
+                      "&:hover": { borderColor: "#d1d5db" },
+                    }),
+                    multiValue: (base) => ({
+                      ...base,
+                      backgroundColor: "#eff6ff",
+                      borderRadius: "9999px",
+                      border: "1px solid #bfdbfe",
+                    }),
+                    multiValueLabel: (base) => ({
+                      ...base,
+                      color: "#1e40af",
+                      fontWeight: 600,
+                      fontSize: "11px",
+                      padding: "2px 6px",
+                    }),
+                    multiValueRemove: (base) => ({
+                      ...base,
+                      color: "#93c5fd",
+                      "&:hover": { backgroundColor: "#dbeafe", color: "#1d4ed8" },
+                    }),
+                    placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
+                    menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                  }}
+                />
+              </div>
+
+              {/* Assign Mentors / Instructors */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
+                  <Users size={14} className="text-purple-500" /> Assign Mentors / Instructors
+                </label>
+                <Select
+                  isMulti
+                  options={mentorSelectOptions}
+                  value={selectedMentors}
+                  onChange={(v) => setSelectedMentors((v ?? []) as readonly SelectOption[])}
+                  placeholder="Select mentors..."
+                  isLoading={isLoadingMembers}
+                  isDisabled={isLoadingMembers}
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      minHeight: "42px",
+                      boxShadow: "none",
+                      "&:hover": { borderColor: "#d1d5db" },
+                    }),
+                    multiValue: (base) => ({
+                      ...base,
+                      backgroundColor: "#faf5ff",
+                      borderRadius: "9999px",
+                      border: "1px solid #e9d5ff",
+                    }),
+                    multiValueLabel: (base) => ({
+                      ...base,
+                      color: "#7e22ce",
+                      fontWeight: 600,
+                      fontSize: "11px",
+                      padding: "2px 6px",
+                    }),
+                    multiValueRemove: (base) => ({
+                      ...base,
+                      color: "#c084fc",
+                      "&:hover": { backgroundColor: "#f3e8ff", color: "#7e22ce" },
+                    }),
+                    placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
+                    menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                  }}
+                />
+              </div>
+
+              {/* Course Thumbnail */}
+              <div>
+                <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                  Course Thumbnail
+                </label>
+                {thumbnailPreview ? (
+                  <label className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group block cursor-pointer bg-gray-50">
+                    <Image
+                      src={thumbnailPreview}
+                      alt="Course Thumbnail"
+                      fill
+                      className="object-contain"
                     />
-                    Active Course
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <input
-                      type="radio"
-                      checked={courseType === "upcoming"}
-                      onChange={() => setCourseType("upcoming")}
-                      className="accent-brand-primary"
-                    />
-                    Upcoming Product
-                  </label>
-                </div>
-              )}
-
-              {/* â”€â”€ UPCOMING: simple product form â”€â”€ */}
-              {courseType === "upcoming" && (
-                <>
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Product Title
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Playwright"
-                      value={courseTitle}
-                      onChange={(e) => setCourseTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 placeholder:text-gray-400 placeholder:font-normal font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Description
-                    </label>
-                    <textarea
-                      value={courseDescription}
-                      onChange={(e) => setCourseDescription(e.target.value)}
-                      rows={3}
-                      placeholder="Brief description of this product..."
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Thumbnail
-                    </label>
-                    {thumbnailPreview ? (
-                      <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group bg-gray-50">
-                        <Image
-                          src={thumbnailPreview}
-                          alt="Thumbnail preview"
-                          fill
-                          className="object-contain"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setThumbnailFile(null);
-                              setThumbnailPreview("");
-                            }}
-                            className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
-                        <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
-                        <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
-                          Click to upload thumbnail
-                        </span>
-                        <span className="text-[10px] text-gray-300 mt-1">
-                          PNG, JPG up to 5MB
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* â”€â”€ ACTIVE: product + batch fields â”€â”€ */}
-              {courseType === "active" && (
-                <>
-                  {/* Product selector */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Product
-                    </label>
-                    {isEditing ? (
-                      /* Edit mode â€” read-only display showing only the assigned product name */
-                      <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800">
-                        {selectedProductName ||
-                          products.find((p) => String(p.id) === selectedProductId)?.title ||
-                          "No product assigned"}
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex gap-4 mb-3">
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                            <input
-                              type="radio"
-                              checked={productMode === "existing"}
-                              onChange={() => setProductMode("existing")}
-                              className="accent-brand-primary"
-                            />
-                            Choose Existing
-                          </label>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                            <input
-                              type="radio"
-                              checked={productMode === "new"}
-                              onChange={() => setProductMode("new")}
-                              className="accent-brand-primary"
-                            />
-                            Create New
-                          </label>
-                        </div>
-
-                        {productMode === "existing" && (
-                          <div className="relative">
-                            {/* Custom dropdown trigger */}
-                            <button
-                              type="button"
-                              onClick={() => setProductDropdownOpen(!productDropdownOpen)}
-                              className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-lg text-sm bg-white transition-all ${productDropdownOpen
-                                ? "border-brand-primary ring-2 ring-brand-primary/20"
-                                : "border-gray-200 hover:border-gray-300"
-                                } ${!selectedProductId ? "text-gray-400" : "text-gray-900 font-medium"}`}
-                            >
-                              <span className="truncate">
-                                {selectedProductId
-                                  ? products.find((p) => String(p.id) === selectedProductId)?.title ?? "Select product..."
-                                  : "Select product..."}
-                              </span>
-                              <svg
-                                className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform duration-200 ${productDropdownOpen ? "rotate-180" : ""}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-
-                            {/* Custom dropdown menu */}
-                            {productDropdownOpen && (
-                              <>
-                                {/* Invisible backdrop to close dropdown on outside click */}
-                                <div
-                                  className="fixed inset-0 z-10"
-                                  onClick={() => setProductDropdownOpen(false)}
-                                />
-                                <div className="absolute z-20 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                                  {products.length === 0 ? (
-                                    <div className="px-4 py-6 text-center">
-                                      <p className="text-sm text-gray-400 font-medium">
-                                        No products yet.
-                                      </p>
-                                      <p className="text-xs text-gray-300 mt-1">
-                                        Create one using the &quot;Create New&quot; option.
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <div className="max-h-52 overflow-y-auto py-1">
-                                      {products.map((product) => {
-                                        const isSelected = selectedProductId === String(product.id);
-                                        const isEditing = editingProductId === String(product.id);
-                                        return (
-                                          <div
-                                            key={product.id}
-                                            onClick={(e) => {
-                                              if (isEditing) {
-                                                e.stopPropagation();
-                                                return;
-                                              }
-                                              setSelectedProductId(String(product.id));
-                                              setProductDropdownOpen(false);
-                                            }}
-                                            className={`group flex items-center justify-between px-4 py-2.5 ${!isEditing ? "cursor-pointer" : ""} transition-colors ${isSelected && !isEditing
-                                              ? "bg-brand-primary/5"
-                                              : "hover:bg-gray-50"
-                                              }`}
-                                          >
-                                            {/* Product label */}
-                                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                              {/* Selection indicator */}
-                                              <span
-                                                className={`w-2 h-2 rounded-full shrink-0 transition-colors ${isSelected
-                                                  ? "bg-brand-primary"
-                                                  : "bg-transparent group-hover:bg-gray-300"
-                                                  }`}
-                                              />
-                                              {isEditing ? (
-                                                <input
-                                                  type="text"
-                                                  value={editingProductTitle}
-                                                  onChange={(e) => setEditingProductTitle(e.target.value)}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  onKeyDown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                      e.preventDefault();
-                                                      e.stopPropagation();
-                                                      void handleSaveProductEdit(product.id);
-                                                    } else if (e.key === "Escape") {
-                                                      e.stopPropagation();
-                                                      setEditingProductId(null);
-                                                    }
-                                                  }}
-                                                  className="w-full text-[14px] px-2 py-1 border border-brand-primary rounded focus:outline-none bg-white text-gray-900"
-                                                  autoFocus
-                                                />
-                                              ) : (
-                                                <span
-                                                  className={`text-[14px] truncate transition-colors ${isSelected
-                                                    ? "font-semibold text-brand-primary"
-                                                    : "font-medium text-gray-700 group-hover:text-gray-900"
-                                                    }`}
-                                                >
-                                                  {product.title}
-                                                </span>
-                                              )}
-                                            </div>
-                                            {/* Actions inside dropdown */}
-                                            <div className="flex items-center">
-                                              {isEditing ? (
-                                                <>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      void handleSaveProductEdit(product.id);
-                                                    }}
-                                                    disabled={isSavingProduct}
-                                                    className="rounded-md p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
-                                                  >
-                                                    {isSavingProduct ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setEditingProductId(null);
-                                                    }}
-                                                    className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                                                  >
-                                                    <X className="h-3.5 w-3.5" />
-                                                  </button>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setEditingProductId(String(product.id));
-                                                      setEditingProductTitle(product.title);
-                                                    }}
-                                                    className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-50 hover:text-blue-500 mr-1"
-                                                    title={`Edit ${product.title}`}
-                                                  >
-                                                    <Pencil className="h-3.5 w-3.5" />
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setProductDropdownOpen(false);
-                                                      void handleDeleteProduct(product);
-                                                    }}
-                                                    disabled={isDeletingProduct}
-                                                    className="rounded-md p-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    title={`Delete ${product.title}`}
-                                                  >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                  </button>
-                                                </>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                  {/* Products count footer */}
-                                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60">
-                                    <p className="text-[11px] text-gray-400 font-medium">
-                                      {products.length} product{products.length !== 1 ? "s" : ""} available
-                                    </p>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {productMode === "new" && (
-                          <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50/50">
-                            <input
-                              type="text"
-                              placeholder="New product title (e.g. Playwright)"
-                              value={newProductTitle}
-                              onChange={(e) => setNewProductTitle(e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary placeholder:text-gray-400 placeholder:font-normal font-medium"
-                            />
-                            <textarea
-                              placeholder="Product description (optional)"
-                              value={newProductDescription}
-                              onChange={(e) =>
-                                setNewProductDescription(e.target.value)
-                              }
-                              rows={2}
-                              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-xs text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
-                            />
-                            {newProductThumbnailPreview ? (
-                              <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group bg-gray-50">
-                                <Image
-                                  src={newProductThumbnailPreview}
-                                  alt="Product thumbnail"
-                                  fill
-                                  className="object-contain"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setNewProductThumbnailFile(null);
-                                      setNewProductThumbnailPreview("");
-                                    }}
-                                    className="bg-white text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-brand-primary transition-colors">
-                                <Upload className="w-4 h-4" />
-                                <span>Upload product thumbnail (optional)</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleNewProductThumbnailChange}
-                                  className="hidden"
-                                />
-                              </label>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Month + Year */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                        Month
-                      </label>
-                      <select
-                        value={batchMonth}
-                        onChange={(e) => setBatchMonth(e.target.value)}
-                        className={`w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-brand-primary ${!batchMonth ? "text-gray-400" : "text-gray-900"}`}
-                      >
-                        <option value="">Month</option>
-                        {[
-                          "January",
-                          "February",
-                          "March",
-                          "April",
-                          "May",
-                          "June",
-                          "July",
-                          "August",
-                          "September",
-                          "October",
-                          "November",
-                          "December",
-                        ].map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                        Year
-                      </label>
-                      <select
-                        value={batchYear}
-                        onChange={(e) => setBatchYear(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary"
-                      >
-                        {[0, 1, 2].map((offset) => {
-                          const y = String(new Date().getFullYear() + offset);
-                          return (
-                            <option key={y} value={y}>
-                              {y}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-
-                  </div>
-
-
-                  {/* Generated internal title preview */}
-                  {generatedTitle && (
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
-                      <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">
-                        Internal Course Title (auto-generated)
-                      </p>
-                      <p className="text-sm font-bold text-blue-900">
-                        {generatedTitle}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* â”€â”€ Assign Members â”€â”€ */}
-                  {isEditing && (
-                    <div>
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
-                        <Users size={14} /> Assign Members
-                      </label>
-                      <Select
-                        isMulti
-                        options={scholarSelectOptions}
-                        value={selectedScholars}
-                        onChange={(v) => setSelectedScholars((v ?? []) as readonly SelectOption[])}
-                        placeholder="Select scholars..."
-                        isLoading={isLoadingMembers}
-                        isDisabled={isLoadingMembers}
-                        classNamePrefix="react-select"
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            borderColor: "#e5e7eb",
-                            borderRadius: "0.5rem",
-                            fontSize: "0.875rem",
-                            minHeight: "42px",
-                            boxShadow: "none",
-                            "&:hover": { borderColor: "#d1d5db" },
-                          }),
-                          multiValue: (base) => ({
-                            ...base,
-                            backgroundColor: "#eff6ff",
-                            borderRadius: "9999px",
-                            border: "1px solid #bfdbfe",
-                          }),
-                          multiValueLabel: (base) => ({
-                            ...base,
-                            color: "#1e40af",
-                            fontWeight: 600,
-                            fontSize: "11px",
-                            padding: "2px 6px",
-                          }),
-                          multiValueRemove: (base) => ({
-                            ...base,
-                            color: "#93c5fd",
-                            "&:hover": { backgroundColor: "#dbeafe", color: "#1d4ed8" },
-                          }),
-                          placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
-                          menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <span className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors shadow-sm">
+                        Change Thumbnail
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setThumbnailFile(null);
+                          setThumbnailPreview("");
                         }}
-                      />
+                        className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors shadow-sm"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  )}
-
-                  {/* â”€â”€ Assign Mentors / Instructors â”€â”€ */}
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
-                      <Users size={14} className="text-purple-500" /> Assign Mentors / Instructors
-                    </label>
-                    <Select
-                      isMulti
-                      options={mentorSelectOptions}
-                      value={selectedMentors}
-                      onChange={(v) => setSelectedMentors((v ?? []) as readonly SelectOption[])}
-                      placeholder="Select mentors..."
-                      isLoading={isLoadingMembers}
-                      isDisabled={isLoadingMembers}
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#e5e7eb",
-                          borderRadius: "0.5rem",
-                          fontSize: "0.875rem",
-                          minHeight: "42px",
-                          boxShadow: "none",
-                          "&:hover": { borderColor: "#d1d5db" },
-                        }),
-                        multiValue: (base) => ({
-                          ...base,
-                          backgroundColor: "#faf5ff",
-                          borderRadius: "9999px",
-                          border: "1px solid #e9d5ff",
-                        }),
-                        multiValueLabel: (base) => ({
-                          ...base,
-                          color: "#7e22ce",
-                          fontWeight: 600,
-                          fontSize: "11px",
-                          padding: "2px 6px",
-                        }),
-                        multiValueRemove: (base) => ({
-                          ...base,
-                          color: "#c084fc",
-                          "&:hover": { backgroundColor: "#f3e8ff", color: "#7e22ce" },
-                        }),
-                        placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: "0.875rem" }),
-                        menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
-                      }}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailChange}
+                      className="hidden"
                     />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                      Description
-                    </label>
-                    <textarea
-                      value={courseDescription}
-                      onChange={(e) => setCourseDescription(e.target.value)}
-                      rows={3}
-                      placeholder="Describe what students will learn in this course..."
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:border-brand-primary resize-none"
+                  </label>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
+                    <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
+                    <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
+                      Click to upload thumbnail
+                    </span>
+                    <span className="text-[10px] text-gray-300 mt-1">
+                      PNG, JPG up to 5MB
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailChange}
+                      className="hidden"
                     />
-                  </div>
-
-                  {/* Thumbnail */}
-                  {(() => {
-                    const defaultThumbnailPreview =
-                      productMode === "existing"
-                        ? products.find((p) => String(p.id) === selectedProductId)?.thumbnail_url
-                        : newProductThumbnailPreview;
-
-                    const displayThumbnail = thumbnailPreview || defaultThumbnailPreview;
-
-                    return (
-                      <div>
-                        <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
-                          Course Thumbnail
-                        </label>
-                        {displayThumbnail ? (
-                          <label className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 group block cursor-pointer bg-gray-50">
-                            <Image
-                              src={displayThumbnail}
-                              alt="Course Thumbnail"
-                              fill
-                              className="object-contain"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                              <span className="bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-100 transition-colors shadow-sm">
-                                {thumbnailPreview ? "Change Override" : "Upload Custom"}
-                              </span>
-                              {thumbnailPreview && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setThumbnailFile(null);
-                                    setThumbnailPreview("");
-                                  }}
-                                  className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors shadow-sm"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleThumbnailChange}
-                              className="hidden"
-                            />
-                          </label>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-brand-primary hover:bg-blue-50/30 transition-all group">
-                            <Upload className="w-8 h-8 text-gray-300 group-hover:text-brand-primary transition-colors mb-2" />
-                            <span className="text-xs text-gray-400 group-hover:text-brand-primary font-medium">
-                              Click to upload thumbnail
-                            </span>
-                            <span className="text-[10px] text-gray-300 mt-1">
-                              PNG, JPG up to 5MB
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleThumbnailChange}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  </label>
+                )}
+              </div>
 
                   {/* Start Date */}
                   <div>
@@ -2865,9 +2011,6 @@ export default function AdminCourses() {
                   </div>
 
 
-                </>
-              )}
-
               {modalMessage && (
                 <p
                   className={`text-xs font-medium ${modalMessage.type === "success" ? "text-emerald-600" : "text-red-600"}`}
@@ -2949,52 +2092,7 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* â”€â”€â”€ PRODUCT DELETE CONFIRMATION MODAL â”€â”€â”€ */}
-      {showProductDeleteConfirm && deletingProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-6">
-              <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
-                Delete Product
-              </h3>
-              <p className="text-[15px] leading-relaxed text-gray-500 text-center">
-                Are you sure you want to delete{" "}
-                <strong className="text-gray-900 font-semibold">
-                  &ldquo;{deletingProduct.title}&rdquo;
-                </strong>
-                ? This product will be permanently removed from the catalog.
-              </p>
-              {modalMessage?.type === "error" && (
-                <p className="text-xs text-red-600 text-center mt-3 font-medium bg-red-50 rounded-lg px-3 py-2">
-                  {modalMessage.text}
-                </p>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button
-                onClick={() => {
-                  setShowProductDeleteConfirm(false);
-                  setDeletingProduct(null);
-                }}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDeleteProduct}
-                disabled={isDeletingProduct}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {isDeletingProduct && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isDeletingProduct ? "Deleting..." : "Yes, Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* â”€â”€â”€ QUIZ PREVIEW MODAL POPUP (ENLARGED & PROMINENT) â”€â”€â”€ */}
       {previewQuizData && (
