@@ -435,12 +435,12 @@ export default function InboxPage() {
                                       <p>5.1. Go to Settings → Webhooks → New Webhook.</p>
                                       <div className="flex items-center justify-between gap-2">
                                         <span className="font-mono text-[10px] truncate text-slate-800">
-                                          5.2. URL: https://automate-learning-portal.vercel.app/api/webhooks/calcom
+                                          5.2. URL: https://learning-portal-sable.vercel.app/api/webhooks/calcom
                                         </span>
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            navigator.clipboard.writeText("https://automate-learning-portal.vercel.app/api/webhooks/calcom");
+                                            navigator.clipboard.writeText("https://learning-portal-sable.vercel.app/api/webhooks/calcom");
                                             setCopiedWebhook(true);
                                             setTimeout(() => setCopiedWebhook(false), 2000);
                                           }}

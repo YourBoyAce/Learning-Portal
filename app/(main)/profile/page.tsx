@@ -944,12 +944,12 @@ export default function ProfilePage() {
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2.5">
                             <div className="truncate font-mono text-[11px] text-slate-800">
                               <span className="font-bold text-slate-500 mr-1.5">5.2. URL:</span>
-                              https://automate-learning-portal.vercel.app/api/webhooks/calcom
+                              https://learning-portal-sable.vercel.app/api/webhooks/calcom
                             </div>
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText("https://automate-learning-portal.vercel.app/api/webhooks/calcom");
+                                navigator.clipboard.writeText("https://learning-portal-sable.vercel.app/api/webhooks/calcom");
                                 setCopiedWebhook(true);
                                 setTimeout(() => setCopiedWebhook(false), 2500);
                               }}
