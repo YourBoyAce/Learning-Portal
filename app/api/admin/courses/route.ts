@@ -724,11 +724,12 @@ export async function POST(request: Request) {
           order_id: orderId,
           course_id: newCourse.id,
           bundle_id: starterBundleId,
-          product_id: (newCourse as any)?.product_id || null,
+          product_id: null,
           batch_type: "recorded",
           status: "active",
           access_start_date: new Date().toISOString(),
-          access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          // Recorded session courses provide lifetime access
+          access_end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 100)).toISOString(),
         });
       }
 
