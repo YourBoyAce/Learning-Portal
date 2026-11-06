@@ -49,6 +49,37 @@ export async function GET(request: Request) {
   const role = profile?.role?.toLowerCase() || "user";
   const isMentor = role === "instructor" || role === "admin";
 
+  const { searchParams } = new URL(request.url);
+  const countOnly = searchParams.get("countOnly") === "true";
+
+  if (countOnly) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    let query = supabaseAdmin
+      .from("calendar_events")
+      .select("event_date, event_time")
+      .like("tag", "%status:accepted%")
+      .gte("event_date", todayStr);
+
+    if (isMentor) {
+      query = query.eq("user_id", currentUser.id);
+    } else {
+      query = query.or(`user_id.eq.${currentUser.id},description.ilike.%Student ID: ${currentUser.id}%`);
+    }
+
+    const { data: rawEvents, error: countErr } = await query;
+    if (countErr) {
+      return apiErrorResponse(countErr, undefined, 500);
+    }
+
+    const now = new Date();
+    const count = (rawEvents || []).filter((e) => {
+      const sessionTime = new Date(`${e.event_date}T${e.event_time}`);
+      return sessionTime >= now;
+    }).length;
+
+    return NextResponse.json({ success: true, count, isMentor });
+  }
+
   let sessions = [];
 
   if (isMentor) {
@@ -98,12 +129,12 @@ export async function GET(request: Request) {
     });
 
   } else {
-    // Students: Query calendar_events where description contains Student ID: <their_id> AND tag contains status:accepted
+    // Students: Query calendar_events where description contains Student ID: <their_id> OR user_id = <their_id>, AND tag contains status:accepted
     const { data: events, error: fetchError } = await supabaseAdmin
       .from("calendar_events")
       .select("*")
       .like("tag", "%status:accepted%")
-      .like("description", `%Student ID: ${currentUser.id}%`)
+      .or(`user_id.eq.${currentUser.id},description.ilike.%Student ID: ${currentUser.id}%`)
       .order("event_date", { ascending: true })
       .order("event_time", { ascending: true });
 
@@ -152,5 +183,11 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ success: true, isMentor, sessions });
+  const now = new Date();
+  const upcomingCount = sessions.filter((s) => {
+    const sessionTime = new Date(`${s.event_date}T${s.event_time}`);
+    return sessionTime >= now;
+  }).length;
+
+  return NextResponse.json({ success: true, isMentor, sessions, upcomingCount });
 }

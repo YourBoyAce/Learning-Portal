@@ -12,12 +12,14 @@ import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import { Video, Inbox, Calendar as CalendarIcon, LogOut } from "lucide-react";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { useUpcomingMeetingsCount } from "@/app/hooks/useUpcomingMeetingsCount";
 
 function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
   const { tier, isLoading: isTierLoading } = useSecurityGatedData();
+  const { count: upcomingMeetingsCount } = useUpcomingMeetingsCount();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
@@ -129,7 +131,13 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   };
 
-  const navItems = [
+  const navItems: {
+    label: string;
+    href: string;
+    active: boolean;
+    icon: any;
+    badge?: number;
+  }[] = [
     {
       label: "Live Sessions",
       href: "/premium/webinars",
@@ -141,6 +149,7 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
       href: "/premium/inbox",
       active: pathname === "/premium/inbox",
       icon: pathname === "/premium/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+      badge: upcomingMeetingsCount > 0 ? upcomingMeetingsCount : undefined,
     },
     {
       label: "Calendar",
@@ -199,16 +208,29 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active ? "nav-item-active" : "nav-item-inactive"
+                className={`nav-item flex items-center justify-between px-4 py-3 ${item.active ? "nav-item-active" : "nav-item-inactive"
                   }`}
               >
-                <Image
-                  src={item.icon}
-                  alt={item.label}
-                  width={20}
-                  height={20}
-                />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={item.icon}
+                    alt={item.label}
+                    width={20}
+                    height={20}
+                  />
+                  <span>{item.label}</span>
+                </div>
+                {typeof item.badge === "number" && item.badge > 0 && (
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full ${
+                      item.active
+                        ? "bg-white text-brand-primary"
+                        : "bg-brand-alt text-white"
+                    }`}
+                  >
+                    {item.badge > 9 ? "9+" : item.badge}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

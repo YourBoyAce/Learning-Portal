@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import MentionNotificationsBell from "@/app/components/MentionNotificationsBell";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
+import { useUpcomingMeetingsCount } from "@/app/hooks/useUpcomingMeetingsCount";
 
 function MainLayoutContent({
   children,
@@ -30,6 +31,7 @@ function MainLayoutContent({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { canAccess } = useSecurityGatedData();
+  const { count: upcomingMeetingsCount } = useUpcomingMeetingsCount();
 
   // Close sidebar on path change
   useEffect(() => {
@@ -135,7 +137,16 @@ function MainLayoutContent({
 
   const isMentor = role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
 
-  const navItems = [];
+  interface NavItem {
+    label: string;
+    href: string;
+    active: boolean;
+    icon: any;
+    isExternal?: boolean;
+    badge?: number;
+  }
+
+  const navItems: NavItem[] = [];
   
   if (isMentor) {
     navItems.push({
@@ -221,6 +232,7 @@ function MainLayoutContent({
     href: "/inbox",
     active: pathname === "/inbox",
     icon: pathname === "/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+    badge: upcomingMeetingsCount > 0 ? upcomingMeetingsCount : undefined,
   });
 
   // Mentor Connect is visible to everyone
@@ -289,15 +301,23 @@ function MainLayoutContent({
                   <a
                     key={item.label}
                     href={item.href}
-                    className="nav-item flex items-center gap-3 px-4 py-3 nav-item-inactive"
+                    className="nav-item flex items-center justify-between px-4 py-3 nav-item-inactive"
                   >
-                    <Image
-                      src={item.icon}
-                      alt={item.label}
-                      width={20}
-                      height={20}
-                    />
-                    <span>{item.label}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Image
+                        src={item.icon}
+                        alt={item.label}
+                        width={20}
+                        height={20}
+                        className="shrink-0"
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {item.badge != null && item.badge > 0 && (
+                      <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold bg-brand-alt text-white shadow-sm shrink-0">
+                        {item.badge > 9 ? "9+" : item.badge}
+                      </span>
+                    )}
                   </a>
                 );
               }
@@ -306,19 +326,33 @@ function MainLayoutContent({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`nav-item flex items-center gap-3 px-4 py-3 ${item.active
+                  className={`nav-item flex items-center justify-between px-4 py-3 ${item.active
                       ? "nav-item-active"
                       : "nav-item-inactive"
                     }`}
                 >
-                  <Image
-                    src={item.icon}
-                    alt={item.label}
-                    width={20}
-                    height={20}
-                  />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Image
+                      src={item.icon}
+                      alt={item.label}
+                      width={20}
+                      height={20}
+                      className="shrink-0"
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </div>
 
-                  <span>{item.label}</span>
+                  {item.badge != null && item.badge > 0 && (
+                    <span
+                      className={`flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold shrink-0 transition-colors shadow-sm ${
+                        item.active
+                          ? "bg-white text-brand-primary"
+                          : "bg-brand-alt text-white"
+                      }`}
+                    >
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { dispatchInboxUpdated } from "@/app/lib/inbox-events";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import {
   Calendar,
@@ -137,6 +138,7 @@ export default function PremiumInboxPage() {
       if (!res.ok) throw new Error(json?.error || "Failed to update invite.");
 
       await loadInvites();
+      dispatchInboxUpdated();
     } catch (error) {
       console.error("Invite action failed:", error);
     } finally {

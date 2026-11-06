@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { dispatchInboxUpdated } from "@/app/lib/inbox-events";
 
 const TYPOGRAPHY_CLASSES = {
   MAIN_HEADING: "text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight",
@@ -167,7 +168,8 @@ export default function InvitesPage() {
         });
       }
 
-      // Reload
+      // Reload and notify listeners
+      dispatchInboxUpdated();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await loadInvites(user.id);
