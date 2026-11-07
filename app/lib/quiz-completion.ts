@@ -44,7 +44,13 @@ export async function recordQuizCompletion(
   });
   const result = await response.json().catch(() => null);
   if (!response.ok) throw new Error(result?.error || "Unable to record quiz completion.");
-  return result as { success: true; awarded: boolean; score: number };
+  return result as {
+    success: true;
+    awarded: boolean;
+    score: number;
+    correctAnswers: number;
+    totalQuestions: number;
+  };
 }
 
 export async function verifyLearnerAnswer(

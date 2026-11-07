@@ -158,6 +158,11 @@ export async function POST(request: Request) {
 
   const correctAnswers = quizRow.questions.filter((question) => answers[question.id] === question.correctAnswer).length;
   const score = Math.round((correctAnswers / quizRow.questions.length) * 100);
+  const result = {
+    score,
+    correctAnswers,
+    totalQuestions: quizRow.questions.length,
+  };
   // The table's existing (user_id, course_id, quiz_id) unique constraint is
   // the concurrency-safe guard against awarding points for a retake.
   const { error: insertError } = await auth.supabaseAdmin
@@ -173,8 +178,8 @@ export async function POST(request: Request) {
     });
 
   if (insertError?.code === "23505") {
-    return NextResponse.json({ success: true, awarded: false, score });
+    return NextResponse.json({ success: true, awarded: false, ...result });
   }
   if (insertError) return apiErrorResponse(insertError, undefined, 500);
-  return NextResponse.json({ success: true, awarded: true, score });
+  return NextResponse.json({ success: true, awarded: true, ...result });
 }

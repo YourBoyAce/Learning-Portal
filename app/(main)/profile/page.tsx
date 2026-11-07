@@ -18,8 +18,6 @@
 //   const [memberSince, setMemberSince] = useState("Loading...");
 
 //   const [fullName, setFullName] = useState("");
-//   const [bio, setBio] = useState("");
-//   const [portfolioUrl, setPortfolioUrl] = useState("");
 
 //   useEffect(() => {
 //     async function loadUserProfile() {
@@ -48,8 +46,6 @@
 
 //         if (profile) {
 //           setFullName(profile.full_name || "");
-//           setBio(profile.bio || "");
-//           setPortfolioUrl(profile.portfolio_url || "");
 
 //           if (profile.role) {
 //             setRole(profile.role);
@@ -88,8 +84,6 @@
 //         .from("profiles")
 //         .update({
 //           full_name: fullName.trim(),
-//           bio: bio.trim(),
-//           portfolio_url: portfolioUrl.trim(),
 //         })
 //         .eq("id", userId);
 
@@ -240,102 +234,6 @@
 //               </div>
 //             </div>
 
-//             {/* SCHOLARLY BIO */}
-//             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-//               <h3 className="font-bold text-brand-primary text-[18px] mb-6">
-//                 Scholarly Bio
-//               </h3>
-
-//               <div>
-//                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
-//                   INTELLECTUAL INTERESTS & GOALS
-//                 </label>
-
-//                 <textarea
-//                   value={bio}
-//                   onChange={(e) => setBio(e.target.value)}
-//                   rows={4}
-//                   maxLength={500}
-//                   className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors resize-none"
-//                   placeholder="Dedicated polymath currently exploring..."
-//                 />
-
-//                 <div className="text-right mt-2">
-//                   <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-//                     {bio.length} / 500 CHARACTERS
-//                   </span>
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* DIGITAL FOOTPRINT */}
-//             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-//               <h3 className="font-bold text-brand-primary text-[18px] mb-6">
-//                 Digital Footprint
-//               </h3>
-
-//               <div className="flex items-center bg-surface-subtle rounded-md px-4 py-3.5 border border-transparent focus-within:border-brand-primary/30 focus-within:bg-white transition-colors mb-12">
-//                 <svg
-//                   className="w-5 h-5 text-gray-400 mr-3"
-//                   fill="none"
-//                   stroke="currentColor"
-//                   viewBox="0 0 24 24"
-//                 >
-//                   <path
-//                     strokeLinecap="round"
-//                     strokeLinejoin="round"
-//                     strokeWidth={2}
-//                     d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-//                   />
-//                 </svg>
-
-//                 <input
-//                   type="text"
-//                   value={portfolioUrl}
-//                   onChange={(e) => setPortfolioUrl(e.target.value)}
-//                   className="w-full bg-transparent border-none text-[13px] text-gray-800 font-medium outline-none"
-//                   placeholder="https://portfolio.atelier.edu/a-hamilton"
-//                 />
-//               </div>
-
-//               <div className="flex flex-col sm:flex-row gap-4 sm:justify-between items-stretch sm:items-center">
-//                 <div className="flex items-center gap-2">
-//                   <div className="w-5 h-5 bg-[#00E5FF] rounded-full flex items-center justify-center shrink-0">
-//                     <svg
-//                       className="w-3 h-3 text-white"
-//                       fill="currentColor"
-//                       viewBox="0 0 20 20"
-//                     >
-//                       <path
-//                         fillRule="evenodd"
-//                         d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-//                         clipRule="evenodd"
-//                       />
-//                     </svg>
-//                   </div>
-
-//                   <span className="text-[11px] text-gray-400 font-medium tracking-wide">
-//                     Profile updates are saved securely
-//                   </span>
-//                 </div>
-
-//                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-//                   <button
-//                     type="button"
-//                     onClick={() => {
-//                       setBio("");
-//                       setPortfolioUrl("");
-//                     }}
-//                     className="text-[13px] text-gray-600 font-semibold hover:text-gray-800 transition text-center sm:text-left"
-//                   >
-//                     Discard
-//                   </button>
-
-//                   <Button
-//                     onClick={handleSave}
-//                     disabled={isSaving}
-//                     className="w-full sm:w-auto justify-center"
-//                   >
 //                     {isSaving ? "Saving..." : "Commit Changes"}
 //                   </Button>
 //                 </div>
@@ -355,9 +253,7 @@ import { useState, useEffect } from "react";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
 import UserAvatar from "@/app/components/UserAvatar";
 import { Button } from "@/components/ui/button";
-import { ICONS } from "@/app/styles/icons";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import Image from "next/image";
 import { Lock, Loader2, Eye, EyeOff, ShieldAlert, X, CheckCircle2, Copy, Check, ExternalLink } from "lucide-react";
 import { dispatchProfileUpdated } from "@/app/lib/profile-events";
 
@@ -382,8 +278,6 @@ export default function ProfilePage() {
   const [memberSince, setMemberSince] = useState("Loading...");
 
   const [fullName, setFullName] = useState("");
-  const [bio, setBio] = useState("");
-  const [portfolioUrl, setPortfolioUrl] = useState("");
   const [calEventTypeId, setCalEventTypeId] = useState("");
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
@@ -414,7 +308,7 @@ export default function ProfilePage() {
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("*")
+          .select("full_name,cal_event_type_id,role,created_at")
           .eq("id", user.id)
           .single();
 
@@ -426,8 +320,6 @@ export default function ProfilePage() {
 
         if (profile) {
           setFullName(profile.full_name || resolvedName || "");
-          setBio(profile.bio || "");
-          setPortfolioUrl(profile.portfolio_url || "");
           setCalEventTypeId(profile.cal_event_type_id ? String(profile.cal_event_type_id) : "");
 
           if (profile.role) {
@@ -473,8 +365,6 @@ export default function ProfilePage() {
         .from("profiles")
         .update({
           full_name: fullName.trim(),
-          bio: bio.trim(),
-          portfolio_url: portfolioUrl.trim(),
           cal_event_type_id: parsedCalId,
         })
         .eq("id", userId);
@@ -999,63 +889,8 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* SCHOLARLY BIO */}
+            {/* PROFILE SAVE */}
             <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-              <h3 className="font-bold text-brand-primary text-[18px] mb-6">
-                Scholarly Bio
-              </h3>
-
-              <div>
-                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block">
-                  INTELLECTUAL INTERESTS & GOALS
-                </label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={4}
-                  maxLength={500}
-                  className="w-full bg-surface-subtle border border-transparent rounded-md px-4 py-4 text-[13px] text-gray-600 leading-relaxed focus:border-brand-primary/30 focus:bg-white focus:outline-none transition-colors resize-none"
-                  placeholder="Dedicated polymath currently exploring..."
-                />
-                <div className="text-right mt-2">
-                  <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                    {bio.length} / 500 CHARACTERS
-                  </span>
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* DIGITAL FOOTPRINT & MASTER SAVE */}
-            <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-4 sm:p-8">
-              <h3 className="font-bold text-brand-primary text-[18px] mb-6">
-                Digital Footprint
-              </h3>
-
-              <div className="flex items-center bg-surface-subtle rounded-md px-4 py-3.5 border border-transparent focus-within:border-brand-primary/30 focus-within:bg-white transition-colors mb-12">
-                <svg
-                  className="w-5 h-5 text-gray-400 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  value={portfolioUrl}
-                  onChange={(e) => setPortfolioUrl(e.target.value)}
-                  className="w-full bg-transparent border-none text-[13px] text-gray-800 font-medium outline-none"
-                  placeholder="https://portfolio.atelier.edu/a-hamilton"
-                />
-              </div>
-
               {/* MASTER SAVE BUTTONS */}
               <div className="flex flex-col sm:flex-row gap-4 sm:justify-between items-stretch sm:items-center">
                 <div className="flex items-center gap-2">
@@ -1078,16 +913,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBio("");
-                      setPortfolioUrl("");
-                    }}
-                    className="text-[13px] text-gray-600 font-semibold hover:text-gray-800 transition text-center sm:text-left px-2"
-                  >
-                    Discard
-                  </button>
                   <Button
                     onClick={handleSave}
                     disabled={isSaving}

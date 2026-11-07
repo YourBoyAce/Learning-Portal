@@ -56,8 +56,8 @@ export async function generateCertificatePDF(studentName: string, courseName: st
     color: rgb(0.1, 0.1, 0.1),
   });
 
-  // 7. Overlay dynamic Authorized Signature (centered above the line)
-  const signatureText = "Auto-Mate Team";
+  // 7. Overlay the instructor name (centered above the line)
+  const signatureText = "Vinoth Vasu";
   const sigWidth = helveticaOblique.widthOfTextAtSize(signatureText, 14);
   page.drawText(signatureText, {
     x: 490 + (160 - sigWidth) / 2,

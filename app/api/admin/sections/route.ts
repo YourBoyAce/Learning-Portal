@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { apiErrorResponse } from "@/app/lib/error-handler";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -54,7 +55,33 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role?.toLowerCase() !== "admin") {
+  let verifiedRole = profile?.role;
+  if (profileError || !profile) {
+    const profileAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    const { data: adminProfile, error: adminProfileError } = await profileAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    if (adminProfileError) {
+      return {
+        error: apiErrorResponse(
+          adminProfileError,
+          "Failed to verify admin role.",
+        ),
+      };
+    }
+
+    verifiedRole = adminProfile?.role;
+  }
+
+  if (!verifiedRole?.trim() || verifiedRole.trim().toLowerCase() !== "admin") {
     return {
       error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     };

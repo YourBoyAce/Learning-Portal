@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase, resolveUserProfileDetails } from "@/app/lib/supabase";
 import { Logo } from "@/app/components/Logo";
@@ -21,8 +21,6 @@ function MainLayoutContent({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab");
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
@@ -86,6 +84,8 @@ function MainLayoutContent({
   }, [router, pathname]);
 
   const displayName = fullName || userEmail?.split("@")[0] || "User";
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "");
+  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : null;
 
   // Session heartbeat
   useEffect(() => {
@@ -186,24 +186,6 @@ function MainLayoutContent({
         icon: pathname === "/courses"
           ? ICONS.BOOKLIGHT
           : ICONS.BOOK,
-        isExternal: false,
-      },
-      {
-        label: "Quizzes",
-        href: "/practice?tab=quizzes",
-        active: pathname === "/practice" && activeTab !== "artifacts",
-        icon: pathname === "/practice" && activeTab !== "artifacts"
-          ? ICONS.BULBLIGHT
-          : ICONS.BULB,
-        isExternal: false,
-      },
-      {
-        label: "Artifacts",
-        href: "/practice?tab=artifacts",
-        active: pathname === "/practice" && activeTab === "artifacts",
-        icon: pathname === "/practice" && activeTab === "artifacts"
-          ? ICONS.MATERIALLIGHT
-          : ICONS.MATERIAL,
         isExternal: false,
       },
       {
@@ -364,10 +346,23 @@ function MainLayoutContent({
               Sign Out
             </Button>
 
-            <Button className="w-full">
-              <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Support
-            </Button>
+            {whatsappUrl ? (
+              <Button asChild className="w-full">
+                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                  <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Support
+                </a>
+              </Button>
+            ) : (
+              <Button
+                className="w-full"
+                disabled
+                title="WhatsApp support is not configured"
+              >
+                <svg className="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Support
+              </Button>
+            )}
           </div>
         </aside>
 

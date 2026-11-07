@@ -141,23 +141,6 @@ export default function AdminLayout({
     },
 
     {
-      label: "Quiz Management",
-      href: "/admin/quizzes",
-      active: pathname === "/admin/quizzes",
-      icon: pathname === "/admin/quizzes"
-        ? ICONS.BULBLIGHT
-        : ICONS.BULB,
-    },
-
-    {
-      label: "Artifacts Management",
-      href: "/admin/artifacts",
-      active: pathname === "/admin/artifacts",
-      icon: pathname === "/admin/artifacts"
-        ? ICONS.MATERIALLIGHT
-        : ICONS.MATERIAL,
-    },
-    {
       label: "Communities Management",
       href: "/admin/communities",
       active: pathname === "/admin/communities",

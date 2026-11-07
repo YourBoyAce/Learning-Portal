@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLoading } from "@/app/context/LoadingContext";
 import { useRouter } from "next/navigation";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
-import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import {
   BookOpen,
@@ -16,7 +15,10 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { getCourseProgress } from "@/app/actions/get-course-progress";
+import { isCourseModuleAvailable } from "@/app/lib/course-progress";
 import CourseCard from "@/app/components/course/CourseCard";
+import Certificate from "@/app/components/certificate/Certificate";
+import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import Image from "next/image";
@@ -28,7 +30,6 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"; // <-- Update path to match your folder structure
 import { ICONS } from "@/app/styles/icons";
-import CueCard from "@/app/components/course/CueCard";
 import {
   Line,
   LineChart,
@@ -55,6 +56,7 @@ type Enrollment = {
   courseDescription?: string;
   courseCategory?: string;
   courseThumbnail?: string;
+  whatsappCommunityLink?: string | null;
 };
 
 type CalendarEvent = {
@@ -67,11 +69,6 @@ type CalendarEvent = {
   meet_link?: string;
   mentorName?: string;
 };
-interface Insight {
-  id: number;
-  content: string;
-  author: string;
-}
 type LearningActivityDay = {
   day: string;
   earnedPoints: number;
@@ -213,13 +210,14 @@ export default function Dashboard() {
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
-  const [upcomingCoursesList, setUpcomingCoursesList] = useState<any[]>([]);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userProfileName, setUserProfileName] = useState<string>("Learner");
-  // Insight states
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
+  const [selectedCertificateCourse, setSelectedCertificateCourse] =
+    useState<Enrollment | null>(null);
+  const [certificateIssuedAt, setCertificateIssuedAt] = useState<
+    Record<string, string>
+  >({});
   const [totalTime, setTotalTime] = useState<string>("00:00:00");
   const [allCourseModules, setAllCourseModules] = useState<any[]>([]);
 
@@ -366,23 +364,25 @@ export default function Dashboard() {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
-      // fetch profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("current_insight_index, full_name")
-        .eq("id", session.user.id)
-        .single();
-
-      setCurrentInsightIndex(profile?.current_insight_index || 0);
       const resolvedName = await resolveUserName(supabase, session.user.id, session.user.email);
       setUserProfileName(resolvedName);
-      //Fetch Scholarly insights
-      const { data: insightsData } = await supabase
-        .from("scholarly_insights")
-        .select("*")
-        .order("id", { ascending: true });
 
-      if (insightsData) setInsights(insightsData);
+      const { data: certificateRows, error: certificateError } = await supabase
+        .from("certificates")
+        .select("course_id, issued_at")
+        .eq("user_id", session.user.id);
+      if (certificateError) {
+        console.error("Error loading certificate issue dates:", certificateError);
+      } else {
+        setCertificateIssuedAt(
+          Object.fromEntries(
+            (certificateRows ?? []).map((certificate) => [
+              String(certificate.course_id),
+              String(certificate.issued_at),
+            ]),
+          ),
+        );
+      }
 
       const enrollmentsResult = await enrollmentsResponse
         .json()
@@ -497,7 +497,7 @@ export default function Dashboard() {
           const modules = scopeModulesToBatch(
             String(course.id),
             rawModules ?? [],
-          );
+          ).filter(isCourseModuleAvailable);
 
           if (!modules?.length) continue;
 
@@ -538,7 +538,7 @@ export default function Dashboard() {
             const modules = scopeModulesToBatch(
               String(course.id),
               rawModules ?? [],
-            );
+            ).filter(isCourseModuleAvailable);
 
             if (!modules?.length) continue;
 
@@ -589,7 +589,7 @@ export default function Dashboard() {
           const courseModules = scopeModulesToBatch(
             String(course.id),
             rawCourseModules ?? [],
-          );
+          ).filter(isCourseModuleAvailable);
 
           if (courseModules && courseModules.length > 0) {
             allModules = [...allModules, ...courseModules];
@@ -817,15 +817,6 @@ export default function Dashboard() {
       }
     }
 
-    // Fetch upcoming courses (course_type = 'upcoming')
-    const { data: upcomingCoursesData } = await supabase
-      .from("maincourses")
-      .select("id, title, thumbnail_url")
-      .eq("course_type", "upcoming")
-      .order("created_at", { ascending: false });
-
-    setUpcomingCoursesList(upcomingCoursesData ?? []);
-
     setLoading(false);
   };
 
@@ -880,11 +871,6 @@ export default function Dashboard() {
   }, [profile?.full_name, userEmail]);
 
   const hasEnrollments = enrolledCourses.length > 0;
-  const currentInsight = insights[currentInsightIndex] || {
-    id: 0,
-    content: "Cultivating new insights...",
-    author: "",
-  };
 
   const formatEventLabel = (eventDate: string, eventTime: string) => {
     const start = new Date(`${eventDate}T${eventTime}`);
@@ -917,17 +903,6 @@ export default function Dashboard() {
     }
     router.push(`/courses/${nextCourse.id}?module=${nextModule.id}`);
   };
-  // async function for handling insights
-  const handleMarkInsightAsRead = async () => {
-    if (!userId || insights.length === 0) return;
-    const nextIndex = (currentInsightIndex + 1) % insights.length;
-    setCurrentInsightIndex(nextIndex);
-    await supabase
-      .from("profiles")
-      .update({ current_insight_index: nextIndex })
-      .eq("id", userId);
-  };
-
   const handleOpenCourse = (courseId: number | string) => {
     router.push(`/courses/${courseId}`);
   };
@@ -939,6 +914,16 @@ export default function Dashboard() {
 
   const progressPercentage =
     totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
+  const selectedCertificateDate = selectedCertificateCourse
+    ? new Date(
+        certificateIssuedAt[String(selectedCertificateCourse.courseId)] ||
+          new Date(),
+      ).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -1504,6 +1489,7 @@ export default function Dashboard() {
                             }
                             showProgress
                             variant="user"
+                            whatsappLink={enrollment.whatsappCommunityLink}
                             onClick={() =>
                               handleOpenCourse(enrollment.courseId!)
                             }
@@ -1560,6 +1546,11 @@ export default function Dashboard() {
                             }
                             showProgress
                             variant="user"
+                            isCompleted
+                            whatsappLink={enrollment.whatsappCommunityLink}
+                            onCertificateClick={() =>
+                              setSelectedCertificateCourse(enrollment)
+                            }
                             onClick={() =>
                               handleOpenCourse(enrollment.courseId!)
                             }
@@ -1581,102 +1572,37 @@ export default function Dashboard() {
           );
         })()}
 
-        {/* Upcoming courses section */}
-
-        {upcomingCoursesList.length > 0 && (
-          <section>
-            <div className="mb-12 relative px-0 sm:px-4 md:px-0">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                  Coming Soon
-                </h2>
-              </div>
-
-              <Carousel
-                opts={{
-                  align: "start",
-                  loop: false,
-                  dragFree: true,
-                }}
-                className="w-full"
+      </div>
+      {selectedCertificateCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
+          <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-gray-100 bg-white p-1 shadow-2xl">
+            <div className="relative flex flex-col items-center rounded-[22px] border border-amber-500/10 bg-white p-6 text-center sm:p-8">
+              <button
+                type="button"
+                onClick={() => setSelectedCertificateCourse(null)}
+                aria-label="Close certificate preview"
+                className="absolute right-4 top-4 rounded-full p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-700"
               >
-                <CarouselContent className="-ml-4 sm:-ml-6 pb-8 pt-2">
-                  {upcomingCoursesList.map((course) => (
-                    <CarouselItem
-                      key={course.id}
-                      className="pl-4 sm:pl-6 basis-[85vw] sm:basis-[45%] lg:basis-[23%]"
-                    >
-                      <CueCard
-                        title={course.title}
-                        thumbnail={course.thumbnail_url}
-                        onClick={() => console.log("Clicked:", course.title)}
-                      />
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-
-                {/* Navigation Arrows */}
-                {upcomingCoursesList.length > 3 && (
-                  <>
-                    <CarouselPrevious className="hidden lg:flex -left-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
-                    <CarouselNext className="hidden lg:flex -right-5 bg-white shadow-lg border border-gray-100 text-[#2283FF] hover:bg-gray-50 hover:text-blue-600 h-12 w-12 z-10" />
-                  </>
-                )}
-              </Carousel>
-            </div>
-          </section>
-        )}
-
-        <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
-          <div className="absolute right-6 top-6 opacity-40 text-brand-primary/10">
-            <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
-          </div>
-
-          <div className="flex items-center gap-3 mb-4 relative z-10">
-            <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-              <Image
-                src={ICONS.BOOKLIGHT}
-                alt="Certificate"
-                width={20}
-                height={20}
+                <X size={20} />
+              </button>
+              <div className="mb-6 flex h-[300px] w-full items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 py-4 sm:h-[450px]">
+                <div className="shrink-0 origin-center scale-[0.3] rounded-lg border bg-white shadow-lg sm:scale-[0.5] md:scale-[0.6]">
+                  <Certificate
+                    userName={userProfileName}
+                    courseName={selectedCertificateCourse.courseTitle}
+                    completedDate={selectedCertificateDate}
+                  />
+                </div>
+              </div>
+              <CertificateDownload
+                userName={userProfileName}
+                courseName={selectedCertificateCourse.courseTitle}
+                completedDate={selectedCertificateDate}
               />
             </div>
-            <h3 className="font-bold text-brand-heading text-base">
-              The Automate Insight
-            </h3>
           </div>
-
-          <div className="mb-6 relative z-10">
-            {insights.length > 0 ? (
-              <>
-                <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
-                  &quot;{currentInsight.content}&quot;
-                </p>
-                {currentInsight.author && (
-                  <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
-                    &mdash; {currentInsight.author}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">
-                Cultivating new insights...
-              </p>
-            )}
-          </div>
-
-          <div className="relative z-10 flex justify-end">
-            <Button
-              onClick={handleMarkInsightAsRead}
-              disabled={insights.length === 0}
-              className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
-            >
-              {" "}
-              Mark as Read
-            </Button>
-          </div>
-        </section>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

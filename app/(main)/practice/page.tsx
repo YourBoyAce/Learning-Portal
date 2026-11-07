@@ -335,34 +335,28 @@ if (artifactsError) {
   const handleViewResults = async () => {
     if (!activeQuiz) return;
     const totalQuestions = activeQuiz.questions.length;
-    const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
     const targetCourseId = String(activeCourseId || "general");
 
-    // Save best score
-    const courseScores = bestScores[targetCourseId] || {};
-    const currentBest = courseScores[activeQuiz.id] || 0;
-    
-    if (scorePercentage > currentBest) {
-      const updatedScores = {
-        ...courseScores,
-        [activeQuiz.id]: scorePercentage
-      };
-      
-      const newBestScoresState = {
-        ...bestScores,
-        [targetCourseId]: updatedScores
-      };
-      
-      setBestScores(newBestScoresState);
-      localStorage.setItem(`best_scores_${targetCourseId}`, JSON.stringify(updatedScores));
-    }
-    
-    setQuizStep("results");
+    let correctAnswers = quizScore;
+    let scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
     try {
-      await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
+      const completion = await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
+      correctAnswers = completion.correctAnswers;
+      scorePercentage = completion.score;
     } catch (error) {
       console.error("Unable to record quiz completion:", error);
     }
+
+    setQuizScore(correctAnswers);
+    const courseScores = bestScores[targetCourseId] || {};
+    const currentBest = courseScores[activeQuiz.id] || 0;
+    if (scorePercentage > currentBest) {
+      const updatedScores = { ...courseScores, [activeQuiz.id]: scorePercentage };
+      setBestScores({ ...bestScores, [targetCourseId]: updatedScores });
+      localStorage.setItem(`best_scores_${targetCourseId}`, JSON.stringify(updatedScores));
+    }
+
+    setQuizStep("results");
   };
 
   const handleRestartQuiz = () => {

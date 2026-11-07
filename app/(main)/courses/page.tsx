@@ -5,15 +5,13 @@ import { useLoading } from "@/app/context/LoadingContext";
 import Link from "next/link";
 import { supabase, resolveUserName } from "@/app/lib/supabase";
 import { getMyLearningData } from "@/app/actions/my-learning";
-import { getCourseProgress } from "@/app/actions/get-course-progress";
+import { calculateCourseProgress } from "@/app/lib/course-progress";
 import { useRouter } from "next/navigation";
 import CourseCard from "@/app/components/course/CourseCard";
 import CourseCardSkeleton from "@/app/components/course/CourseCardSkeleton";
 import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
-import { Button } from "@/components/ui/button";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import Image from "next/image";
 import {
   Carousel,
   CarouselContent,
@@ -21,18 +19,11 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { BookOpen, PlayCircle, CheckCircle2, ExternalLink, X, Star } from "lucide-react";
-import { ICONS } from "@/app/styles/icons";
+import { PlayCircle, CheckCircle2, ExternalLink, X } from "lucide-react";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 
 // --- Types ---
-interface Insight {
-  id: number;
-  content: string;
-  author: string;
-}
-
 interface UserStats {
   liveSessions: number;
   pendingModules: number;
@@ -92,39 +83,6 @@ interface UpcomingWebinarCard {
   attendees: number;
 }
 
-const normalizeId = (id: string | null | undefined) =>
-  String(id || "").replace(/-/g, "").trim().toLowerCase();
-
-function resolveModuleCompletion(modules: any[] = [], progressRows: any[] = []) {
-  const completionByModuleId = new Map<string, boolean>();
-  const updatedAtByModuleId = new Map<string, string>();
-
-  for (const progress of progressRows) {
-    const normalizedProgressId = normalizeId(progress.video_id);
-    if (!normalizedProgressId) continue;
-
-    const matchedModule = modules.find((module: any) => {
-      return (
-        normalizeId(module.id) === normalizedProgressId ||
-        normalizeId(module.video_cf_id) === normalizedProgressId
-      );
-    });
-
-    if (!matchedModule) continue;
-
-    const moduleId = String(matchedModule.id);
-    const updatedAt = String(progress.updated_at || "");
-    const previousUpdatedAt = updatedAtByModuleId.get(moduleId);
-
-    if (!previousUpdatedAt || updatedAt >= previousUpdatedAt) {
-      completionByModuleId.set(moduleId, Boolean(progress.completed));
-      updatedAtByModuleId.set(moduleId, updatedAt);
-    }
-  }
-
-  return completionByModuleId;
-}
-
 export default function MyLearningDashboard() {
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
@@ -146,11 +104,6 @@ export default function MyLearningDashboard() {
   const [activeTab, setActiveTab] = useState<"in_progress" | "completed">("in_progress");
   const [selectedCertificateCourse, setSelectedCertificateCourse] = useState<CurriculumCourse | null>(null);
   const [userProfileName, setUserProfileName] = useState<string>("Learner");
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [reviewSaved, setReviewSaved] = useState(false);
-  const [reviewError, setReviewError] = useState("");
 
   // Data States
   const [stats, setStats] = useState<UserStats>({
@@ -161,91 +114,6 @@ export default function MyLearningDashboard() {
   const [courseProgress, setCourseProgress] = useState<Record<string, { progressPercentage: number; completedModules: number; totalModules: number }>>({});
 
   const router = useRouter();
-
-  const handleSubmitReview = async () => {
-    if (!userId || !selectedCertificateCourse) {
-      setReviewError("Please sign in again to save your review.");
-      return;
-    }
-
-    if (reviewRating < 1) {
-      setReviewError("Please select a rating from 1 to 5 stars.");
-      return;
-    }
-
-    if (!reviewText.trim()) {
-      setReviewError("Please share a short description of your experience.");
-      return;
-    }
-
-    try {
-      setReviewSubmitting(true);
-      setReviewError("");
-
-      const { error } = await supabase.from("course_ratings").upsert(
-        {
-          user_id: userId,
-          course_id: String(selectedCertificateCourse.id),
-          product_id: selectedCertificateCourse.product_id
-            ? String(selectedCertificateCourse.product_id)
-            : null,
-          rating: reviewRating,
-          review: reviewText.trim(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,course_id" },
-      );
-
-      if (error) throw error;
-
-      setReviewSaved(true);
-    } catch (error) {
-      console.error("Error saving course review:", error);
-      setReviewError("We could not save your review right now. Please try again.");
-    } finally {
-      setReviewSubmitting(false);
-    }
-  };
-
-  useEffect(() => {
-    const checkExistingReview = async () => {
-      if (!userId || !selectedCertificateCourse) {
-        setReviewSaved(false);
-        setReviewRating(0);
-        setReviewText("");
-        setReviewError("");
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("course_ratings")
-          .select("rating, review")
-          .eq("user_id", userId)
-          .eq("course_id", String(selectedCertificateCourse.id))
-          .maybeSingle();
-
-        if (!error && data) {
-          setReviewSaved(true);
-          setReviewRating(Number(data.rating) || 0);
-          setReviewText(String(data.review || ""));
-        } else {
-          setReviewSaved(false);
-          setReviewRating(0);
-          setReviewText("");
-        }
-      } catch (error) {
-        console.error("Error checking existing review:", error);
-        setReviewSaved(false);
-      }
-    };
-
-    checkExistingReview();
-  }, [selectedCertificateCourse, userId]);
-
-  // Insight States
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [currentInsightIndex, setCurrentInsightIndex] = useState(0);
 
   // Curriculum State
   const [curriculum, setCurriculum] = useState<CurriculumCourse[]>([]);
@@ -293,28 +161,8 @@ export default function MyLearningDashboard() {
       // --------------------------------------------------
       // USER PROFILE
       // --------------------------------------------------
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("current_insight_index, full_name, role")
-        .eq("id", session.user.id)
-        .single();
-
-      setCurrentInsightIndex(profile?.current_insight_index || 0);
-
       const resolvedName = await resolveUserName(supabase, session.user.id, session.user.email);
       setUserProfileName(resolvedName);
-
-      // --------------------------------------------------
-      // INSIGHTS
-      // --------------------------------------------------
-      const { data: insightsData } = await supabase
-        .from("scholarly_insights")
-        .select("*")
-        .order("id", { ascending: true });
-
-      if (insightsData) {
-        setInsights(insightsData);
-      }
 
       // --------------------------------------------------
       // WEBINARS
@@ -461,8 +309,6 @@ export default function MyLearningDashboard() {
             (a.order_index ?? 0) - (b.order_index ?? 0)
         );
 
-        const totalModules = modules.length;
-
         // ------------------------------------------
         // COURSE PROGRESS ROWS
         // ------------------------------------------
@@ -472,35 +318,18 @@ export default function MyLearningDashboard() {
               String(p.course_id) === String(course.id)
           ) || [];
 
-        const moduleCompletion = resolveModuleCompletion(
+        const courseProgress = calculateCourseProgress(
           modules,
           courseProgressRows,
         );
 
         // ------------------------------------------
-        // COMPLETED MODULES
-        // ------------------------------------------
-        const completedModules = modules.filter((m: any) => {
-          return moduleCompletion.get(String(m.id));
-        }).length;
-
-        // ------------------------------------------
-        // PERCENTAGE
-        // ------------------------------------------
-        const progressPercentage =
-          totalModules > 0
-            ? Math.round(
-              (completedModules / totalModules) * 100
-            )
-            : 0;
-
-        // ------------------------------------------
         // STORE PROGRESS MAP
         // ------------------------------------------
         progressMap[String(course.id)] = {
-          progressPercentage,
-          completedModules,
-          totalModules,
+          progressPercentage: courseProgress.progressPercentage,
+          completedModules: courseProgress.completedModules,
+          totalModules: courseProgress.totalModules,
         };
 
         // ------------------------------------------
@@ -528,7 +357,7 @@ export default function MyLearningDashboard() {
 
           thumbnail_url: course.thumbnail_url,
 
-          progress: progressPercentage,
+          progress: courseProgress.progressPercentage,
 
           modules,
 
@@ -540,11 +369,11 @@ export default function MyLearningDashboard() {
             cert?.certificate_url || null,
 
           duration:
-            progressPercentage === 0
+            courseProgress.progressPercentage === 0
               ? "Ready to begin"
-              : progressPercentage === 100
+              : courseProgress.progressPercentage === 100
                 ? "Completed"
-                : `${completedModules}/${totalModules} Modules`,
+                : `${courseProgress.completedModules}/${courseProgress.totalModules} Modules`,
 
           product_id: course.product_id ?? null,
 
@@ -633,23 +462,6 @@ export default function MyLearningDashboard() {
     };
   }, [userId]);
 
-
-  const handleMarkInsightAsRead = async () => {
-    if (!userId || insights.length === 0) return;
-    const nextIndex = (currentInsightIndex + 1) % insights.length;
-    setCurrentInsightIndex(nextIndex);
-    await supabase
-      .from("profiles")
-      .update({ current_insight_index: nextIndex })
-      .eq("id", userId);
-  };
-
-
-
-  const currentInsight = insights[currentInsightIndex] || {
-    content: "Loading insight...",
-    author: "",
-  };
 
   // Calculate SVG Circle values
   const circleRadius = 45;
@@ -853,49 +665,6 @@ export default function MyLearningDashboard() {
               </section>
             )}
 
-            {/* ─── THE AUTOMATE INSIGHT ─── */}
-            <section className="bg-gradient-to-r from-surface-accent-start to-surface-accent-end border-l-[6px] border-brand-primary p-7 rounded-r-2xl shadow-sm relative">
-              <div className="absolute right-6 opacity-40 top-6 text-brand-primary/10">
-                <Image src={ICONS.BOOK} alt="Certificate" width={60} height={60} />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center shrink-0">
-                  <Image src={ICONS.BOOKLIGHT} alt="Certificate" width={20} height={20} />
-                </div>
-                <h3 className="font-bold text-brand-heading text-base">
-                  The Automate Insight
-                </h3>
-              </div>
-
-              <div className="mb-6 relative z-10">
-                {insights.length > 0 ? (
-                  <>
-                    <p className="text-[15px] text-gray-700 leading-relaxed max-w-4xl">
-                      &quot;{currentInsight.content}&quot;
-                    </p>
-                    {currentInsight.author && (
-                      <p className="text-[11px] text-brand-hover font-bold mt-4 tracking-wider uppercase">
-                        &mdash; {currentInsight.author}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    Cultivating new insights...
-                  </p>
-                )}
-              </div>
-
-              <div className="relative z-10 flex justify-end">
-                <Button
-                  onClick={handleMarkInsightAsRead}
-                  disabled={insights.length === 0}
-                  className={`w-full sm:w-auto ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
-                > Mark as Read
-                </Button>
-              </div>
-            </section>
           </>
         )}
       </div>
@@ -914,97 +683,31 @@ export default function MyLearningDashboard() {
                 <X size={20} />
               </button>
 
-              <div className="w-full rounded-3xl border border-amber-100 bg-amber-50/70 p-5 sm:p-6 text-left mb-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100">
-                    <Star size={18} className="text-amber-600" />
-                  </div>
-                  <h3 className="text-base font-semibold text-gray-800">Share your experience</h3>
+              <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
+                <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
+                  <Certificate
+                    userName={userProfileName}
+                    courseName={selectedCertificateCourse.title}
+                    completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  />
                 </div>
-                <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                  A review is required before this certificate can be downloaded. If you have already submitted one for this course, it will be reused automatically.
-                </p>
-
-                <div className="flex items-center gap-2 mb-4">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => {
-                        setReviewRating(star);
-                        setReviewError("");
-                      }}
-                      className="transition-transform hover:scale-110"
-                      aria-label={`Rate ${star} out of 5`}
-                    >
-                      <Star
-                        size={24}
-                        className={star <= reviewRating ? "text-amber-500 fill-amber-500" : "text-gray-300"}
-                        strokeWidth={1.8}
-                      />
-                    </button>
-                  ))}
-                </div>
-
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                  Your experience
-                </label>
-                <textarea
-                  value={reviewText}
-                  onChange={(event) => {
-                    setReviewText(event.target.value);
-                    if (reviewError) setReviewError("");
-                  }}
-                  rows={4}
-                  placeholder="Tell us what you liked, what felt difficult, or any suggestions you have..."
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 min-h-[112px]"
-                />
-
-                {reviewError && <p className="mt-2 text-xs text-red-600">{reviewError}</p>}
-                {reviewSaved && (
-                  <p className="mt-2 text-xs font-medium text-emerald-600">
-                    Thank you! Your review has been saved for this course.
-                  </p>
-                )}
-
-                <Button
-                  onClick={handleSubmitReview}
-                  disabled={reviewSubmitting || !reviewText.trim() || reviewRating < 1}
-                  className="mt-4 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-heading hover:bg-brand-heading-hover text-white font-bold text-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {reviewSubmitting ? "Saving review..." : reviewSaved ? "Review Saved" : "Save Review"}
-                </Button>
               </div>
 
-              {reviewSaved && (
-                <>
-                  <div className="w-full overflow-hidden flex justify-center items-center py-4 bg-gray-50 rounded-2xl border border-gray-100 mb-6 h-[300px] sm:h-[450px]">
-                    <div className="scale-[0.3] sm:scale-[0.5] md:scale-[0.6] origin-center shadow-lg rounded-lg border bg-white overflow-hidden shrink-0">
-                      <Certificate
-                        userName={userProfileName}
-                        courseName={selectedCertificateCourse.title}
-                        completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-2">
-                    <CertificateDownload
-                      userName={userProfileName}
-                      courseName={selectedCertificateCourse.title}
-                      completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    />
-                  </div>
-                </>
-              )}
+              <div className="mb-2">
+                <CertificateDownload
+                  userName={userProfileName}
+                  courseName={selectedCertificateCourse.title}
+                  completedDate={new Date(selectedCertificateCourse.issued_at || new Date()).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                />
+              </div>
 
             </div>
           </div>

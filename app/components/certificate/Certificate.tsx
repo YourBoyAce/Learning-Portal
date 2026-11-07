@@ -115,10 +115,12 @@ const Certificate = forwardRef<HTMLDivElement, CertificateProps>(
 
           {/* SIGNATURE */}
           <div className="text-center flex flex-col items-center">
-            <div className="h-[30px] w-[220px]" />
+            <p className="h-[30px] w-[220px] flex items-end justify-center text-[20px] font-semibold italic text-gray-800">
+              Vinoth Vasu
+            </p>
             <div className="w-[220px] h-[2px] bg-gray-300 mt-2 mb-2" />
             <p className="text-[14px] text-gray-500 font-bold uppercase tracking-widest">
-              Authorized Signature
+              Instructor
             </p>
           </div>
           

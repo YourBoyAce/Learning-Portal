@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 
   let courseQuery = authContext.supabaseAdmin
     .from("maincourses")
-    .select("id, title, description, category, thumbnail_url, created_at, product_id");
+    .select("id, title, description, category, thumbnail_url, created_at, product_id, whatsapp_community_link");
 
   if (directCourseIds.length > 0 && enrollmentProductIds.length > 0) {
     courseQuery = courseQuery.or(
@@ -149,6 +149,7 @@ export async function GET(request: Request) {
       courseDescription: course.description ?? "",
       courseCategory: course.category ?? "General",
       courseThumbnail: course.thumbnail_url ?? "",
+      whatsappCommunityLink: course.whatsapp_community_link ?? null,
     };
   });
 

@@ -21,7 +21,7 @@ function normalizeId(value: unknown): string | number | null {
 }
 
 function isAdminRole(role: string | null | undefined): boolean {
-  return role?.toLowerCase() === "admin";
+  return role?.trim().toLowerCase() === "admin";
 }
 
 type ProfileRow = {
@@ -128,7 +128,33 @@ async function authenticateAdmin(request: Request): Promise<AuthContext> {
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role?.toLowerCase() !== "admin") {
+  let verifiedRole = profile?.role;
+  if (profileError || !profile) {
+    const profileAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    const { data: adminProfile, error: adminProfileError } = await profileAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    if (adminProfileError) {
+      return {
+        error: apiErrorResponse(
+          adminProfileError,
+          "Failed to verify admin role.",
+        ),
+      };
+    }
+
+    verifiedRole = adminProfile?.role;
+  }
+
+  if (!isAdminRole(verifiedRole)) {
     return {
       error: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     };

@@ -125,7 +125,7 @@ export default function AdminCourses() {
   }
 
   const [modules, setModules] = useState<
-    Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[]; section_id?: string | number | null }>
+    Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[]; section_id?: string | number | null; video_cf_id?: string | null }>
   >([]);
 
   // â”€â”€ Section state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -133,7 +133,7 @@ export default function AdminCourses() {
     id?: string | number;
     title: string;
     description: string;
-    modules: Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[] }>;
+    modules: Array<{ id?: string | number; title: string; description: string; module_type?: "video" | "quiz" | "artifact"; questions?: ModuleQuestion[]; video_cf_id?: string | null }>;
   }
   const [courseSections, setCourseSections] = useState<SectionState[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -304,7 +304,7 @@ export default function AdminCourses() {
     try {
       const { data, error } = await supabase
         .from("coursemodules")
-        .select("id, title, description, module_type, questions")
+        .select("id, title, description, module_type, questions, video_cf_id")
         .eq("maincourse_id", course.id)
         .order("order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
@@ -316,6 +316,7 @@ export default function AdminCourses() {
             title: m.title,
             description: m.description || "",
             module_type: m.module_type || "video",
+            video_cf_id: m.video_cf_id || null,
             questions: Array.isArray(m.questions)
               ? m.questions
               : typeof m.questions === "string"
@@ -347,7 +348,7 @@ export default function AdminCourses() {
         // Fetch modules to group into sections
         const { data: allModules } = await supabase
           .from("coursemodules")
-          .select("id, title, description, module_type, questions, section_id")
+          .select("id, title, description, module_type, questions, section_id, video_cf_id")
           .eq("maincourse_id", course.id)
           .order("order_index", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true });
@@ -363,6 +364,7 @@ export default function AdminCourses() {
               title: m.title,
               description: m.description || "",
               module_type: m.module_type || "video",
+              video_cf_id: m.video_cf_id || null,
               questions: Array.isArray(m.questions)
                 ? m.questions
                 : typeof m.questions === "string"
@@ -1441,6 +1443,12 @@ export default function AdminCourses() {
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
+                              {(mod.module_type || "video") === "video" &&
+                                !mod.video_cf_id?.trim() && (
+                                  <p className="text-[11px] font-medium text-amber-700">
+                                    Video not uploaded yet
+                                  </p>
+                                )}
                               {mod.module_type === "quiz" ? (
                                 <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-3.5 -mb-3.5">
                                   <div className="flex items-center justify-between pb-1">
@@ -1754,6 +1762,12 @@ export default function AdminCourses() {
                             <X className="w-4 h-4" />
                           </button>
                         </div>
+                        {(module.module_type || "video") === "video" &&
+                          !module.video_cf_id?.trim() && (
+                            <p className="text-[11px] font-medium text-amber-700">
+                              Video not uploaded yet
+                            </p>
+                          )}
                         {module.module_type === "quiz" ? (
                           <div className="space-y-3 pt-3 border-t-2 border-slate-200 bg-slate-50/90 rounded-b-xl p-3.5 -mx-4 -mb-4">
                             <div className="flex items-center justify-between pb-1">

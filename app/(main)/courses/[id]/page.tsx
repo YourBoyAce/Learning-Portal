@@ -217,22 +217,17 @@ export default function CoursePlayerPage() {
   const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
-  // --- QUIZZES, ARTIFACTS & COMMUNITY INTEGRATION STATE ---
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "modules" | "quizzes" | "artifacts" | "community"
-  >("modules");
+  const [activeTab, setActiveTab] = useState<"overview" | "modules">("modules");
 
   // Persist tab state across reloads
   useEffect(() => {
     if (id && typeof window !== "undefined") {
       const saved = sessionStorage.getItem(`activeTab_${id}`);
-      if (saved && ["overview", "modules", "quizzes", "artifacts", "community"].includes(saved)) {
-        setActiveTab(saved as any);
-      }
+      setActiveTab(saved === "overview" ? "overview" : "modules");
     }
   }, [id]);
 
-  const handleTabChange = (tab: "overview" | "modules" | "quizzes" | "artifacts" | "community") => {
+  const handleTabChange = (tab: "overview" | "modules") => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       sessionStorage.setItem(`activeTab_${id}`, tab);
@@ -298,16 +293,18 @@ export default function CoursePlayerPage() {
               data = await fetchLearnerQuizzes(String(id));
             } catch {}
           }
-          setCourseQuizzes((data || []).map((quiz) => ({
-            id: String(quiz.id),
-            courseId: quiz.course_id,
-            courseName: course.title,
-            title: quiz.title,
-            questions: Array.isArray(quiz.questions) ? quiz.questions : [],
-            questionsCount: Array.isArray(quiz.questions) ? quiz.questions.length : 0,
-            passingScore: Number(quiz.passing_score || 80),
-            status: quiz.status,
-          })));
+          setCourseQuizzes((data || [])
+            .filter((quiz) => Array.isArray(quiz.questions) && quiz.questions.length > 0)
+            .map((quiz) => ({
+              id: String(quiz.id),
+              courseId: quiz.course_id,
+              courseName: course.title,
+              title: quiz.title,
+              questions: quiz.questions,
+              questionsCount: quiz.questions.length,
+              passingScore: Number(quiz.passing_score || 80),
+              status: quiz.status,
+            })));
         } catch (error) {
           console.error("Failed to fetch quizzes:", error);
           setCourseQuizzes([]);
@@ -329,9 +326,11 @@ export default function CoursePlayerPage() {
             .or(courseFilter);
 
           if (!error && dbArtifacts && dbArtifacts.length > 0) {
-            const batchFiltered = dbArtifacts.filter((it: any) => {
-              return true;
-            });
+            const batchFiltered = dbArtifacts.filter(
+              (artifact: any) =>
+                (typeof artifact.file_url === "string" && artifact.file_url.trim()) ||
+                (typeof artifact.file_path === "string" && artifact.file_path.trim()),
+            );
             setCourseArtifacts(
               batchFiltered.map((it: any) => ({
                 id: it.id,
@@ -562,29 +561,27 @@ export default function CoursePlayerPage() {
   const handleViewResults = async () => {
     if (!activeQuiz) return;
     const totalQuestions = activeQuiz.questions.length;
-    const scorePercentage = Math.round((quizScore / totalQuestions) * 100);
+    let correctAnswers = quizScore;
+    let scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
+    try {
+      const completion = await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
+      correctAnswers = completion.correctAnswers;
+      scorePercentage = completion.score;
+    } catch (error) {
+      console.error("Unable to record quiz completion:", error);
+    }
 
+    setQuizScore(correctAnswers);
     const currentBest = bestScores[activeQuiz.id] || 0;
     if (scorePercentage > currentBest) {
-      const updatedBest = {
-        ...bestScores,
-        [activeQuiz.id]: scorePercentage,
-      };
+      const updatedBest = { ...bestScores, [activeQuiz.id]: scorePercentage };
       setBestScores(updatedBest);
       if (course) {
-        localStorage.setItem(
-          `best_scores_${course.id}`,
-          JSON.stringify(updatedBest),
-        );
+        localStorage.setItem(`best_scores_${course.id}`, JSON.stringify(updatedBest));
       }
     }
 
     setQuizStep("results");
-    try {
-      await recordQuizCompletion(activeQuiz.id, activeQuiz.questions, userAnswers);
-    } catch (error) {
-      console.error("Unable to record quiz completion:", error);
-    }
   };
 
   const handleRestartQuiz = () => {
@@ -673,7 +670,6 @@ export default function CoursePlayerPage() {
 
         if (sectionData && sectionData.length > 0) {
           sectionRows = sectionData;
-          setCourseSections(sectionData);
         }
       } catch {
         // Sections are optional, continue without them
@@ -699,7 +695,39 @@ export default function CoursePlayerPage() {
               })
               .map(({ m }) => m)
           : rawModules;
-      setModules(orderedModules);
+      const visibleModules = isAdminCoursePage
+        ? orderedModules
+        : orderedModules.filter((module) => {
+            const moduleType = module.module_type || "video";
+
+            if (moduleType === "video") {
+              return Boolean(module.video_cf_id?.trim());
+            }
+
+            if (moduleType === "quiz") {
+              return Array.isArray(module.questions) && module.questions.length > 0;
+            }
+
+            const artifact = Array.isArray(module.questions)
+              ? module.questions[0]
+              : null;
+            return Boolean(
+              artifact &&
+                typeof artifact.text === "string" &&
+                artifact.text.trim() &&
+                typeof artifact.correctAnswer === "string" &&
+                artifact.correctAnswer.trim(),
+            );
+          });
+      const visibleSections = isAdminCoursePage
+        ? sectionRows
+        : sectionRows.filter((section) =>
+            visibleModules.some(
+              (module) => String(module.section_id) === String(section.id),
+            ),
+          );
+      setCourseSections(visibleSections);
+      setModules(visibleModules);
 
       let { data: progressData, error: progressError }: {
         data: any[] | null;
@@ -732,7 +760,7 @@ export default function CoursePlayerPage() {
       const positionMap: Record<string, number> = {};
       const progressUpdatedAt: Record<string, string> = {};
       progressData?.forEach((p: any) => {
-        const matchedModule = findModuleByLookupId(orderedModules, p.video_id);
+        const matchedModule = findModuleByLookupId(visibleModules, p.video_id);
         if (!matchedModule) return;
 
         const moduleKey = getModuleKey(matchedModule);
@@ -785,7 +813,7 @@ export default function CoursePlayerPage() {
             number
           >;
           Object.entries(localPositions).forEach(([moduleId, position]) => {
-            const module = findModuleByLookupId(orderedModules, moduleId);
+            const module = findModuleByLookupId(visibleModules, moduleId);
             if (!module) return;
             const moduleKey = getModuleKey(module);
             if (!progressMap[moduleKey] && Number(position) > 0) {
@@ -805,13 +833,13 @@ export default function CoursePlayerPage() {
       setPlaybackPositions(positionMap);
 
       // Select the best module to play
-      const playableModules = orderedModules.filter((m) => m.module_type !== "quiz");
-      const modulesForPlayback = playableModules.length > 0 ? playableModules : orderedModules;
+      const playableModules = visibleModules.filter((m) => m.module_type !== "quiz");
+      const modulesForPlayback = playableModules.length > 0 ? playableModules : visibleModules;
 
       if (modulesForPlayback.length > 0) {
         const requestedModuleId = searchParams.get("module");
         const requestedModule = findModuleByLookupId(
-          orderedModules,
+          visibleModules,
           requestedModuleId
         );
 
@@ -1732,6 +1760,13 @@ export default function CoursePlayerPage() {
                                       {mod.description}
                                     </p>
                                   )}
+                                  {isAdminCoursePage &&
+                                    (mod.module_type || "video") === "video" &&
+                                    !mod.video_cf_id?.trim() && (
+                                      <p className="text-[11px] font-medium text-amber-700">
+                                        Video not uploaded yet
+                                      </p>
+                                    )}
                                 </div>
 
                                 {isAdminCoursePage && (
@@ -1846,6 +1881,13 @@ export default function CoursePlayerPage() {
                                     <FileText size={10} /> Artifact
                                   </span>
                                 )}
+                                {isAdminCoursePage &&
+                                  (mod.module_type || "video") === "video" &&
+                                  !mod.video_cf_id?.trim() && (
+                                    <span className="text-[10px] font-medium text-amber-700">
+                                      Video not uploaded yet
+                                    </span>
+                                  )}
                               </div>
                             </div>
                           </div>
@@ -2530,7 +2572,7 @@ export default function CoursePlayerPage() {
                       setModQuizIsSubmitted(true);
                     };
 
-                    const handleNextModQuestion = () => {
+                    const handleNextModQuestion = async () => {
                       if (modQuizQIdx < qList.length - 1) {
                         setModQuizQIdx((prev) => prev + 1);
                         setModQuizSelectedAnswer(null);
@@ -2538,7 +2580,39 @@ export default function CoursePlayerPage() {
                       } else {
                         setModQuizFinished(true);
                         if (activeModuleId) {
-                          applyAutoCompletionState(String(activeModuleId));
+                          const moduleKey = String(activeModuleId);
+                          if (!userId || !id) {
+                            setCompletionError(
+                              "Your quiz was completed, but progress could not be saved. Please sign in again and retry.",
+                            );
+                            return;
+                          }
+
+                          const module = findModuleByLookupId(
+                            modules,
+                            moduleKey,
+                          );
+                          const progressIds = getModuleProgressIds(module);
+
+                          try {
+                            await upsertUserProgress(
+                              userId,
+                              String(id),
+                              progressIds[0] || moduleKey,
+                              100,
+                              true,
+                              progressIds,
+                            );
+                            applyAutoCompletionState(moduleKey);
+                          } catch (error) {
+                            console.error(
+                              "Failed to save quiz module completion:",
+                              error,
+                            );
+                            setCompletionError(
+                              "Your quiz was completed, but progress could not be saved. Please try again.",
+                            );
+                          }
                         }
                       }
                     };
@@ -2960,38 +3034,6 @@ export default function CoursePlayerPage() {
                   <Clock size={13} />
                   Modules
                 </button>
-                <button
-                  onClick={() => handleTabChange("quizzes")}
-                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block relative ${activeTab === "quizzes"
-                    ? "border-brand-heading text-brand-heading bg-white"
-                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                    }`}
-                >
-                  <HelpCircle size={13} />
-                  Quizzes
-                  {(courseQuizzes.length > 0 || modules.some((m) => m.module_type === "quiz")) && (
-                    <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => handleTabChange("artifacts")}
-                  className={`flex-1 min-w-0 py-3 px-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 [&>svg]:hidden sm:[&>svg]:block relative ${activeTab === "artifacts"
-                    ? "border-brand-heading text-brand-heading bg-white"
-                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                    }`}
-                >
-                  <DownloadCloud size={13} />
-                  Artifacts
-                  {courseArtifacts.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                    </span>
-                  )}
-                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
@@ -2999,8 +3041,6 @@ export default function CoursePlayerPage() {
                   <div className="p-5 sm:p-6">{renderModuleOverview()}</div>
                 )}
                 {activeTab === "modules" && renderModulesList()}
-                {activeTab === "quizzes" && renderQuizzesList()}
-                {activeTab === "artifacts" && renderArtifactsList()}
               </div>
             </div>
 
@@ -3011,56 +3051,18 @@ export default function CoursePlayerPage() {
 
         {/* Right: Module Sidebar (Desktop Only) */}
         <div className="hidden xl:flex xl:col-span-4 bg-white xl:sticky xl:top-16 xl:h-[calc(100vh-160px)] mb-6 self-start overflow-hidden border-l border-gray-100 flex-col rounded-bl-xl rounded-br-xl">
-          <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0">
+          <div className="flex border-b border-gray-100 bg-gray-50/50 shrink-0 px-4">
             <button
               onClick={() => handleTabChange("modules")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === "modules" || activeTab === "overview"
-                ? "border-brand-heading text-brand-heading bg-white"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                }`}
+              className="relative inline-flex items-center justify-start gap-1.5 border-b-2 border-transparent bg-white py-4 text-left text-[10px] font-bold uppercase tracking-wider text-brand-heading after:absolute after:bottom-[-2px] after:left-0 after:h-0.5 after:w-10 after:bg-brand-heading"
             >
               <BookOpen size={13} />
               Modules
             </button>
-            <button
-              onClick={() => handleTabChange("quizzes")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "quizzes"
-                ? "border-brand-heading text-brand-heading bg-white"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                }`}
-            >
-              <HelpCircle size={13} />
-              Quizzes
-              {(courseQuizzes.length > 0 || modules.some((m) => m.module_type === "quiz")) && (
-                <span className="absolute top-2 right-2 flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-alt"></span>
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => handleTabChange("artifacts")}
-              className={`flex-1 py-4 text-[10px] font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 relative ${activeTab === "artifacts"
-                ? "border-brand-heading text-brand-heading bg-white"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50"
-                }`}
-            >
-              <DownloadCloud size={13} />
-              Artifacts
-              {courseArtifacts.length > 0 && (
-                <span className="absolute top-2 right-2 flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                </span>
-              )}
-            </button>
           </div>
 
           <div className="flex-1 flex flex-col divide-y divide-gray-50 overflow-y-auto">
-            {(activeTab === "modules" || activeTab === "overview") &&
-              renderModulesList()}
-            {activeTab === "quizzes" && renderQuizzesList()}
-            {activeTab === "artifacts" && renderArtifactsList()}
+            {renderModulesList()}
           </div>
         </div>
       </main>
@@ -3521,6 +3523,8 @@ export default function CoursePlayerPage() {
       <Modal
         open={showCertificateModal && canViewCertificate}
         onClose={() => setShowCertificateModal(false)}
+        showCloseButton
+        closeButtonClassName="z-20 bg-white shadow-sm"
         panelClassName="max-w-4xl w-full border border-gray-100 relative p-1 bg-gradient-to-br from-amber-400 via-white to-amber-400 max-h-[90vh] overflow-y-auto scrollbar-hide"
       >
         <div className="bg-white rounded-[22px] p-6 sm:p-8 md:p-12 flex flex-col items-center justify-center text-center relative border border-amber-500/10">
