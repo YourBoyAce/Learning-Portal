@@ -46,6 +46,12 @@ export function extractDurationFromTag(tag?: string | null, fallback = 60): numb
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+export function extractCourseIdFromTag(tag?: string | null): string | null {
+  if (!tag) return null;
+  const match = tag.match(/(?:^|\|)course:([^|]+)/);
+  return match?.[1]?.trim() || null;
+}
+
 export function splitEventDateTime(
   eventDateValue?: string | null,
   fallbackDate?: string | null,

@@ -50,8 +50,8 @@ async function getSecureUserId(accessToken: string): Promise<string | null> {
 }
 
 /**
- * Creates mention notification rows for tagged admins/mentors.
- * Skips self-mentions and non-staff recipients.
+ * Creates mention notification rows for tagged admins.
+ * Skips self-mentions and non-admin recipients.
  */
 export async function createMentionNotifications(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,19 +79,19 @@ export async function createMentionNotifications(
     .select("id, role")
     .in("id", uniqueIds);
 
-  const staffRoles = new Set(["admin", "instructor", "mentor"]);
-  const staffRecipients = (profiles ?? [])
+  const allowedRoles = new Set(["admin"]);
+  const adminRecipients = (profiles ?? [])
     .filter((p: { id: string; role: string | null }) =>
-      staffRoles.has((p.role ?? "").toLowerCase()),
+      allowedRoles.has((p.role ?? "").toLowerCase()),
     )
     .map((p: { id: string }) => p.id);
 
-  if (staffRecipients.length === 0) return;
+  if (adminRecipients.length === 0) return;
 
   const preview =
     content.length > 120 ? `${content.slice(0, 117)}...` : content;
 
-  const rows = staffRecipients.map((recipientId: string) => ({
+  const rows = adminRecipients.map((recipientId: string) => ({
     recipient_user_id: recipientId,
     sender_user_id: senderUserId,
     message_id: messageId,

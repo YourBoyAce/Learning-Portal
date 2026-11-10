@@ -215,36 +215,38 @@ export default function ProfilePage() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] text-gray-400 font-medium">
-                    Verification
-                  </span>
+                {false && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-gray-400 font-medium">
+                      Verification
+                    </span>
 
-                  <div className="flex items-center gap-1.5">
-                    {phoneVerified ? (
-                      <>
-                        <svg
-                          className="w-4 h-4 text-[#0052CC]"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <span className="text-[13px] font-bold text-[#0052CC]">
-                          Phone Verified
+                    <div className="flex items-center gap-1.5">
+                      {phoneVerified ? (
+                        <>
+                          <svg
+                            className="w-4 h-4 text-[#0052CC]"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span className="text-[13px] font-bold text-[#0052CC]">
+                            Phone Verified
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[13px] font-bold text-amber-600">
+                          Phone Not Verified
                         </span>
-                      </>
-                    ) : (
-                      <span className="text-[13px] font-bold text-amber-600">
-                        Phone Not Verified
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -287,15 +289,17 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <PhoneVerification
-              initialPhone={phone}
-              initialVerified={phoneVerified}
-              onVerified={(verifiedPhone) => {
-                setPhone(verifiedPhone);
-                setPhoneVerified(true);
-                dispatchProfileUpdated();
-              }}
-            />
+            {false && (
+              <PhoneVerification
+                initialPhone={phone}
+                initialVerified={phoneVerified}
+                onVerified={(verifiedPhone) => {
+                  setPhone(verifiedPhone);
+                  setPhoneVerified(true);
+                  dispatchProfileUpdated();
+                }}
+              />
+            )}
 
             {/* MENTOR SETTINGS (ONLY FOR INSTRUCTORS & ADMINS) */}
             {(role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin") && (

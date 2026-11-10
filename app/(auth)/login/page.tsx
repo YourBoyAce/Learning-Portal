@@ -7,10 +7,10 @@ import AdminVerificationModal from "@/app/components/AdminVerificationModal";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
 import Image from "next/image";
-import { Mail, Phone, Loader2, ShieldAlert, X } from "lucide-react";
+import { Mail, Loader2, ShieldAlert, X } from "lucide-react";
 
 type LoginStep = "credentials" | "chooseMethod";
-type VerificationMethod = "email" | "phone";
+type VerificationMethod = "email";
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
@@ -28,7 +28,6 @@ function LoginPageInner() {
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
   const [maskedEmail, setMaskedEmail] = useState("");
-  const [savedPhone, setSavedPhone] = useState("");
   const [activeVerification, setActiveVerification] =
     useState<VerificationMethod | null>(null);
   const [loading, setLoading] = useState(false);
@@ -192,7 +191,6 @@ function LoginPageInner() {
   const resetToCredentials = () => {
     setStep("credentials");
     setMaskedEmail("");
-    setSavedPhone("");
     setActiveVerification(null);
     setError("");
   };
@@ -289,8 +287,7 @@ function LoginPageInner() {
     }
 
     setMaskedEmail(result.maskedEmail || email);
-    setSavedPhone(result.savedPhone || "");
-    setStep("chooseMethod");
+    setActiveVerification("email");
     setLoading(false);
   };
 
@@ -434,11 +431,11 @@ function LoginPageInner() {
                   Verify Admin Login
                 </h2>
                 <p className="text-xs text-gray-500 mt-1 mb-4">
-                  Your admin credentials are valid. Choose how you would like to
-                  receive your verification code.
+                  Your admin credentials are valid. Verify your login using the
+                  code sent to your email.
                 </p>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3">
                   <button
                     type="button"
                     onClick={() => setActiveVerification("email")}
@@ -450,38 +447,6 @@ function LoginPageInner() {
                     <p className="text-sm font-semibold text-gray-800">Email</p>
                     <p className="mt-1 text-xs text-gray-500 break-words">
                       Send a code to {maskedEmail || "your email"}.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!savedPhone}
-                    onClick={() => {
-                      if (!savedPhone) {
-                        setError(
-                          "No phone number is registered for this admin account. Contact an administrator.",
-                        );
-                        return;
-                      }
-                      setError("");
-                      setActiveVerification("phone");
-                    }}
-                    className={`rounded-xl border border-gray-200 bg-[#F8FAFC] p-4 text-left transition ${
-                      savedPhone
-                        ? "hover:border-brand-primary hover:bg-brand-primary/5"
-                        : "cursor-not-allowed opacity-50"
-                    }`}
-                  >
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-                      <Phone className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      Phone Number
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 break-words">
-                      {savedPhone
-                        ? "Send a code automatically to your registered admin phone."
-                        : "No admin phone on file. Ask an administrator to add one."}
                     </p>
                   </button>
                 </div>
@@ -570,8 +535,6 @@ function LoginPageInner() {
           email={email}
           password={password}
           maskedEmail={maskedEmail}
-          savedPhone={savedPhone}
-          useStoredPhoneOnly={activeVerification === "phone"}
           onClose={() => setActiveVerification(null)}
           onVerified={() => {
             setActiveVerification(null);

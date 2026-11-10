@@ -334,42 +334,21 @@ export async function fetchOlderMessages(
 async function fetchMentionablePeopleInternal(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseAdmin: any,
-  courseId: string,
+  _courseId?: string,
 ): Promise<MentionablePerson[]> {
-  // Fetch all active members assigned to this specific course
-  const { data: courseMembers } = await supabaseAdmin
-    .from("course_members")
-    .select("email")
-    .eq("maincourse_id", courseId)
-    .eq("status", "active");
-
-  const courseMemberEmails = new Set(
-    (courseMembers ?? []).map((cm: { email?: string }) =>
-      cm.email?.toLowerCase(),
-    ),
-  );
-
-  if (courseMemberEmails.size === 0) {
-    return [];
-  }
-
-  // Fetch only staff profiles (admin/instructor/mentor) whose email is
-  // in the course_members list for this course — not all mentors globally.
-  const { data: staffProfiles } = await supabaseAdmin
+  // Users in communities can only tag admins.
+  const { data: adminProfiles } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, role, email")
-    .in("role", ["admin", "instructor", "mentor"])
-    .not("full_name", "is", null);
+    .ilike("role", "admin");
 
-  const people: MentionablePerson[] = (staffProfiles ?? [])
-    .filter((p: { email?: string }) =>
-      courseMemberEmails.has(p.email?.toLowerCase() ?? ""),
-    )
-    .map((p: { id: string; full_name: string | null; role: string | null }) => ({
+  const people: MentionablePerson[] = (adminProfiles ?? []).map(
+    (p: { id: string; full_name: string | null; role: string | null; email?: string | null }) => ({
       id: p.id,
-      full_name: p.full_name ?? "Unknown",
-      role: p.role ?? "mentor",
-    }));
+      full_name: p.full_name?.trim() || p.email?.split("@")[0] || "Admin",
+      role: p.role ?? "admin",
+    }),
+  );
 
   const seen = new Set<string>();
   return people.filter((p) => {
@@ -710,7 +689,7 @@ export async function getCommunitySidebarData(
 }
 
 /**
- * Fetch mentors, instructors, and admins who are associated with a course.
+ * Fetch admins who can be tagged in community chat.
  * Used to populate the @mention dropdown in the community chat.
  */
 export async function getMentionablePeople(

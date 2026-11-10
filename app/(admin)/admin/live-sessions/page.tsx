@@ -24,12 +24,19 @@ import {
   CheckSquare,
   Square,
   AlertCircle,
+  BookOpen,
 } from "lucide-react";
+
+interface CourseOption {
+  id: string;
+  title: string;
+}
 
 interface ProUser {
   id: string;
   name: string;
   email: string;
+  proCourseIds: string[];
 }
 
 interface LiveSession {
@@ -47,12 +54,15 @@ interface LiveSession {
   link_text: string;
   attendees_count: number;
   created_at: string;
+  course_id?: string;
+  course_title?: string;
   assigned_user_ids: string[];
 }
 
 export default function AdminLiveSessionsPage() {
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [proUsers, setProUsers] = useState<ProUser[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,6 +88,7 @@ export default function AdminLiveSessionsPage() {
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
   const [meetingLink, setMeetingLink] = useState("");
+  const [courseId, setCourseId] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
 
@@ -106,6 +117,7 @@ export default function AdminLiveSessionsPage() {
 
       setLiveSessions(result?.sessions || []);
       setProUsers(result?.proUsers || []);
+      setCourses(result?.courses || []);
     } catch (error) {
       console.error("Failed to fetch live sessions:", error);
       showToast("Failed to load live sessions.");
@@ -132,6 +144,7 @@ export default function AdminLiveSessionsPage() {
       setStartTime(sessionItem.start_time || "10:00");
       setEndTime(sessionItem.end_time || "11:00");
       setMeetingLink(sessionItem.link_text || "");
+      setCourseId(sessionItem.course_id || "");
       setSelectedUserIds(sessionItem.assigned_user_ids || []);
     } else {
       setIsEditing(false);
@@ -144,20 +157,38 @@ export default function AdminLiveSessionsPage() {
       setStartTime("10:00");
       setEndTime("11:00");
       setMeetingLink("");
+      setCourseId("");
       setSelectedUserIds([]);
     }
     setShowModal(true);
   };
 
+  const courseEligibleProUsers = useMemo(() => {
+    if (!courseId) return proUsers;
+    return proUsers.filter((u) => u.proCourseIds?.includes(courseId));
+  }, [proUsers, courseId]);
+
   const allProSelected =
-    proUsers.length > 0 && proUsers.every((u) => selectedUserIds.includes(u.id));
+    courseEligibleProUsers.length > 0 &&
+    courseEligibleProUsers.every((u) => selectedUserIds.includes(u.id));
 
   const handleToggleSelectAllPro = () => {
     if (allProSelected) {
       setSelectedUserIds([]);
     } else {
-      setSelectedUserIds(proUsers.map((u) => u.id));
+      setSelectedUserIds(courseEligibleProUsers.map((u) => u.id));
     }
+  };
+
+  const handleCourseChange = (nextCourseId: string) => {
+    setCourseId(nextCourseId);
+    if (!nextCourseId) return;
+    const eligibleIds = new Set(
+      proUsers
+        .filter((u) => u.proCourseIds?.includes(nextCourseId))
+        .map((u) => u.id),
+    );
+    setSelectedUserIds((prev) => prev.filter((id) => eligibleIds.has(id)));
   };
 
   const handleToggleUser = (userId: string) => {
@@ -170,13 +201,28 @@ export default function AdminLiveSessionsPage() {
 
   const filteredProUsers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
-    if (!q) return proUsers;
-    return proUsers.filter(
+    if (!q) return courseEligibleProUsers;
+    return courseEligibleProUsers.filter(
       (u) =>
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q),
     );
-  }, [proUsers, memberSearch]);
+  }, [courseEligibleProUsers, memberSearch]);
+
+  const courseTitleById = useMemo(
+    () => new Map(courses.map((c) => [c.id, c.title])),
+    [courses],
+  );
+
+  const proCountByCourseId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const u of proUsers) {
+      for (const cid of u.proCourseIds ?? []) {
+        counts.set(cid, (counts.get(cid) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [proUsers]);
 
   const handleSaveLiveSession = async () => {
     setFormError(null);
@@ -195,7 +241,7 @@ export default function AdminLiveSessionsPage() {
     }
     const trimmedLink = meetingLink.trim();
     if (!trimmedLink || !/^https?:\/\//i.test(trimmedLink)) {
-      setFormError("Please paste a valid Zoom meeting link starting with https:// or http://.");
+      setFormError("Please paste a valid meet link starting with https:// or http://.");
       return;
     }
     if (selectedUserIds.length === 0) {
@@ -220,6 +266,7 @@ export default function AdminLiveSessionsPage() {
         date: sessionDate,
         startTime,
         endTime,
+        courseId: courseId || undefined,
         meetingLink: trimmedLink,
         selectedUserIds,
       };
@@ -299,7 +346,8 @@ export default function AdminLiveSessionsPage() {
   const searchedSessions = liveSessions.filter(
     (s) =>
       s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.subtitle?.toLowerCase().includes(searchTerm.toLowerCase()),
+      s.subtitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.course_title?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const upcomingSessions = searchedSessions.filter(
@@ -360,7 +408,7 @@ export default function AdminLiveSessionsPage() {
                 " text-gray-600"
               }
             >
-              Schedule live Zoom sessions and assign them directly to Pro users.
+              Schedule live sessions and assign them directly to Pro users.
             </p>
           </div>
           <Button
@@ -465,7 +513,7 @@ export default function AdminLiveSessionsPage() {
                     Date &amp; Time Slot
                   </th>
                   <th className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}>
-                    Zoom Link &amp; Members
+                    Meet Link &amp; Members
                   </th>
                   <th className={`${TYPOGRAPHY_CLASSES.TABLE_HEADER} px-4 py-3`}>
                     Actions
@@ -532,6 +580,12 @@ export default function AdminLiveSessionsPage() {
                               >
                                 {sessionItem.title}
                               </h3>
+                              {sessionItem.course_title && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded-md text-[10px] font-bold bg-blue-50 text-brand-primary border border-blue-100">
+                                  <BookOpen size={10} />
+                                  {sessionItem.course_title}
+                                </span>
+                              )}
                               {sessionItem.subtitle && (
                                 <p
                                   className={`${TYPOGRAPHY_CLASSES.CAPTION} ${
@@ -628,7 +682,7 @@ export default function AdminLiveSessionsPage() {
                     {isEditing ? "Edit Live Session" : "Create New Live Session"}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Set the title, date &amp; time slot, Zoom meeting link, and select Pro members.
+                    Set the title, date &amp; time slot, meet link, and select Pro members.
                   </p>
                 </div>
               </div>
@@ -692,20 +746,49 @@ export default function AdminLiveSessionsPage() {
                   </div>
                 </div>
 
-                {/* Zoom Meeting Link */}
+                {/* Meet Link */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
-                    Zoom Meeting Link
+                    Meet Link
                   </label>
                   <input
                     type="url"
                     value={meetingLink}
                     onChange={(e) => setMeetingLink(e.target.value)}
-                    placeholder="https://zoom.us/j/1234567890?pwd=..."
+                    placeholder="https://meet.google.com/... or https://zoom.us/j/..."
                     className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">
                     Selected Pro users will use this link on the scheduled date and time slot to join.
+                  </p>
+                </div>
+
+                {/* Course Filter (Optional) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                    Course (Optional)
+                  </label>
+                  <select
+                    value={courseId}
+                    onChange={(e) => handleCourseChange(e.target.value)}
+                    className="w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all text-gray-700 cursor-pointer"
+                  >
+                    <option value="">
+                      All Courses ({proUsers.length} Pro user{proUsers.length !== 1 ? "s" : ""})
+                    </option>
+                    {courses.map((c) => {
+                      const count = proCountByCourseId.get(c.id) ?? 0;
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.title} ({count} Pro)
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {courseId
+                      ? "Showing only Pro users enrolled in the selected course."
+                      : "No course selected — choose from all Pro users across the learning portal."}
                   </p>
                 </div>
 
@@ -714,7 +797,7 @@ export default function AdminLiveSessionsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider">
-                        Pro Members ({selectedUserIds.length} / {proUsers.length} selected)
+                        Pro Members ({selectedUserIds.length} / {courseEligibleProUsers.length} selected)
                       </label>
                       <p className="text-[11px] text-gray-500 mt-0.5">
                         Only selected Pro users will see this live session.
@@ -724,7 +807,7 @@ export default function AdminLiveSessionsPage() {
                     <button
                       type="button"
                       onClick={handleToggleSelectAllPro}
-                      disabled={proUsers.length === 0}
+                      disabled={courseEligibleProUsers.length === 0}
                       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all disabled:opacity-50 ${
                         allProSelected
                           ? "bg-brand-primary text-white border-brand-primary"
@@ -740,7 +823,7 @@ export default function AdminLiveSessionsPage() {
                     </button>
                   </div>
 
-                  {proUsers.length > 0 && (
+                  {courseEligibleProUsers.length > 0 && (
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                       <input
@@ -753,9 +836,11 @@ export default function AdminLiveSessionsPage() {
                     </div>
                   )}
 
-                  {proUsers.length === 0 ? (
+                  {courseEligibleProUsers.length === 0 ? (
                     <div className="py-6 text-center text-xs text-gray-500 bg-white rounded-xl border border-dashed border-gray-200">
-                      No Pro users found yet. Upgrade a learner to Pro in Manage Users to assign live sessions.
+                      {courseId
+                        ? "No Pro users are currently enrolled in the selected course."
+                        : "No Pro users found yet. Upgrade a learner to Pro in Manage Users to assign live sessions."}
                     </div>
                   ) : filteredProUsers.length === 0 ? (
                     <div className="py-5 text-center text-xs text-gray-500 bg-white rounded-xl border border-gray-100">
@@ -790,9 +875,27 @@ export default function AdminLiveSessionsPage() {
                                 )}
                               </div>
                             </div>
-                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
-                              Pro
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                              {!courseId &&
+                                (user.proCourseIds?.length ? (
+                                  user.proCourseIds.map((cid) => (
+                                    <span
+                                      key={cid}
+                                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200 max-w-[140px] truncate"
+                                      title={courseTitleById.get(cid) || cid}
+                                    >
+                                      {courseTitleById.get(cid) || "Course"}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                    No course enrolled
+                                  </span>
+                                ))}
+                              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                Pro
+                              </span>
+                            </div>
                           </label>
                         );
                       })}

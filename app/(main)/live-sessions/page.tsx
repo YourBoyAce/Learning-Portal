@@ -27,6 +27,8 @@ interface LiveSession {
   start_time?: string;
   end_time?: string;
   duration_minutes?: number;
+  course_id?: string;
+  course_title?: string;
   status: "streaming" | "link" | string;
   link_text: string;
   attendees_count: number;
@@ -114,6 +116,11 @@ function LiveSessionCard({ session, past }: { session: LiveSession; past: boolea
           >
             {session.title}
           </h3>
+          {session.course_title && (
+            <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-brand-primary border border-blue-100">
+              {session.course_title}
+            </span>
+          )}
           {session.subtitle && (
             <p className={`text-xs mt-0.5 truncate ${past ? "text-gray-400" : "text-gray-500"}`}>
               {session.subtitle}
@@ -264,7 +271,7 @@ export default function LiveSessionsPage() {
               Live Sessions
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Exclusive live Zoom sessions assigned to your Pro account.
+              Exclusive live sessions assigned to your Pro account.
             </p>
           </div>
 
@@ -283,7 +290,7 @@ export default function LiveSessionsPage() {
           <div className="py-6">
             <UpgradeRequired
               title="Live Sessions Locked"
-              description="Live Sessions are exclusively available to Pro plan members. Upgrade to the Pro plan to join scheduled live Zoom sessions with instructors."
+              description="Live Sessions are exclusively available to Pro plan members. Upgrade to the Pro plan to join scheduled live sessions with instructors."
               requiredTier="Pro"
             />
           </div>

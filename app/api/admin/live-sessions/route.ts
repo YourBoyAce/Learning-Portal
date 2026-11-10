@@ -5,6 +5,7 @@ import { apiErrorResponse } from "@/app/lib/error-handler";
 import {
   addMinutesToTime,
   computeDurationMinutes,
+  extractCourseIdFromTag,
   extractDurationFromTag,
   splitEventDateTime,
 } from "@/app/lib/live-session-helpers";
@@ -12,10 +13,17 @@ import {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+interface CourseOption {
+  id: string;
+  title: string;
+  product_id?: string | null;
+}
+
 interface ProMember {
   id: string;
   name: string;
   email: string;
+  proCourseIds: string[];
 }
 
 async function authenticateAdminRequest(request: Request) {
@@ -59,7 +67,47 @@ async function authenticateAdminRequest(request: Request) {
   return { user: authData.user } as const;
 }
 
-async function fetchProUsers(): Promise<ProMember[]> {
+async function fetchCoursesCatalog(): Promise<{
+  courses: Array<{ id: string; title: string }>;
+  courseTitleById: Map<string, string>;
+  courseIdByProductId: Map<string, string>;
+}> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("maincourses")
+    .select("id, title, product_id")
+    .order("title", { ascending: true });
+
+  if (error) {
+    console.warn("[admin/live-sessions] Could not load maincourses:", error);
+    return {
+      courses: [],
+      courseTitleById: new Map(),
+      courseIdByProductId: new Map(),
+    };
+  }
+
+  const courses: Array<{ id: string; title: string }> = [];
+  const courseTitleById = new Map<string, string>();
+  const courseIdByProductId = new Map<string, string>();
+
+  for (const row of (rows ?? []) as CourseOption[]) {
+    if (!row.id) continue;
+    const cid = String(row.id);
+    const title = (row.title || "Untitled Course").trim();
+    courses.push({ id: cid, title });
+    courseTitleById.set(cid, title);
+    if (row.product_id) {
+      courseIdByProductId.set(String(row.product_id), cid);
+    }
+  }
+
+  return { courses, courseTitleById, courseIdByProductId };
+}
+
+async function fetchProUsers(
+  courseTitleById: Map<string, string>,
+  courseIdByProductId: Map<string, string>,
+): Promise<ProMember[]> {
   const { data: profiles, error: profError } = await supabaseAdmin
     .from("profiles")
     .select("id, email, full_name, role, created_at")
@@ -92,8 +140,34 @@ async function fetchProUsers(): Promise<ProMember[]> {
     console.warn("[admin/live-sessions] Could not list auth users:", err);
   }
 
+  const courseMembersByEmail = new Map<string, Set<string>>();
+  try {
+    const { data: cmRows } = await supabaseAdmin
+      .from("course_members")
+      .select("email, maincourse_id")
+      .eq("status", "active");
+
+    for (const cm of (cmRows ?? []) as Array<{
+      email?: string | null;
+      maincourse_id?: string | null;
+    }>) {
+      const em = cm.email?.trim().toLowerCase() || "";
+      const cid = cm.maincourse_id ? String(cm.maincourse_id) : "";
+      if (!em || !cid) continue;
+      if (!courseMembersByEmail.has(em)) {
+        courseMembersByEmail.set(em, new Set());
+      }
+      courseMembersByEmail.get(em)!.add(cid);
+    }
+  } catch (err) {
+    console.warn("[admin/live-sessions] Could not fetch course_members:", err);
+  }
+
   const phase2NameMap = new Map<string, string>();
   const phase2PlanMap = new Map<string, string>();
+  const proCoursesByAuthId = new Map<string, Set<string>>();
+  const allEnrolledCoursesByAuthId = new Map<string, Set<string>>();
+
   try {
     const { data: p2Users } = await supabaseAdmin
       .schema("phase2")
@@ -121,11 +195,13 @@ async function fetchProUsers(): Promise<ProMember[]> {
     const { data: p2Enrollments } = await supabaseAdmin
       .schema("phase2")
       .from("enrollments")
-      .select("user_id, bundles(bundle_name)")
+      .select("user_id, course_id, product_id, bundles(bundle_name)")
       .eq("status", "active");
 
     for (const e of (p2Enrollments ?? []) as Array<{
       user_id: string;
+      course_id?: string | number | null;
+      product_id?: string | number | null;
       bundles?: { bundle_name?: string } | Array<{ bundle_name?: string }> | null;
     }>) {
       const bn = Array.isArray(e.bundles)
@@ -138,6 +214,26 @@ async function fetchProUsers(): Promise<ProMember[]> {
       const curr = phase2PlanMap.get(authId);
       if (!curr || (curr === "starter" && planStr === "pro")) {
         phase2PlanMap.set(authId, planStr);
+      }
+
+      const rawCourseId = e.course_id ? String(e.course_id) : "";
+      const resolvedCourseId =
+        (rawCourseId && courseTitleById.has(rawCourseId) ? rawCourseId : null) ||
+        (e.product_id ? courseIdByProductId.get(String(e.product_id)) : null) ||
+        rawCourseId;
+
+      if (resolvedCourseId) {
+        if (!allEnrolledCoursesByAuthId.has(authId)) {
+          allEnrolledCoursesByAuthId.set(authId, new Set());
+        }
+        allEnrolledCoursesByAuthId.get(authId)!.add(resolvedCourseId);
+
+        if (planStr === "pro") {
+          if (!proCoursesByAuthId.has(authId)) {
+            proCoursesByAuthId.set(authId, new Set());
+          }
+          proCoursesByAuthId.get(authId)!.add(resolvedCourseId);
+        }
       }
     }
   } catch (err) {
@@ -157,19 +253,33 @@ async function fetchProUsers(): Promise<ProMember[]> {
 
     if (!isPro) continue;
 
+    const emailLower = profile.email?.trim().toLowerCase() || "";
     const p2Name =
       phase2NameMap.get(profile.id) ||
-      phase2NameMap.get(profile.email?.toLowerCase() || "");
+      (emailLower ? phase2NameMap.get(emailLower) : undefined);
     const resolvedName =
       p2Name ||
       profile.full_name ||
       profile.email?.split("@")[0] ||
       "Pro Learner";
 
+    const proCourseSet = new Set<string>(proCoursesByAuthId.get(profile.id) ?? []);
+    const p2EnrolledSet = allEnrolledCoursesByAuthId.get(profile.id);
+
+    // Fallback for legacy metadata-level Pro accounts enrolled only via course_members
+    if (metadataPlan === "pro" && emailLower) {
+      for (const cmCourseId of courseMembersByEmail.get(emailLower) ?? []) {
+        if (!p2EnrolledSet?.has(cmCourseId)) {
+          proCourseSet.add(cmCourseId);
+        }
+      }
+    }
+
     proMembers.push({
       id: profile.id,
       name: resolvedName,
       email: profile.email || "",
+      proCourseIds: Array.from(proCourseSet),
     });
   }
 
@@ -197,8 +307,11 @@ export async function GET(request: Request) {
   if ("error" in auth) return auth.error;
 
   try {
+    const { courses, courseTitleById, courseIdByProductId } =
+      await fetchCoursesCatalog();
+
     const [proUsers, webinarsRes, eventsRes] = await Promise.all([
-      fetchProUsers(),
+      fetchProUsers(courseTitleById, courseIdByProductId),
       supabaseAdmin
         .from("webinars")
         .select("*")
@@ -215,7 +328,13 @@ export async function GET(request: Request) {
     const assignedByWebinarId = new Map<string, Set<string>>();
     const metaByWebinarId = new Map<
       string,
-      { event_date: string; event_time: string; duration_minutes: number; meet_link: string }
+      {
+        event_date: string;
+        event_time: string;
+        duration_minutes: number;
+        meet_link: string;
+        course_id: string | null;
+      }
     >();
 
     for (const ev of eventsRes.data ?? []) {
@@ -233,6 +352,7 @@ export async function GET(request: Request) {
           event_time: (ev.event_time || "").slice(0, 5),
           duration_minutes: extractDurationFromTag(ev.tag, 60),
           meet_link: ev.meet_link || "",
+          course_id: extractCourseIdFromTag(ev.tag),
         });
       }
     }
@@ -248,6 +368,8 @@ export async function GET(request: Request) {
       );
       const durationMinutes = calMeta?.duration_minutes ?? 60;
       const endTime = startTime ? addMinutesToTime(startTime, durationMinutes) : "";
+      const courseId = calMeta?.course_id || "";
+      const courseTitle = courseId ? (courseTitleById.get(courseId) || "") : "";
 
       return {
         ...w,
@@ -256,6 +378,8 @@ export async function GET(request: Request) {
         end_time: endTime,
         duration_minutes: durationMinutes,
         link_text: w.link_text || calMeta?.meet_link || "",
+        course_id: courseId,
+        course_title: courseTitle,
         assigned_user_ids: assignedIds,
       };
     });
@@ -264,6 +388,7 @@ export async function GET(request: Request) {
       success: true,
       sessions,
       proUsers,
+      courses,
     });
   } catch (error) {
     return apiErrorResponse(error, "GET /api/admin/live-sessions", 500);
@@ -282,6 +407,10 @@ export async function POST(request: Request) {
     const sessionDate = typeof body?.date === "string" ? body.date.trim() : "";
     const startTime = typeof body?.startTime === "string" ? body.startTime.trim() : "";
     const endTime = typeof body?.endTime === "string" ? body.endTime.trim() : "";
+    const courseId =
+      typeof body?.courseId === "string"
+        ? body.courseId.replace(/[|\s]/g, "").trim()
+        : "";
     const meetingLink = normalizeHttpUrl(body?.meetingLink);
     const selectedUserIds: string[] = Array.isArray(body?.selectedUserIds)
       ? Array.from(new Set(body.selectedUserIds.map((id: unknown) => String(id).trim()).filter(Boolean)))
@@ -304,7 +433,7 @@ export async function POST(request: Request) {
     }
     if (!meetingLink) {
       return NextResponse.json(
-        { error: "A valid Zoom meeting link URL (https://...) is required." },
+        { error: "A valid meet link URL (https://...) is required." },
         { status: 400 },
       );
     }
@@ -340,7 +469,9 @@ export async function POST(request: Request) {
 
     if (insertError) throw insertError;
 
-    const tag = `status:scheduled|live-session|dur:${durationMinutes}`;
+    const tag = courseId
+      ? `status:scheduled|live-session|dur:${durationMinutes}|course:${courseId}`
+      : `status:scheduled|live-session|dur:${durationMinutes}`;
     const calendarRows = selectedUserIds.map((userId) => ({
       user_id: userId,
       webinar_id: created.id,
@@ -388,6 +519,10 @@ export async function PUT(request: Request) {
     const sessionDate = typeof body?.date === "string" ? body.date.trim() : "";
     const startTime = typeof body?.startTime === "string" ? body.startTime.trim() : "";
     const endTime = typeof body?.endTime === "string" ? body.endTime.trim() : "";
+    const courseId =
+      typeof body?.courseId === "string"
+        ? body.courseId.replace(/[|\s]/g, "").trim()
+        : "";
     const meetingLink = normalizeHttpUrl(body?.meetingLink);
     const selectedUserIds: string[] = Array.isArray(body?.selectedUserIds)
       ? Array.from(new Set(body.selectedUserIds.map((uid: unknown) => String(uid).trim()).filter(Boolean)))
@@ -413,7 +548,7 @@ export async function PUT(request: Request) {
     }
     if (!meetingLink) {
       return NextResponse.json(
-        { error: "A valid Zoom meeting link URL (https://...) is required." },
+        { error: "A valid meet link URL (https://...) is required." },
         { status: 400 },
       );
     }
@@ -474,7 +609,9 @@ export async function PUT(request: Request) {
       if (delErr) throw delErr;
     }
 
-    const tag = `status:scheduled|live-session|dur:${durationMinutes}`;
+    const tag = courseId
+      ? `status:scheduled|live-session|dur:${durationMinutes}|course:${courseId}`
+      : `status:scheduled|live-session|dur:${durationMinutes}`;
     const sharedPayload = {
       title,
       description:

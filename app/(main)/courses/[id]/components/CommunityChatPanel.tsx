@@ -312,8 +312,10 @@ function MentionDropdown({
   query: string;
   onSelect: (person: MentionablePerson) => void;
 }) {
-  const filtered = people.filter((p) =>
-    p.full_name.toLowerCase().includes(query.toLowerCase())
+  const filtered = people.filter(
+    (p) =>
+      p.role.toLowerCase() === "admin" &&
+      p.full_name.toLowerCase().includes(query.toLowerCase()),
   );
 
   if (filtered.length === 0) return null;
@@ -335,7 +337,7 @@ function MentionDropdown({
       <div className="px-3 py-2 border-b border-gray-100">
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
           <AtSign size={10} />
-          Mention someone
+          Tag Admin
         </p>
       </div>
       <div className="max-h-48 overflow-y-auto">
@@ -1093,7 +1095,7 @@ export default function CommunityChatPanel({ courseId, onBack }: CommunityChatPa
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Write a message… (@ to mention, Enter to send)"
+              placeholder="Write a message… (@ to tag admin, Enter to send)"
               rows={1}
               maxLength={2000}
               disabled={isPending || isUploading}

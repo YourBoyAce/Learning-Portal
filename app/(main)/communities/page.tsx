@@ -32,7 +32,7 @@ export default function UserCommunitiesPage() {
                         <div className="flex flex-1 items-center justify-center p-6 bg-[#fcfcfc]">
                             <UpgradeRequired
                                 title="Community Chat Gated"
-                                description="Accessing batch student communities requires an active plan subscription. Upgrade today to join discussions with peers and mentors."
+                                description="Accessing batch student communities requires an active plan subscription. Upgrade today to join discussions in your course communities."
                                 requiredTier="Starter"
                             />
                         </div>

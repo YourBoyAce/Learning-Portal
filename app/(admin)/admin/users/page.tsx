@@ -9,10 +9,10 @@ import { TYPOGRAPHY, TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import Image from "next/image";
 import {
   createUser,
-  updateUserRole,
-  updateUserPlan,
+  updateAdminUser,
   deleteUser,
   getAdminUsers,
+  type AdminUserCourseEnrollment,
 } from "@/app/actions/create-user";
 import {
   MoreVertical,
@@ -25,6 +25,10 @@ import {
   LogIn,
   LogOut,
   Trash2,
+  Pencil,
+  X,
+  AlertCircle,
+  BookOpen,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -43,8 +47,10 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   plan?: string;
+  enrolledCourses?: AdminUserCourseEnrollment[];
   todaySessions: LoginSession[];
   todayTimeSpentSeconds: number;
 }
@@ -116,6 +122,19 @@ export default function AdminUsers() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit User Modal State
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editRole, setEditRole] = useState("user");
+  const [editPlan, setEditPlan] = useState("starter");
+  const [editCoursePlans, setEditCoursePlans] = useState<AdminUserCourseEnrollment[]>([]);
+  const [editAddCourseId, setEditAddCourseId] = useState("");
+  const [editAddCoursePlan, setEditAddCoursePlan] = useState<"starter" | "pro">("starter");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
 
   async function fetchUsers() {
     setLoading(true);
@@ -257,25 +276,71 @@ export default function AdminUsers() {
     link.click();
   };
 
-  const handleChangeRole = async (userId: string, newRole: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || "";
-    await updateUserRole(userId, newRole, token);
+  const handleOpenEditModal = (user: User) => {
     setOpenActionMenuId(null);
-    showToast("Role updated successfully.");
-    fetchUsers();
+    setEditError("");
+    setEditingUser(user);
+    setEditName(user.name || "");
+    setEditEmail(user.email === "No Email" ? "" : (user.email || ""));
+    setEditPhone(user.phone || "");
+    const normalizedRole = (user.role || "user").toLowerCase();
+    setEditRole(
+      normalizedRole === "admin"
+        ? "admin"
+        : normalizedRole === "instructor" || normalizedRole === "mentor"
+          ? "instructor"
+          : "user",
+    );
+    const normalizedPlan = user.plan === "pro" || user.plan === "premium" ? "pro" : "starter";
+    setEditPlan(normalizedPlan);
+    setEditCoursePlans(
+      (user.enrolledCourses ?? []).map((ec) => ({ ...ec })),
+    );
+    setEditAddCourseId("");
+    setEditAddCoursePlan("starter");
   };
 
-  const handleChangePlan = async (userId: string, newPlan: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || "";
-    const res = await updateUserPlan(userId, newPlan, token);
-    setOpenActionMenuId(null);
-    if (res.success) {
-      showToast(res.message || "Plan updated successfully.");
-      fetchUsers();
-    } else {
-      showToast(res.error || "Failed to update plan.");
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setEditError("");
+    setIsSavingEdit(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+      const res = await updateAdminUser(
+        {
+          userId: editingUser.id,
+          name: editName,
+          email: editEmail,
+          phone: editPhone,
+          role: editRole,
+          plan: editPlan,
+          coursePlans:
+            editRole === "user"
+              ? editCoursePlans.map((cp) => ({ courseId: cp.courseId, plan: cp.plan }))
+              : undefined,
+          addCourseId: editRole === "user" && editAddCourseId ? editAddCourseId : undefined,
+          addCoursePlan: editRole === "user" && editAddCourseId ? editAddCoursePlan : undefined,
+        },
+        token,
+      );
+
+      if (!res.success) {
+        setEditError(res.error || "Failed to update user details.");
+        return;
+      }
+
+      setEditingUser(null);
+      showToast(res.message || "User details updated successfully.");
+      await fetchUsers();
+    } catch (err) {
+      console.error("handleSaveEditUser error:", err);
+      setEditError("An unexpected error occurred while updating the user.");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -472,7 +537,7 @@ export default function AdminUsers() {
                   </>
                 )}
 
-                {role === "admin" && (
+                {false && role === "admin" && (
                   <div className="sm:col-span-2 rounded-xl border border-brand-primary/15 bg-brand-primary/5 p-4 space-y-3">
                     <div>
                       <p className="text-xs font-semibold text-brand-primary">
@@ -756,56 +821,22 @@ export default function AdminUsers() {
                         <MoreVertical size={18} />
                       </button>
                       {openActionMenuId === user.id && (
-                        <div className="absolute right-0 top-8 w-44 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 overflow-hidden text-left">
-                          <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
-                            Change Role To:
-                          </div>
-                          {ROLES.map((r) => (
-                            <button
-                              key={r.value}
-                              onClick={() => handleChangeRole(user.id, r.value)}
-                              className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 transition-colors"
-                            >
-                              {r.label}
-                            </button>
-                          ))}
-                          {user.role === "user" && (
-                            <>
-                              <div className="border-t border-gray-100 mt-1 pt-1">
-                                <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
-                                  Upgrade / Change Plan:
-                                </div>
-                                {[
-                                  { value: "starter", label: "Starter" },
-                                  { value: "pro", label: "Pro" },
-                                ].map((p) => (
-                                  <button
-                                    key={p.value}
-                                    onClick={() => handleChangePlan(user.id, p.value)}
-                                    className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
-                                      ? "text-brand-primary font-bold bg-brand-primary/5"
-                                      : "text-gray-700"
-                                      }`}
-                                  >
-                                    <span>{p.label} Plan</span>
-                                    {user.plan === p.value && <CheckCircle2 size={12} className="text-brand-primary" />}
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          )}
-                          <div className="border-t border-gray-100 mt-1 pt-1">
-                            <button
-                              onClick={() => handleDeleteClick(user)}
-                              className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
-                            >
-                              {user.role === "admin"
-                                ? "Remove Admin"
-                                : user.role === "instructor"
-                                  ? "Remove Instructor"
-                                  : "Remove Scholar"}
-                            </button>
-                          </div>
+                        <div className="absolute right-0 top-8 w-40 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-1.5 overflow-hidden text-left">
+                          <button
+                            onClick={() => handleOpenEditModal(user)}
+                            className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 font-semibold transition-colors flex items-center gap-2"
+                          >
+                            <Pencil size={13} className="text-brand-primary" />
+                            Edit
+                          </button>
+                          <div className="border-t border-gray-100 my-1" />
+                          <button
+                            onClick={() => handleDeleteClick(user)}
+                            className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors flex items-center gap-2"
+                          >
+                            <Trash2 size={13} />
+                            Delete
+                          </button>
                         </div>
                       )}
                     </div>
@@ -912,32 +943,18 @@ export default function AdminUsers() {
                           </div>
                         </td>
 
-                        {/* Role & Plan */}
+                        {/* Role */}
                         <td className="py-4 px-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border capitalize ${user.role?.toLowerCase() === "admin"
-                                ? "bg-red-500/10 text-red-600 border-red-500/20"
-                                : user.role?.toLowerCase() === "instructor"
-                                  ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
-                                  : "bg-brand-success/10 text-[#174778] border-brand-success/20"
-                                }`}
-                            >
-                              {user.role || "User"}
-                            </span>
-                            {user.role === "user" && (
-                              <span
-                                className={`px-2 py-0.5 text-[10px] font-bold rounded-md border capitalize ${user.plan === "pro" || user.plan === "premium"
-                                    ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
-                                    : "bg-gray-100 text-gray-700 border-gray-200"
-                                  }`}
-                              >
-                                {user.plan === "pro" || user.plan === "premium"
-                                  ? "Pro Plan"
-                                  : "Starter Plan"}
-                              </span>
-                            )}
-                          </div>
+                          <span
+                            className={`px-2.5 py-1 text-[11px] font-bold tracking-wide rounded-md border capitalize ${user.role?.toLowerCase() === "admin"
+                              ? "bg-red-500/10 text-red-600 border-red-500/20"
+                              : user.role?.toLowerCase() === "instructor"
+                                ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+                                : "bg-brand-success/10 text-[#174778] border-brand-success/20"
+                              }`}
+                          >
+                            {user.role || "User"}
+                          </span>
                         </td>
 
                         {/* Today's Sessions */}
@@ -994,56 +1011,22 @@ export default function AdminUsers() {
                             <MoreVertical size={18} />
                           </button>
                           {openActionMenuId === user.id && (
-                            <div className="absolute right-8 top-10 w-48 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-2 overflow-hidden text-left">
-                              <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
-                                Change Role To:
-                              </div>
-                              {ROLES.map((r) => (
-                                <button
-                                  key={r.value}
-                                  onClick={() => handleChangeRole(user.id, r.value)}
-                                  className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 transition-colors"
-                                >
-                                  {r.label}
-                                </button>
-                              ))}
-                              {user.role === "user" && (
-                                <>
-                                  <div className="border-t border-gray-100 mt-1 pt-1">
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
-                                      Upgrade / Change Plan:
-                                    </div>
-                                    {[
-                                      { value: "starter", label: "Starter" },
-                                      { value: "pro", label: "Pro" },
-                                    ].map((p) => (
-                                      <button
-                                        key={p.value}
-                                        onClick={() => handleChangePlan(user.id, p.value)}
-                                        className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors flex items-center justify-between ${user.plan === p.value
-                                          ? "text-brand-primary font-bold bg-brand-primary/5"
-                                          : "text-gray-700"
-                                          }`}
-                                      >
-                                        <span>{p.label} Plan</span>
-                                        {user.plan === p.value && <CheckCircle2 size={12} className="text-brand-primary" />}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </>
-                              )}
-                              <div className="border-t border-gray-100 mt-1 pt-1">
-                                <button
-                                  onClick={() => handleDeleteClick(user)}
-                                  className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors"
-                                >
-                                  {user.role === "admin"
-                                    ? "Remove Admin"
-                                    : user.role === "instructor"
-                                      ? "Remove Instructor"
-                                      : "Remove Scholar"}
-                                </button>
-                              </div>
+                            <div className="absolute right-8 top-10 w-40 bg-white border border-gray-100 shadow-xl rounded-xl z-50 py-1.5 overflow-hidden text-left">
+                              <button
+                                onClick={() => handleOpenEditModal(user)}
+                                className="w-full text-left px-4 py-2 text-xs hover:bg-gray-50 text-gray-700 font-semibold transition-colors flex items-center gap-2"
+                              >
+                                <Pencil size={13} className="text-brand-primary" />
+                                Edit
+                              </button>
+                              <div className="border-t border-gray-100 my-1" />
+                              <button
+                                onClick={() => handleDeleteClick(user)}
+                                className="w-full text-left px-4 py-2 text-xs hover:bg-red-50 text-red-600 font-semibold transition-colors flex items-center gap-2"
+                              >
+                                <Trash2 size={13} />
+                                Delete
+                              </button>
                             </div>
                           )}
                         </td>
@@ -1126,6 +1109,221 @@ export default function AdminUsers() {
           </div>
         </div>
       </div>
+      {/* --- EDIT USER MODAL --- */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/40">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Update profile details, role, and course plans.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditUser}>
+              <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto light-scrollbar">
+                {editError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter display name"
+                      className="w-full px-3.5 py-2.5 text-xs text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full px-3.5 py-2.5 text-xs text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Role
+                    </label>
+                    <select
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={TYPOGRAPHY_CLASSES.INNERHEADING}>
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ""))}
+                      placeholder="Optional"
+                      className="w-full px-3.5 py-2.5 text-xs text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                    />
+                  </div>
+                </div>
+
+                {editRole === "user" && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={15} className="text-brand-primary" />
+                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                        Enrolled Courses &amp; Plans
+                      </h4>
+                    </div>
+
+                    {editCoursePlans.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {editCoursePlans.map((cp, index) => (
+                          <div
+                            key={cp.courseId}
+                            className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3.5 py-2.5"
+                          >
+                            <span className="text-xs font-semibold text-gray-800 truncate">
+                              {cp.courseTitle}
+                            </span>
+                            <select
+                              value={cp.plan}
+                              onChange={(e) => {
+                                const nextPlan = e.target.value === "pro" ? "pro" : "starter";
+                                setEditCoursePlans((prev) =>
+                                  prev.map((item, idx) =>
+                                    idx === index ? { ...item, plan: nextPlan } : item,
+                                  ),
+                                );
+                              }}
+                              className="px-3 py-1.5 text-xs font-semibold text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary cursor-pointer shrink-0 bg-gray-50"
+                            >
+                              <option value="starter">Starter Plan</option>
+                              <option value="pro">Pro Plan</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500">
+                          No courses enrolled yet. Default account plan:
+                        </p>
+                        <select
+                          value={editPlan}
+                          onChange={(e) => setEditPlan(e.target.value)}
+                          className="w-full px-3.5 py-2 text-xs font-semibold text-gray-900 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-primary cursor-pointer bg-white"
+                        >
+                          <option value="starter">Starter Plan</option>
+                          <option value="pro">Pro Plan</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Optional quick course enrollment */}
+                    {courses.some(
+                      (c) => !editCoursePlans.some((cp) => cp.courseId === String(c.id)),
+                    ) && (
+                      <div className="pt-2 border-t border-gray-200/70 space-y-2">
+                        <label className="block text-[11px] font-semibold text-gray-600">
+                          Enroll in Additional Course (Optional)
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <select
+                            value={editAddCourseId}
+                            onChange={(e) => setEditAddCourseId(e.target.value)}
+                            className="flex-1 px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-primary cursor-pointer"
+                          >
+                            <option value="">— Select Course —</option>
+                            {courses
+                              .filter(
+                                (c) =>
+                                  !editCoursePlans.some((cp) => cp.courseId === String(c.id)),
+                              )
+                              .map((c) => (
+                                <option key={c.id} value={String(c.id)}>
+                                  {c.title}
+                                </option>
+                              ))}
+                          </select>
+                          {editAddCourseId && (
+                            <select
+                              value={editAddCoursePlan}
+                              onChange={(e) =>
+                                setEditAddCoursePlan(
+                                  e.target.value === "pro" ? "pro" : "starter",
+                                )
+                              }
+                              className="px-3 py-2 text-xs font-semibold text-gray-900 border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-primary cursor-pointer"
+                            >
+                              <option value="starter">Starter Plan</option>
+                              <option value="pro">Pro Plan</option>
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/40 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  disabled={isSavingEdit}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-brand-primary rounded-lg hover:bg-brand-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {isSavingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSavingEdit ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- DELETE CONFIRMATION MODAL --- */}
       {showDeleteConfirm && deletingUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">

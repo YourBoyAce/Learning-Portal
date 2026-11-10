@@ -161,10 +161,10 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
     return { success: false, error: "Password must be at least 6 characters long." };
   }
 
-  if (role === "admin" && !normalizedPhone) {
+  if (phoneInput && !normalizedPhone) {
     return {
       success: false,
-      error: "A valid phone number is required when creating an admin account.",
+      error: "Please enter a valid phone number.",
     };
   }
 
@@ -667,14 +667,400 @@ export async function updateUserPlan(userId: string, newPlan: string, adminAcces
   }
 }
 
+export interface AdminUserCourseEnrollment {
+  courseId: string;
+  courseTitle: string;
+  plan: "starter" | "pro";
+}
+
 export interface AdminUserData {
   id: string;
   name: string;
   email: string;
+  phone: string;
   role: string;
   plan: string;
+  enrolledCourses: AdminUserCourseEnrollment[];
   todaySessions: { loginAt: string; logoutAt: string; durationSeconds: number }[];
   todayTimeSpentSeconds: number;
+}
+
+export interface UpdateAdminUserInput {
+  userId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  plan?: string;
+  coursePlans?: Array<{ courseId: string; plan: string }>;
+  addCourseId?: string;
+  addCoursePlan?: string;
+}
+
+async function resolveBundleByPlan(planStr: "starter" | "pro") {
+  let bundleQuery = supabaseAdmin
+    .schema("phase2" as "public")
+    .from("bundles")
+    .select("id, bundle_name, price");
+
+  if (planStr === "pro") {
+    bundleQuery = bundleQuery
+      .ilike("bundle_name", "%pro%")
+      .not("bundle_name", "ilike", "%premium%");
+  } else {
+    bundleQuery = bundleQuery.ilike("bundle_name", "%starter%");
+  }
+
+  const { data } = await bundleQuery.limit(1).maybeSingle();
+  return data as { id: string; bundle_name?: string; price?: number } | null;
+}
+
+export async function updateAdminUser(
+  input: UpdateAdminUserInput,
+  adminAccessToken?: string,
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const callerAuth = await verifyAdminCaller(adminAccessToken);
+  if (!callerAuth.ok) {
+    return { success: false, error: callerAuth.error };
+  }
+
+  const userId = String(input.userId || "").trim();
+  const trimmedName = String(input.name || "").trim();
+  const normalizedEmail = String(input.email || "").trim().toLowerCase();
+  const normalizedRole = String(input.role || "user").trim().toLowerCase();
+  const phoneInput = String(input.phone || "").trim();
+  const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
+
+  if (!userId || !trimmedName || !normalizedEmail) {
+    return { success: false, error: "Name and email address are required." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { success: false, error: "Please enter a valid email address." };
+  }
+  if (!["user", "instructor", "admin"].includes(normalizedRole)) {
+    return { success: false, error: "Invalid role selected." };
+  }
+  if (phoneInput && !normalizedPhone) {
+    return { success: false, error: "Please enter a valid phone number." };
+  }
+
+  try {
+    // 1. Read existing profile & auth metadata
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("email, role, phone")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const { data: authUserData, error: getAuthErr } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getAuthErr || !authUserData?.user) {
+      return { success: false, error: "User auth record not found." };
+    }
+
+    const oldEmail =
+      existingProfile?.email?.trim().toLowerCase() ||
+      authUserData.user.email?.trim().toLowerCase() ||
+      "";
+    const existingMeta = authUserData.user.user_metadata || {};
+
+    // Normalize per-course plan updates and overall account plan
+    const normalizedCoursePlans: Array<{ courseId: string; plan: "starter" | "pro" }> =
+      (input.coursePlans ?? [])
+        .map((cp) => ({
+          courseId: String(cp.courseId || "").trim(),
+          plan: (
+            ["pro", "premium"].includes(String(cp.plan || "").toLowerCase())
+              ? "pro"
+              : "starter"
+          ) as "starter" | "pro",
+        }))
+        .filter((cp) => Boolean(cp.courseId));
+
+    const addCourseId = String(input.addCourseId || "").trim();
+    const addCoursePlan: "starter" | "pro" = ["pro", "premium"].includes(
+      String(input.addCoursePlan || "").toLowerCase(),
+    )
+      ? "pro"
+      : "starter";
+
+    if (
+      addCourseId &&
+      !normalizedCoursePlans.some((cp) => cp.courseId === addCourseId)
+    ) {
+      normalizedCoursePlans.push({ courseId: addCourseId, plan: addCoursePlan });
+    }
+
+    let accountPlan: "starter" | "pro" = ["pro", "premium"].includes(
+      String(input.plan || "").toLowerCase(),
+    )
+      ? "pro"
+      : "starter";
+
+    if (normalizedCoursePlans.length > 0) {
+      accountPlan = normalizedCoursePlans.some((cp) => cp.plan === "pro")
+        ? "pro"
+        : "starter";
+    }
+
+    // 2. Update auth.users (email + metadata)
+    const authEmail = authUserData.user.email?.trim().toLowerCase() || "";
+    const authUpdatePayload: {
+      email?: string;
+      email_confirm?: boolean;
+      user_metadata: Record<string, unknown>;
+    } = {
+      user_metadata: {
+        ...existingMeta,
+        email: normalizedEmail,
+        full_name: trimmedName,
+        name: trimmedName,
+        username: trimmedName,
+        role: normalizedRole,
+        plan: accountPlan,
+      },
+    };
+    if (authEmail !== normalizedEmail) {
+      authUpdatePayload.email = normalizedEmail;
+      authUpdatePayload.email_confirm = true;
+    }
+
+    const { error: authUpdateErr } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      authUpdatePayload,
+    );
+    if (authUpdateErr) {
+      return { success: false, error: authUpdateErr.message || "Failed to update auth user." };
+    }
+
+    // 3. Update public.profiles
+    const profileUpdatePayload: Record<string, unknown> = {
+      full_name: trimmedName,
+      email: normalizedEmail,
+      role: normalizedRole,
+    };
+    if (normalizedPhone) {
+      profileUpdatePayload.phone = normalizedPhone;
+      if (normalizedRole === "admin") {
+        profileUpdatePayload.phone_verified = true;
+      }
+    } else if (phoneInput === "" && normalizedRole !== "admin") {
+      profileUpdatePayload.phone = null;
+    }
+
+    const { error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .update(profileUpdatePayload)
+      .eq("id", userId);
+    if (profileErr) {
+      return { success: false, error: profileErr.message || "Failed to update profile." };
+    }
+
+    // 4. Sync phase2.users & phase2.landing_users
+    let phase2UserId: string | null = null;
+    try {
+      const { data: p2ByAuth } = await supabaseAdmin
+        .schema("phase2" as "public")
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .maybeSingle();
+
+      let p2User = p2ByAuth;
+      if (!p2User?.id && oldEmail) {
+        const { data: p2ByEmail } = await supabaseAdmin
+          .schema("phase2" as "public")
+          .from("users")
+          .select("id")
+          .ilike("email", oldEmail)
+          .maybeSingle();
+        p2User = p2ByEmail;
+      }
+
+      if (p2User?.id) {
+        phase2UserId = p2User.id;
+        await supabaseAdmin
+          .schema("phase2" as "public")
+          .from("users")
+          .update({
+            auth_user_id: userId,
+            username: trimmedName,
+            email: normalizedEmail,
+            role: normalizedRole,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", phase2UserId);
+      } else if (normalizedCoursePlans.length > 0) {
+        const { data: insertedP2 } = await supabaseAdmin
+          .schema("phase2" as "public")
+          .from("users")
+          .insert({
+            auth_user_id: userId,
+            username: trimmedName,
+            email: normalizedEmail,
+            role: normalizedRole,
+            created_at: new Date().toISOString(),
+          })
+          .select("id")
+          .maybeSingle();
+        if (insertedP2?.id) {
+          phase2UserId = insertedP2.id;
+        }
+      }
+
+      // Sync phase2.landing_users email if row exists for this user
+      const { data: existingLandingUser } = await supabaseAdmin
+        .schema("phase2" as "public")
+        .from("landing_users")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (existingLandingUser?.id) {
+        await supabaseAdmin
+          .schema("phase2" as "public")
+          .from("landing_users")
+          .update({ email: normalizedEmail })
+          .eq("id", userId);
+      }
+    } catch (p2Err) {
+      console.warn("[updateAdminUser] phase2.users sync warning:", p2Err);
+    }
+
+    // 5. Keep course_members email in sync if email changed
+    if (oldEmail && oldEmail !== normalizedEmail) {
+      try {
+        await supabaseAdmin
+          .from("course_members")
+          .update({ email: normalizedEmail })
+          .ilike("email", oldEmail);
+      } catch (cmEmailErr) {
+        console.warn("[updateAdminUser] course_members email sync warning:", cmEmailErr);
+      }
+    }
+
+    // 6. Apply per-course plan updates (when role is user or courses are explicitly passed)
+    if (normalizedCoursePlans.length > 0) {
+      const [starterBundle, proBundle] = await Promise.all([
+        resolveBundleByPlan("starter"),
+        resolveBundleByPlan("pro"),
+      ]);
+
+      const enrollUserId = phase2UserId || userId;
+      const oneYearFromNow = new Date(
+        new Date().setFullYear(new Date().getFullYear() + 1),
+      ).toISOString();
+
+      for (const cp of normalizedCoursePlans) {
+        const targetBundle = cp.plan === "pro" ? proBundle : starterBundle;
+        if (!targetBundle?.id) continue;
+
+        const { data: courseRow } = await supabaseAdmin
+          .from("maincourses")
+          .select("id, product_id")
+          .eq("id", cp.courseId)
+          .maybeSingle();
+
+        const productId = courseRow?.product_id || null;
+        const orClause = productId
+          ? `course_id.eq.${cp.courseId},product_id.eq.${cp.courseId},product_id.eq.${productId}`
+          : `course_id.eq.${cp.courseId},product_id.eq.${cp.courseId}`;
+
+        const candidateUserIds = Array.from(
+          new Set([enrollUserId, userId].filter(Boolean)),
+        );
+
+        const { data: existingEnrollments } = await supabaseAdmin
+          .schema("phase2" as "public")
+          .from("enrollments")
+          .select("id")
+          .in("user_id", candidateUserIds)
+          .eq("status", "active")
+          .or(orClause);
+
+        if (existingEnrollments && existingEnrollments.length > 0) {
+          await supabaseAdmin
+            .schema("phase2" as "public")
+            .from("enrollments")
+            .update({
+              user_id: enrollUserId,
+              bundle_id: targetBundle.id,
+              updated_at: new Date().toISOString(),
+            })
+            .in(
+              "id",
+              existingEnrollments.map((e: { id: string }) => e.id),
+            );
+        } else {
+          let orderId: number | null = null;
+          try {
+            const { data: newOrder } = await supabaseAdmin
+              .schema("phase2" as "public")
+              .from("orders")
+              .insert({
+                user_id: enrollUserId,
+                course_id: cp.courseId,
+                bundle_id: targetBundle.id,
+                amount: targetBundle.price ?? 0,
+                status: "paid",
+                razorpay_order_id: `admin_edit_order_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                razorpay_payment_id: `admin_edit_pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .select("id")
+              .maybeSingle();
+            if (newOrder?.id) orderId = newOrder.id;
+          } catch (orderErr) {
+            console.warn("[updateAdminUser] orders insert warning:", orderErr);
+          }
+
+          await supabaseAdmin
+            .schema("phase2" as "public")
+            .from("enrollments")
+            .insert({
+              user_id: enrollUserId,
+              order_id: orderId,
+              course_id: cp.courseId,
+              bundle_id: targetBundle.id,
+              product_id: productId,
+              batch_type: "recorded",
+              status: "active",
+              access_start_date: new Date().toISOString(),
+              access_end_date: oneYearFromNow,
+            });
+
+          // Ensure course_members record exists for non-admin users
+          if (normalizedRole !== "admin") {
+            const { data: existingCm } = await supabaseAdmin
+              .from("course_members")
+              .select("id")
+              .eq("maincourse_id", cp.courseId)
+              .ilike("email", normalizedEmail)
+              .limit(1)
+              .maybeSingle();
+
+            if (!existingCm) {
+              await supabaseAdmin.from("course_members").insert({
+                maincourse_id: cp.courseId,
+                email: normalizedEmail,
+                status: "active",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    revalidatePath("/admin/users");
+    return { success: true, message: "User details updated successfully." };
+  } catch (error: unknown) {
+    console.error("[updateAdminUser] error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update user details.",
+    };
+  }
 }
 
 export async function getAdminUsers(adminAccessToken: string): Promise<{ success: boolean; users?: AdminUserData[]; error?: string }> {
@@ -750,12 +1136,49 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
       console.warn("Could not list auth users for metadata plan:", authListErr);
     }
 
-    // 4. Fetch phase2 users and enrollments
+    // 4. Fetch courses, course_members, phase2 users and enrollments
+    const courseTitleById = new Map<string, string>();
+    const courseIdByProductId = new Map<string, string>();
+    try {
+      const { data: courseRows } = await supabaseAdmin
+        .from("maincourses")
+        .select("id, title, product_id");
+      for (const c of courseRows ?? []) {
+        const cid = String(c.id);
+        courseTitleById.set(cid, c.title || "Untitled Course");
+        if (c.product_id) {
+          courseIdByProductId.set(String(c.product_id), cid);
+        }
+      }
+    } catch (cErr) {
+      console.warn("Could not fetch maincourses in getAdminUsers:", cErr);
+    }
+
+    const courseMembersByEmail = new Map<string, Set<string>>();
+    try {
+      const { data: cmRows } = await supabaseAdmin
+        .from("course_members")
+        .select("email, maincourse_id")
+        .eq("status", "active");
+      for (const cm of cmRows ?? []) {
+        const em = cm.email?.trim().toLowerCase();
+        const cid = cm.maincourse_id ? String(cm.maincourse_id) : "";
+        if (!em || !cid) continue;
+        if (!courseMembersByEmail.has(em)) {
+          courseMembersByEmail.set(em, new Set());
+        }
+        courseMembersByEmail.get(em)!.add(cid);
+      }
+    } catch (cmErr) {
+      console.warn("Could not fetch course_members in getAdminUsers:", cmErr);
+    }
+
     const phase2UserMap = new Map<string, string>();
     const phase2PlanMap = new Map<string, string>();
+    const phase2CoursesByAuthId = new Map<string, Map<string, "starter" | "pro">>();
     try {
       const { data: p2Users } = await supabaseAdmin
-        .schema("phase2" as any)
+        .schema("phase2" as "public")
         .from("users")
         .select("id, auth_user_id, email, username");
 
@@ -769,21 +1192,46 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
       }
 
       const { data: p2Enrollments } = await supabaseAdmin
-        .schema("phase2" as any)
+        .schema("phase2" as "public")
         .from("enrollments")
-        .select("user_id, bundles(bundle_name)")
+        .select("user_id, course_id, product_id, bundles(bundle_name)")
         .eq("status", "active");
 
+      interface Phase2EnrollmentWithBundle {
+        user_id: string;
+        course_id: string | number | null;
+        product_id: string | number | null;
+        bundles?: { bundle_name?: string | null } | Array<{ bundle_name?: string | null }> | null;
+      }
+
       if (p2Enrollments) {
-        for (const e of p2Enrollments as any[]) {
+        for (const e of p2Enrollments as unknown as Phase2EnrollmentWithBundle[]) {
           const bn = (Array.isArray(e.bundles) ? e.bundles[0]?.bundle_name : e.bundles?.bundle_name) || "";
           const lower = bn.toLowerCase();
-          const planStr = lower.includes("pro") || lower.includes("premium") ? "pro" : "starter";
+          const planStr: "starter" | "pro" =
+            lower.includes("pro") || lower.includes("premium") ? "pro" : "starter";
           const authId = p2IdToAuthId.get(e.user_id) || e.user_id;
 
           const curr = phase2PlanMap.get(authId);
           if (!curr || (curr === "starter" && planStr !== "starter")) {
             phase2PlanMap.set(authId, planStr);
+          }
+
+          const rawCourseId = e.course_id ? String(e.course_id) : "";
+          const resolvedCourseId =
+            (rawCourseId && courseTitleById.has(rawCourseId) ? rawCourseId : null) ||
+            (e.product_id ? courseIdByProductId.get(String(e.product_id)) : null) ||
+            rawCourseId;
+
+          if (resolvedCourseId) {
+            if (!phase2CoursesByAuthId.has(authId)) {
+              phase2CoursesByAuthId.set(authId, new Map());
+            }
+            const userCourseMap = phase2CoursesByAuthId.get(authId)!;
+            const prevPlan = userCourseMap.get(resolvedCourseId);
+            if (!prevPlan || (prevPlan === "starter" && planStr === "pro")) {
+              userCourseMap.set(resolvedCourseId, planStr);
+            }
           }
         }
       }
@@ -794,7 +1242,8 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
     // 5. Transform profiles
     const transformed: AdminUserData[] = (profiles || []).map((profile) => {
       const userLogs = logsByUser.get(profile.id);
-      const p2Name = phase2UserMap.get(profile.id) || phase2UserMap.get(profile.email?.toLowerCase() || "");
+      const profileEmailLower = profile.email?.trim().toLowerCase() || "";
+      const p2Name = phase2UserMap.get(profile.id) || phase2UserMap.get(profileEmailLower);
       const isFromLanding = !profile.created_at && Boolean(p2Name);
       const resolvedName = (isFromLanding && p2Name)
         ? p2Name
@@ -818,20 +1267,43 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
         resolvedPlan = "starter";
       }
 
+      const coursePlanMap = new Map<string, "starter" | "pro">(
+        phase2CoursesByAuthId.get(profile.id) ?? [],
+      );
+      if (profileEmailLower) {
+        for (const cmCourseId of courseMembersByEmail.get(profileEmailLower) ?? []) {
+          if (!coursePlanMap.has(cmCourseId)) {
+            coursePlanMap.set(cmCourseId, "starter");
+          }
+        }
+      }
+
+      const enrolledCourses: AdminUserCourseEnrollment[] = Array.from(
+        coursePlanMap.entries(),
+      ).map(([cid, cPlan]) => ({
+        courseId: cid,
+        courseTitle: courseTitleById.get(cid) || `Course ${cid}`,
+        plan: cPlan,
+      }));
+
+      enrolledCourses.sort((a, b) => a.courseTitle.localeCompare(b.courseTitle));
+
       return {
         id: profile.id,
         name: resolvedName,
         email: profile.email || "No Email",
+        phone: profile.phone || "",
         role: profile.role?.toLowerCase() || "user",
         plan: resolvedPlan,
+        enrolledCourses,
         todaySessions: userLogs?.sessions || [],
         todayTimeSpentSeconds: userLogs?.totalSec || 0,
       };
     });
 
     return { success: true, users: transformed };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("getAdminUsers error:", err);
-    return { success: false, error: err.message || "Failed to load users" };
+    return { success: false, error: err instanceof Error ? err.message : "Failed to load users" };
   }
 }

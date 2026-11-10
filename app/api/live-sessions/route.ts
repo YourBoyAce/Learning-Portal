@@ -6,6 +6,7 @@ import { TIER_FEATURES } from "@/app/lib/tier.constants";
 import { apiErrorResponse } from "@/app/lib/error-handler";
 import {
   addMinutesToTime,
+  extractCourseIdFromTag,
   extractDurationFromTag,
   splitEventDateTime,
 } from "@/app/lib/live-session-helpers";
@@ -90,6 +91,26 @@ export async function GET(request: Request) {
       }
     }
 
+    const courseIdsFromEvents = Array.from(
+      new Set(
+        (userEvents ?? [])
+          .map((ev) => extractCourseIdFromTag(ev.tag))
+          .filter((cid): cid is string => Boolean(cid)),
+      ),
+    );
+    const courseTitleById = new Map<string, string>();
+    if (courseIdsFromEvents.length > 0) {
+      const { data: courseRows } = await supabaseAdmin
+        .from("maincourses")
+        .select("id, title")
+        .in("id", courseIdsFromEvents);
+      for (const c of courseRows ?? []) {
+        if (c.id && c.title) {
+          courseTitleById.set(String(c.id), c.title);
+        }
+      }
+    }
+
     const seenKeys = new Set<string>();
     const sessions = [];
 
@@ -103,6 +124,8 @@ export async function GET(request: Request) {
       if (ev.webinar_id != null && !webinar) continue;
 
       const durationMinutes = extractDurationFromTag(ev.tag, 60);
+      const courseId = extractCourseIdFromTag(ev.tag) || "";
+      const courseTitle = courseId ? (courseTitleById.get(courseId) || "") : "";
       const { date, startTime } = splitEventDateTime(
         webinar?.event_date,
         ev.event_date,
@@ -121,6 +144,8 @@ export async function GET(request: Request) {
         start_time: startTime,
         end_time: endTime,
         duration_minutes: durationMinutes,
+        course_id: courseId,
+        course_title: courseTitle,
         status: meetingLink ? "link" : (webinar?.status || "streaming"),
         link_text: meetingLink,
         attendees_count: webinar?.attendees_count || 0,
