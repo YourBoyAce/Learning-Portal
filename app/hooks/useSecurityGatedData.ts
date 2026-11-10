@@ -31,22 +31,22 @@ export function useSecurityGatedData() {
         const role = profile?.role?.toLowerCase() ?? "";
         if (role === "admin" || role === "instructor") {
           if (mounted) {
-            setTier("Premium");
+            setTier("Pro");
             setIsLoading(false);
           }
           return;
         }
 
         const normalizedEmail = session.user.email?.trim().toLowerCase() ?? "";
-        const demoPremiumEmails = [
+        const demoProEmails = [
           "demouser@gmail.com",
           "user@example.com",
           "premium@gmail.com",
         ];
 
-        if (demoPremiumEmails.includes(normalizedEmail)) {
+        if (demoProEmails.includes(normalizedEmail)) {
           if (mounted) {
-            setTier("Premium");
+            setTier("Pro");
             setIsLoading(false);
           }
           return;
@@ -144,7 +144,7 @@ export function useCoursePermissions(courseId?: string) {
           return;
         }
 
-        // Demo/test override — always Premium regardless of course
+        // Demo/test override — always Pro regardless of course
         const demoEmails = [
           "demouser@gmail.com",
           "user@example.com",
@@ -153,7 +153,7 @@ export function useCoursePermissions(courseId?: string) {
         const normalizedEmail = (session.user.email ?? "").trim().toLowerCase();
         if (demoEmails.includes(normalizedEmail)) {
           if (mounted) {
-            setTier("Premium");
+            setTier("Pro");
             setIsLoading(false);
           }
           return;

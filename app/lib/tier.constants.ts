@@ -6,27 +6,19 @@ export type Feature =
   | "Ratings"
   | "Labs"
   | "Quizzes"
-  | "Webinars"
+  | "LiveSessions"
   | "Mentorship";
 
 export const TIER_HIERARCHY: Record<NonNullable<UserTier>, number> = {
   Starter: 1,
   Pro: 2,
-  Premium: 3,
+  Premium: 2,
 };
 
 export const TIER_FEATURES: Record<NonNullable<UserTier>, Feature[]> = {
   Starter: ["Videos", "Chat", "Ratings", "Labs", "Quizzes"],
-  Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "Mentorship"],
-  Premium: [
-    "Videos",
-    "Chat",
-    "Ratings",
-    "Labs",
-    "Quizzes",
-    "Webinars",
-    "Mentorship",
-  ],
+  Pro: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "LiveSessions"],
+  Premium: ["Videos", "Chat", "Ratings", "Labs", "Quizzes", "LiveSessions"],
 };
 
 export function normalizeTier(tier: UserTier): number {

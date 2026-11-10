@@ -50,13 +50,12 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
     .maybeSingle();
 
   const role = profile?.role?.toLowerCase() ?? "";
-  if (role === "admin" || role === "instructor") return "Premium";
+  if (role === "admin" || role === "instructor") return "Pro";
 
   const authPlan = getAuthUserPlanFromMetadata(user);
   let resolvedTier: UserTier = null;
-  
-  if (authPlan === "premium") resolvedTier = "Premium";
-  else if (authPlan === "pro") resolvedTier = "Pro";
+
+  if (authPlan === "premium" || authPlan === "pro") resolvedTier = "Pro";
   else if (authPlan === "starter") resolvedTier = "Starter";
 
   const { data: phase2User } = await supabaseAdmin
@@ -83,11 +82,9 @@ export async function getUserTier(accessToken: string): Promise<UserTier> {
       const bundleName = Array.isArray(b) ? (b[0]?.bundle_name ?? "Starter") : (b?.bundle_name ?? "Starter");
       if (typeof bundleName === "string") {
         const lowerName = bundleName.toLowerCase();
-        if (lowerName.includes("premium")) {
-          resolvedTier = "Premium";
-          break; // Max possible tier
-        } else if (lowerName.includes("pro") && resolvedTier !== "Premium") {
+        if (lowerName.includes("pro") || lowerName.includes("premium")) {
           resolvedTier = "Pro";
+          break; // Max possible tier
         }
       }
     }
@@ -142,14 +139,13 @@ export async function getCourseUserTier(
 
   const role = profile?.role?.toLowerCase() ?? "";
   if (role === "admin" || role === "instructor") {
-    return "Premium";
+    return "Pro";
   }
 
   const authPlan = getAuthUserPlanFromMetadata(user);
   let resolvedTier: UserTier = null;
-  
-  if (authPlan === "premium") resolvedTier = "Premium";
-  else if (authPlan === "pro") resolvedTier = "Pro";
+
+  if (authPlan === "premium" || authPlan === "pro") resolvedTier = "Pro";
   else if (authPlan === "starter") resolvedTier = "Starter";
 
   const { data: phase2User } = await supabaseAdmin
@@ -204,11 +200,9 @@ export async function getCourseUserTier(
       const bundleName = Array.isArray(b) ? (b[0]?.bundle_name ?? "Starter") : (b?.bundle_name ?? "Starter");
       if (typeof bundleName === "string") {
         const lowerName = bundleName.toLowerCase();
-        if (lowerName.includes("premium")) {
-          resolvedTier = "Premium";
-          break; // Max possible
-        } else if (lowerName.includes("pro") && resolvedTier !== "Premium") {
+        if (lowerName.includes("pro") || lowerName.includes("premium")) {
           resolvedTier = "Pro";
+          break; // Max possible
         }
       }
     }

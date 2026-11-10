@@ -65,7 +65,7 @@ export default function InvitesPage() {
 
         if (role !== "instructor" && role !== "admin") {
           // If student, they don't have access to this invites RSVP dashboard
-          router.push("/mentor-planner");
+          router.replace("/dashboard");
           return;
         }
 

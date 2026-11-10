@@ -11,7 +11,6 @@ import { ICONS } from "@/app/styles/icons";
 import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
 import MentionNotificationsBell from "@/app/components/MentionNotificationsBell";
-import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { useUpcomingMeetingsCount } from "@/app/hooks/useUpcomingMeetingsCount";
 
 function MainLayoutContent({
@@ -28,8 +27,8 @@ function MainLayoutContent({
   const [role, setRole] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { canAccess } = useSecurityGatedData();
-  const { count: upcomingMeetingsCount } = useUpcomingMeetingsCount();
+  const isMentor = role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
+  const { count: upcomingMeetingsCount } = useUpcomingMeetingsCount(!loading && isMentor);
 
   // Close sidebar on path change
   useEffect(() => {
@@ -135,8 +134,6 @@ function MainLayoutContent({
     router.replace("/login");
   };
 
-  const isMentor = role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
-
   interface NavItem {
     label: string;
     href: string;
@@ -170,14 +167,6 @@ function MainLayoutContent({
 
   // Add student-only tabs if user is not a mentor
   if (!isMentor) {
-    const landingBase = (process.env.NEXT_PUBLIC_LANDING_SITE_URL || "").trim().replace(/\/$/, "");
-    const landingLiveSessionsUrl =
-      process.env.NEXT_PUBLIC_LANDING_LIVE_SESSION_URL?.trim() ||
-      (landingBase ? `${landingBase}/payment?planName=Premium` : "/upgrade");
-    const hasLiveSessionsAccess = canAccess("Webinars");
-    const liveSessionHref = hasLiveSessionsAccess ? "/webinars" : landingLiveSessionsUrl;
-    const isExternalLiveSession = !hasLiveSessionsAccess && liveSessionHref.startsWith("http");
-
     navItems.push(
       {
         label: "My Learning",
@@ -190,10 +179,10 @@ function MainLayoutContent({
       },
       {
         label: "Live Sessions",
-        href: liveSessionHref,
-        active: pathname === "/webinars",
-        icon: pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
-        isExternal: isExternalLiveSession,
+        href: "/live-sessions",
+        active: pathname === "/live-sessions" || pathname === "/webinars",
+        icon: pathname === "/live-sessions" || pathname === "/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
+        isExternal: false,
       }
     );
   }
@@ -208,38 +197,36 @@ function MainLayoutContent({
       : ICONS.COMMUNITIES,
   });
 
-  // Inbox is visible to everyone
-  navItems.push({
-    label: "Inbox",
-    href: "/inbox",
-    active: pathname === "/inbox",
-    icon: pathname === "/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
-    badge: upcomingMeetingsCount > 0 ? upcomingMeetingsCount : undefined,
-  });
-
-  // Mentor Connect is visible to everyone
-  navItems.push({
-    label: "Mentor Connect",
-    href: "/mentor-planner",
-    active: pathname === "/mentor-planner",
-    icon: pathname === "/mentor-planner"
-      ? ICONS.USERSLIGHT
-      : ICONS.USERS,
-  });
-
-  // If user is admin or instructor, append the Mentor-specific pages (Dashboard is already added at the top)
+  // Mentor Connect, Inbox, and Invites are hidden on the user/scholar side; visible only to mentors/admins
   if (isMentor) {
-    navItems.push({
-      label: "Invites",
-      href: "/invites",
-      active: pathname === "/invites",
-      icon: pathname === "/invites" ? ICONS.BATCHLIGHT : ICONS.BATCH,
-    });
+    navItems.push(
+      {
+        label: "Inbox",
+        href: "/inbox",
+        active: pathname === "/inbox",
+        icon: pathname === "/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+        badge: upcomingMeetingsCount > 0 ? upcomingMeetingsCount : undefined,
+      },
+      {
+        label: "Mentor Connect",
+        href: "/mentor-planner",
+        active: pathname === "/mentor-planner",
+        icon: pathname === "/mentor-planner"
+          ? ICONS.USERSLIGHT
+          : ICONS.USERS,
+      },
+      {
+        label: "Invites",
+        href: "/invites",
+        active: pathname === "/invites",
+        icon: pathname === "/invites" ? ICONS.BATCHLIGHT : ICONS.BATCH,
+      }
+    );
   }
 
   // Profile page always goes last
   navItems.push({
-    label: "Profile",
+    label: "My Profile",
     href: "/profile",
     active: pathname === "/profile",
     icon: pathname === "/profile"

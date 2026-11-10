@@ -3,7 +3,6 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase";
 import { prepareAdminVerification } from "@/app/actions/admin-2fa";
-import { getUserTier } from "@/app/actions/tier";
 import AdminVerificationModal from "@/app/components/AdminVerificationModal";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/app/styles/icons";
@@ -12,12 +11,6 @@ import { Mail, Phone, Loader2, ShieldAlert, X } from "lucide-react";
 
 type LoginStep = "credentials" | "chooseMethod";
 type VerificationMethod = "email" | "phone";
-
-const DEMO_PREMIUM_EMAILS = [
-  "premium@gmail.com",
-  "demouser@gmail.com",
-  "user@example.com",
-];
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
@@ -75,25 +68,10 @@ function LoginPageInner() {
       return;
     }
 
-    if (DEMO_PREMIUM_EMAILS.includes(email.trim().toLowerCase())) {
-      router.push("/premium");
-      return;
-    }
-
     // Honour a ?next= deep-link for regular students
     if (nextPath) {
       router.push(nextPath);
       return;
-    }
-
-    try {
-      const tier = await getUserTier(accessToken);
-      if (tier === "Premium") {
-        router.push("/premium");
-        return;
-      }
-    } catch (err) {
-      console.error("Failed to fetch user tier during login:", err);
     }
 
     router.push("/dashboard");

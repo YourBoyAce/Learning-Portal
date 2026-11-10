@@ -10,12 +10,17 @@ import { INBOX_UPDATED_EVENT } from "@/app/lib/inbox-events";
  * - Subscribes to Supabase Realtime changes on `calendar_events`
  * - Listens for window focus, custom "inbox-updated" events, and 60-second timer to auto-roll off expired sessions
  */
-export function useUpcomingMeetingsCount() {
+export function useUpcomingMeetingsCount(enabled: boolean = true) {
   const [count, setCount] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(enabled);
   const isFetchingRef = useRef(false);
 
   const fetchCount = useCallback(async () => {
+    if (!enabled) {
+      setCount(0);
+      setLoading(false);
+      return;
+    }
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
@@ -49,9 +54,15 @@ export function useUpcomingMeetingsCount() {
       isFetchingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setCount(0);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -126,7 +137,7 @@ export function useUpcomingMeetingsCount() {
         clearInterval(intervalId);
       }
     };
-  }, [fetchCount]);
+  }, [enabled, fetchCount]);
 
   return { count, loading, refresh: fetchCount };
 }

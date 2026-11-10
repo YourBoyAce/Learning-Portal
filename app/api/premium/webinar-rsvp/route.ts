@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (gwError || !globalWebinar) {
-      return NextResponse.json({ error: "Webinar not found." }, { status: 404 });
+      return NextResponse.json({ error: "Live session not found." }, { status: 404 });
     }
 
     const { error: insertError } = await supabaseAdmin

@@ -467,7 +467,6 @@ export default function AdminUsers() {
                       >
                         <option value="starter">Starter</option>
                         <option value="pro">Pro</option>
-                        <option value="premium">Premium</option>
                       </select>
                     </div>
                   </>
@@ -779,7 +778,6 @@ export default function AdminUsers() {
                                 {[
                                   { value: "starter", label: "Starter" },
                                   { value: "pro", label: "Pro" },
-                                  { value: "premium", label: "Premium" },
                                 ].map((p) => (
                                   <button
                                     key={p.value}
@@ -929,14 +927,14 @@ export default function AdminUsers() {
                             </span>
                             {user.role === "user" && (
                               <span
-                                className={`px-2 py-0.5 text-[10px] font-bold rounded-md border capitalize ${user.plan === "premium"
-                                  ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
-                                  : user.plan === "pro"
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-md border capitalize ${user.plan === "pro" || user.plan === "premium"
                                     ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
                                     : "bg-gray-100 text-gray-700 border-gray-200"
                                   }`}
                               >
-                                {user.plan ? `${user.plan} Plan` : "Starter Plan"}
+                                {user.plan === "pro" || user.plan === "premium"
+                                  ? "Pro Plan"
+                                  : "Starter Plan"}
                               </span>
                             )}
                           </div>
@@ -1018,7 +1016,6 @@ export default function AdminUsers() {
                                     {[
                                       { value: "starter", label: "Starter" },
                                       { value: "pro", label: "Pro" },
-                                      { value: "premium", label: "Premium" },
                                     ].map((p) => (
                                       <button
                                         key={p.value}

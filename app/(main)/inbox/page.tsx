@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
 import { supabase } from "@/app/lib/supabase";
 import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/app/components/UserAvatar";
-import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
-import { UpgradeRequired } from "@/app/components/UpgradeRequired";
 import {
   Calendar,
   Video,
@@ -42,9 +41,11 @@ interface Session {
 }
 
 export default function InboxPage() {
+  const router = useRouter();
   const { setLoading: setGlobalLoading } = useLoading();
   const [loading, setLoading] = useState(true);
   const [isMentor, setIsMentor] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [expandedSetupId, setExpandedSetupId] = useState<string | null>(null);
   const [generatingMeetId, setGeneratingMeetId] = useState<string | null>(null);
@@ -52,7 +53,6 @@ export default function InboxPage() {
   const [manualLinks, setManualLinks] = useState<{ [id: string]: string }>({});
   const [sessionFeedback, setSessionFeedback] = useState<{ [id: string]: { type: "success" | "error"; text: string } }>({});
   const [copiedWebhook, setCopiedWebhook] = useState(false);
-  const { isLoading: isTierLoading, canAccess } = useSecurityGatedData();
 
   useEffect(() => {
     setGlobalLoading(loading);
@@ -74,8 +74,13 @@ export default function InboxPage() {
 
       if (res.ok) {
         const data = await res.json();
+        if (!data.isMentor) {
+          router.replace("/dashboard");
+          return;
+        }
         setIsMentor(data.isMentor);
         setSessions(data.sessions || []);
+        setAccessChecked(true);
       }
     } catch (err) {
       console.error("Failed to load inbox data:", err);
@@ -86,7 +91,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadInbox();
-  }, []);
+  }, [router]);
 
   // Split sessions into upcoming and past
   const now = new Date();
@@ -192,6 +197,10 @@ export default function InboxPage() {
     }
   };
 
+  if (!accessChecked || !isMentor) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -209,16 +218,6 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {!isTierLoading && !canAccess("Mentorship") ? (
-          <div className="py-6">
-            <UpgradeRequired
-              title="Inbox Locked"
-              description="Your inbox for 1-on-1 mentor sessions and video meetings is available to Pro and Premium tier members. Upgrade today to book sessions with instructors and join calls right from here."
-              requiredTier="Pro"
-            />
-          </div>
-        ) : (
-        <>
         {/* Upcoming Sessions Section */}
         <div className="space-y-4">
           <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest text-left">
@@ -525,8 +524,6 @@ export default function InboxPage() {
             </div>
           )}
         </div>
-        </>
-        )}
 
       </div>
     </div>

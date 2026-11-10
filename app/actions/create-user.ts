@@ -148,9 +148,10 @@ export async function createUser(formData: FormData, adminAccessToken?: string) 
   const productId = courseId;
   const phoneInput = String(formData.get("phone") || "").trim();
   const normalizedPhone = phoneInput ? normalizePhoneNumber(phoneInput) : null;
-  const normalizedPlan = ["starter", "pro", "premium"].includes(plan)
+  const rawPlan = ["starter", "pro", "premium"].includes(plan)
     ? plan
     : "starter";
+  const normalizedPlan = rawPlan === "premium" ? "pro" : rawPlan;
 
   if (!username || !email || !password || !role) {
     return { success: false, error: "Please fill in all fields" };
@@ -548,9 +549,10 @@ export async function updateUserPlan(userId: string, newPlan: string, adminAcces
     return { success: false, error: callerAuth.error };
   }
 
-  const normalizedPlan = ["starter", "pro", "premium"].includes(newPlan.toLowerCase())
+  const rawPlan = ["starter", "pro", "premium"].includes(newPlan.toLowerCase())
     ? newPlan.toLowerCase()
     : "starter";
+  const normalizedPlan = rawPlan === "premium" ? "pro" : rawPlan;
 
   try {
     // 1. Update user_metadata in auth.users, preserving existing metadata
@@ -776,11 +778,11 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
         for (const e of p2Enrollments as any[]) {
           const bn = (Array.isArray(e.bundles) ? e.bundles[0]?.bundle_name : e.bundles?.bundle_name) || "";
           const lower = bn.toLowerCase();
-          const planStr = lower.includes("premium") ? "premium" : lower.includes("pro") ? "pro" : "starter";
+          const planStr = lower.includes("pro") || lower.includes("premium") ? "pro" : "starter";
           const authId = p2IdToAuthId.get(e.user_id) || e.user_id;
 
           const curr = phase2PlanMap.get(authId);
-          if (!curr || (curr === "starter" && planStr !== "starter") || (curr === "pro" && planStr === "premium")) {
+          if (!curr || (curr === "starter" && planStr !== "starter")) {
             phase2PlanMap.set(authId, planStr);
           }
         }
@@ -805,9 +807,12 @@ export async function getAdminUsers(adminAccessToken: string): Promise<{ success
 
       // Resolve plan prioritizing the highest/active tier between enrollment and metadata
       let resolvedPlan = "starter";
-      if (enrollmentPlan === "premium" || metadataPlan === "premium") {
-        resolvedPlan = "premium";
-      } else if (enrollmentPlan === "pro" || metadataPlan === "pro") {
+      if (
+        enrollmentPlan === "pro" ||
+        enrollmentPlan === "premium" ||
+        metadataPlan === "pro" ||
+        metadataPlan === "premium"
+      ) {
         resolvedPlan = "pro";
       } else if (enrollmentPlan === "starter" || metadataPlan === "starter") {
         resolvedPlan = "starter";

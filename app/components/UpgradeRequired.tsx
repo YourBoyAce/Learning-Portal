@@ -18,7 +18,7 @@ interface UpgradeRequiredProps {
 }
 
 export function UpgradeRequired({
-  title = "Premium Feature Locked",
+  title = "Pro Feature Locked",
   description = "This advanced learning tool is reserved for members of higher tiers. Upgrade today to unlock full curriculum access, live cohort sessions, interactive quizzes, and more.",
   requiredTier = "Pro",
   courseSlug,

@@ -354,19 +354,28 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     try {
-      const parsedCalId = calEventTypeId.trim() ? parseInt(calEventTypeId.trim(), 10) : null;
-      if (calEventTypeId.trim() && isNaN(Number(calEventTypeId.trim()))) {
+      const isStaff =
+        role?.toLowerCase() === "instructor" || role?.toLowerCase() === "admin";
+      const parsedCalId =
+        isStaff && calEventTypeId.trim()
+          ? parseInt(calEventTypeId.trim(), 10)
+          : null;
+      if (isStaff && calEventTypeId.trim() && isNaN(Number(calEventTypeId.trim()))) {
         setToast({ message: "Please enter a valid numeric Event Type ID.", type: "error" });
         setIsSaving(false);
         return;
       }
 
+      const updatePayload: Record<string, unknown> = {
+        full_name: fullName.trim(),
+      };
+      if (isStaff) {
+        updatePayload.cal_event_type_id = parsedCalId;
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName.trim(),
-          cal_event_type_id: parsedCalId,
-        })
+        .update(updatePayload)
         .eq("id", userId);
 
       if (error) throw error;

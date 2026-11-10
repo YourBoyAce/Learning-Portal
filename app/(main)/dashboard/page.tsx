@@ -21,6 +21,10 @@ import Certificate from "@/app/components/certificate/Certificate";
 import CertificateDownload from "@/app/components/certificate/CertificateDownload";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
 import { UpgradeRequired } from "@/app/components/UpgradeRequired";
+import {
+  formatLiveSessionSlot,
+  isLiveSessionPast,
+} from "@/app/lib/live-session-helpers";
 import Image from "next/image";
 import {
   Carousel,
@@ -59,15 +63,18 @@ type Enrollment = {
   whatsappCommunityLink?: string | null;
 };
 
-type CalendarEvent = {
-  id: string;
+type LiveSession = {
+  id: string | number;
   title: string;
+  subtitle: string | null;
   description: string | null;
   event_date: string;
-  event_time: string;
-  event_type: "video" | "course" | "session" | "webinar";
-  meet_link?: string;
-  mentorName?: string;
+  date?: string;
+  start_time?: string;
+  end_time?: string;
+  duration_minutes?: number;
+  status: string;
+  link_text: string | null;
 };
 type LearningActivityDay = {
   day: string;
@@ -144,7 +151,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const forcePremiumDashboard = async () => {
+    const enforceRoleRoute = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -163,33 +170,10 @@ export default function Dashboard() {
       }
       if (role === "instructor") {
         router.replace("/mentor");
-        return;
-      }
-
-      const normalizedEmail = session.user.email?.trim().toLowerCase() ?? "";
-      const isDemoPremium = [
-        "premium@gmail.com",
-        "demouser@gmail.com",
-        "user@example.com",
-      ].includes(normalizedEmail);
-
-      if (isDemoPremium) {
-        router.replace("/premium");
-        return;
-      }
-
-      try {
-        const { getUserTier } = await import("@/app/actions/tier");
-        const tier = await getUserTier(session.access_token);
-        if (tier === "Premium") {
-          router.replace("/premium");
-        }
-      } catch (error) {
-        console.error("Unable to resolve tier for premium redirect:", error);
       }
     };
 
-    void forcePremiumDashboard();
+    void enforceRoleRoute();
   }, [router]);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -209,7 +193,7 @@ export default function Dashboard() {
   const [nextCourse, setNextCourse] = useState<any>(null);
   const [nextModule, setNextModule] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [upcomingLiveSessions, setUpcomingLiveSessions] = useState<LiveSession[]>([]);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userProfileName, setUserProfileName] = useState<string>("Learner");
@@ -271,91 +255,40 @@ export default function Dashboard() {
       .eq("id", user.id)
       .single();
 
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
-    // Current local time as HH:MM:SS for same-day comparison
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    const userRole = fetchedProfile?.role?.toLowerCase() || "user";
-    const isMentorOrAdmin = userRole === "instructor" || userRole === "admin";
-
-    // Mentors own the calendar_events rows (user_id = mentor), so query by user_id.
-    // Students are referenced via "Student ID: <id>" in the description, so query by that.
-    // Note: .gte("event_date", today) only filters by date — same-day past events are
-    // excluded client-side below using currentTime.
-    let calendarQuery = supabase
-      .from("calendar_events")
-      .select(
-        "id,title,description,event_date,event_time,event_type,user_id,meet_link,tag",
-      )
-      .like("tag", "%status:accepted%")
-      .gte("event_date", today)
-      .order("event_date", { ascending: true })
-      .order("event_time", { ascending: true })
-      .limit(10); // Fetch more than needed so client-side time filter doesn't reduce below 5
-
-    if (isMentorOrAdmin) {
-      calendarQuery = calendarQuery.eq("user_id", user.id);
-    } else {
-      calendarQuery = calendarQuery.like(
-        "description",
-        `%Student ID: ${user.id}%`,
-      );
-    }
-
-    const { data: rawCalendarRows } = await calendarQuery;
-
-    // Filter out same-day events whose time has already passed, then cap at 5
-    const calendarRows = (rawCalendarRows || [])
-      .filter((e) => {
-        if (e.event_date > today) return true;
-        if (e.event_date === today) return e.event_time >= currentTime;
-        return false;
-      })
-      .slice(0, 5);
-
-    let mappedMentorEvents: any[] = [];
-    if (calendarRows && calendarRows.length > 0) {
-      if (isMentorOrAdmin) {
-        // For mentors: extract student name from the event description
-        mappedMentorEvents = calendarRows.map((event) => {
-          let studentName = "Student";
-          const desc = event.description || "";
-          const reqMatch = desc.match(/Requested by:\s*([^(]+)\s*\(/);
-          if (reqMatch) studentName = reqMatch[1].trim();
-
-          return {
-            ...event,
-            mentorName: studentName,
-          };
+    if (session?.access_token) {
+      try {
+        const liveSessionsResponse = await fetch("/api/live-sessions", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         });
-      } else {
-        // For students: look up the mentor's name from profiles
-        const mentorIds = Array.from(
-          new Set(calendarRows.map((e) => e.user_id)),
-        );
-        const { data: mentorProfiles } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", mentorIds);
-
-        const mentorsMap = new Map();
-        if (mentorProfiles) {
-          mentorProfiles.forEach((p) => mentorsMap.set(p.id, p));
+        if (liveSessionsResponse.ok) {
+          const liveSessionsPayload = await liveSessionsResponse.json();
+          const activeLiveSessions = ((liveSessionsPayload?.sessions || []) as LiveSession[])
+            .filter(
+              (s) =>
+                !isLiveSessionPast({
+                  eventDate: s.event_date,
+                  date: s.date,
+                  startTime: s.start_time,
+                  durationMinutes: s.duration_minutes,
+                }),
+            )
+            .sort((a, b) => {
+              const aTime = a.event_date ? new Date(a.event_date).getTime() : NaN;
+              const bTime = b.event_date ? new Date(b.event_date).getTime() : NaN;
+              if (!isNaN(aTime) && !isNaN(bTime)) return aTime - bTime;
+              if (!isNaN(aTime)) return -1;
+              if (!isNaN(bTime)) return 1;
+              return 0;
+            })
+            .slice(0, 5);
+          setUpcomingLiveSessions(activeLiveSessions);
         }
-
-        mappedMentorEvents = calendarRows.map((event) => {
-          const mentor = mentorsMap.get(event.user_id);
-          const mentorName = mentor?.full_name || "Instructor";
-
-          return {
-            ...event,
-            mentorName,
-          };
-        });
+      } catch (liveErr) {
+        console.error("Error loading upcoming live sessions:", liveErr);
       }
     }
-
-    setUpcomingEvents(mappedMentorEvents as CalendarEvent[]);
 
     if (session?.access_token) {
       const enrollmentsResponse = await fetch("/api/enrollments", {
@@ -872,28 +805,6 @@ export default function Dashboard() {
 
   const hasEnrollments = enrolledCourses.length > 0;
 
-  const formatEventLabel = (eventDate: string, eventTime: string) => {
-    const start = new Date(`${eventDate}T${eventTime}`);
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const timeLabel = start.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-
-    if (start.toDateString() === now.toDateString())
-      return `Today, ${timeLabel}`;
-    if (start.toDateString() === tomorrow.toDateString()) {
-      return `Tomorrow, ${timeLabel}`;
-    }
-    return `${start.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    })}, ${timeLabel}`;
-  };
-
   const handlePlayModule = () => {
     if (!nextCourse) {
       return;
@@ -1001,40 +912,40 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Upcoming Webinars Widget */}
-        {/* --- Side-by-Side Layout: Webinars & Learning Activity Graph --- */}
+        {/* Upcoming Live Sessions Widget */}
+        {/* --- Side-by-Side Layout: Live Sessions & Learning Activity Graph --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 items-stretch">
-          {/* 1. Upcoming Mentor Session Widget */}
+          {/* 1. Upcoming Live Sessions Widget */}
           <div className="bg-surface-accent rounded-2xl p-4 md:p-5 border border-brand-primary/20 shadow-sm relative overflow-hidden transition-all hover:shadow-md flex flex-col ">
             <div className="flex items-center justify-between mb-3 relative z-10">
               <span className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em]">
-                Live 1-on-1
+                Live Sessions
               </span>
               <span className="text-[10px] font-bold px-3 py-1.5 bg-white text-brand-primary rounded-md border border-brand-primary/20">
-                {upcomingEvents.length} UPCOMING
+                {upcomingLiveSessions.length} UPCOMING
               </span>
             </div>
 
             <h2
               className={`${TYPOGRAPHY_CLASSES.SUBHEADING} mb-1 relative z-10`}
             >
-              Upcoming Mentor Session
+              Upcoming Live Sessions
             </h2>
-            <p className="text-sm text-gray-600 mb-1 relative z-10">
+            <p className="text-sm text-gray-600 mb-3 relative z-10">
               Exclusive live knowledge sessions from your curators.
             </p>
 
             <div className="flex-1 flex flex-col">
-              {!isTierLoading && !canAccess("Mentorship") ? (
+              {!isTierLoading && !canAccess("LiveSessions") ? (
                 <div className="flex-1 pb-2">
                   <UpgradeRequired
-                    title="1-on-1 Mentorship Locked"
+                    title="Live Sessions Locked"
                     description=""
                     requiredTier="Pro"
                     compact={true}
                   />
                 </div>
-              ) : upcomingEvents.length === 0 ? (
+              ) : upcomingLiveSessions.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm relative z-10 h-full flex flex-col items-center justify-center">
                   <div className="w-14 h-14 bg-surface-subtle rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
                     <Image
@@ -1045,17 +956,17 @@ export default function Dashboard() {
                     />
                   </div>
                   <p className="text-gray-700 font-medium">
-                    No upcoming mentor sessions
+                    No upcoming live sessions
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Check back later or visit your calendar.
+                    Check back later or visit Live Sessions.
                   </p>
                 </div>
               ) : (
                 <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide relative z-10">
-                  {upcomingEvents.map((event) => (
+                  {upcomingLiveSessions.map((session) => (
                     <div
-                      key={event.id}
+                      key={session.id}
                       className="min-w-[270px] sm:min-w-[300px] bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-all duration-300 relative group"
                     >
                       <div className="flex items-start justify-between">
@@ -1075,53 +986,58 @@ export default function Dashboard() {
                           </svg>
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/60 bg-surface-accent px-2 py-1 rounded-md">
-                          {event.event_type}
+                          {session.status === "link" ? "Live Link" : "Live"}
                         </span>
                       </div>
 
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand-primary transition-colors mb-1">
-                          {event.title}
+                          {session.title}
                         </h3>
-                        {event.mentorName && (
+                        {session.subtitle && (
                           <p className="text-xs font-bold text-gray-700 mb-2">
-                            With: {event.mentorName}
+                            {session.subtitle}
                           </p>
                         )}
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                          {event.description
-                            ?.replace(/Requested by:.*?\)/, "")
-                            .replace(/Student ID:.*/, "")
-                            .trim() ||
+                          {session.description?.trim() ||
                             "Deep dive into advanced concepts with our industry experts."}
                         </p>
                       </div>
 
                       <div className="pt-4 border-t border-brand-primary/10 flex items-center justify-between mt-auto">
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 pr-2">
                           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                            Commences at
+                            Schedule
                           </p>
                           <p className="text-xs font-black text-brand-primary">
-                            {formatEventLabel(
-                              event.event_date,
-                              event.event_time,
-                            )}
+                            {formatLiveSessionSlot({
+                              eventDate: session.event_date,
+                              date: session.date,
+                              startTime: session.start_time,
+                              endTime: session.end_time,
+                            })}
                           </p>
                         </div>
-                        {event.meet_link ? (
+                        {session.link_text ? (
                           <a
-                            href={event.meet_link}
+                            href={session.link_text}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+                            aria-label={`Join ${session.title}`}
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all shrink-0 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
                           >
                             <ArrowUpRight size={16} />
                           </a>
                         ) : (
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-300 bg-gray-100 cursor-not-allowed">
+                          <button
+                            type="button"
+                            onClick={() => router.push("/live-sessions")}
+                            aria-label={`View ${session.title} in Live Sessions`}
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white hover:scale-105 transition-all shrink-0 ${TYPOGRAPHY_CLASSES.PRIMARY_BUTTON}`}
+                          >
                             <ArrowUpRight size={16} />
-                          </div>
+                          </button>
                         )}
                       </div>
                     </div>

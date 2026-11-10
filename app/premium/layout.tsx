@@ -10,16 +10,13 @@ import Image from "next/image";
 import { ICONS } from "@/app/styles/icons";
 import { Button } from "@/components/ui/button";
 import { PROFILE_UPDATED_EVENT } from "@/app/lib/profile-events";
-import { Video, Inbox, Calendar as CalendarIcon, LogOut } from "lucide-react";
 import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
-import { useUpcomingMeetingsCount } from "@/app/hooks/useUpcomingMeetingsCount";
 
 function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
   const { tier, isLoading: isTierLoading } = useSecurityGatedData();
-  const { count: upcomingMeetingsCount } = useUpcomingMeetingsCount();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [fullName, setFullName] = useState<string | null>(null);
@@ -63,10 +60,6 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
       if (tier === null) {
         router.replace("/login");
         return;
-      }
-
-      if (tier !== "Premium") {
-        router.replace("/dashboard");
       }
     };
 
@@ -143,13 +136,6 @@ function PremiumLayoutContent({ children }: { children: React.ReactNode }) {
       href: "/premium/webinars",
       active: pathname === "/premium/webinars",
       icon: pathname === "/premium/webinars" ? ICONS.GLOBELIGHT : ICONS.GLOBE,
-    },
-    {
-      label: "Inbox",
-      href: "/premium/inbox",
-      active: pathname === "/premium/inbox",
-      icon: pathname === "/premium/inbox" ? ICONS.BATCHLIGHT : ICONS.BATCH,
-      badge: upcomingMeetingsCount > 0 ? upcomingMeetingsCount : undefined,
     },
     {
       label: "Calendar",

@@ -106,7 +106,7 @@ export default function UpgradeSuccessPage() {
           <h1 className="text-2xl font-bold text-gray-900">You're on Pro!</h1>
           <p className="mt-2 max-w-sm text-sm text-gray-500">
             Your selected courses have been upgraded to the Pro plan.
-            Labs, Quizzes, and Mentorship are now unlocked.
+            Live Sessions, Labs, and Quizzes are now unlocked.
           </p>
           {paymentId && (
             <p className="mt-3 text-xs text-gray-400">

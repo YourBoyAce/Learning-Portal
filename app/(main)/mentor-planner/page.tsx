@@ -3,15 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/context/LoadingContext";
-import { supabase, resolveUserName } from "@/app/lib/supabase";
-import { useSecurityGatedData } from "@/app/hooks/useSecurityGatedData";
-import { UpgradeRequired } from "@/app/components/UpgradeRequired";
-import { initiateUpgradeFlow } from "@/app/lib/upgrade-handoff";
-import { TYPOGRAPHY_CLASSES } from "@/app/styles/typography";
-import UserAvatar from "@/app/components/UserAvatar";
-import { getPremiumMentors } from "@/app/actions/get-premium-mentors";
+import { supabase } from "@/app/lib/supabase";
 import { Button } from "@/components/ui/button";
-import Cal, { getCalApi } from "@calcom/embed-react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -20,29 +13,13 @@ import {
   Clock,
   Trash2,
   X,
-  Mail,
-  Sparkles,
-  Lock,
   CalendarDays,
-  Grid,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   Video
 } from "lucide-react";
 
 // Types
-interface Mentor {
-  id: string;
-  full_name: string;
-  email?: string;
-  role: string;
-  cal_link: string;
-  mentor_bio: string;
-  mentor_expertise: string[];
-  cal_event_type_id?: string | number | null;
-}
-
 interface CalendarEvent {
   id: string;
   title: string;
@@ -68,15 +45,6 @@ export default function MentorConnectPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
-  const [currentUserName, setCurrentUserName] = useState<string>("");
-  const [currentUserPhone, setCurrentUserPhone] = useState<string>("");
-
-  // Student view states
-  const [mentors, setMentors] = useState<Mentor[]>([]);
-  const { isLoading: isTierLoading, canAccess } = useSecurityGatedData();
-  const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
-  const [isCalModalOpen, setIsCalModalOpen] = useState(false);
 
   // Mentor view states
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -99,12 +67,6 @@ export default function MentorConnectPage() {
     text: "",
   });
 
-  // Custom Student Connect Request form states
-  const [requestDate, setRequestDate] = useState("");
-  const [requestTime, setRequestTime] = useState("09:00");
-  const [requestDuration, setRequestDuration] = useState("60");
-  const [requestTopic, setRequestTopic] = useState("");
-  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isGeneratingMeet, setIsGeneratingMeet] = useState(false);
   const [manualMeetLink, setManualMeetLink] = useState("");
   const [isSavingManualMeet, setIsSavingManualMeet] = useState(false);
@@ -112,13 +74,6 @@ export default function MentorConnectPage() {
     type: "",
     text: "",
   });
-  const [requestMessage, setRequestMessage] = useState<{ type: "success" | "error" | ""; text: string }>({
-    type: "",
-    text: "",
-  });
-  const [availableSlots, setAvailableSlots] = useState<Array<{ value: string; label: string }>>([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  const [hasAttemptedSlotFetch, setHasAttemptedSlotFetch] = useState(false);
 
   // Availability settings
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]); // Monday to Friday (1-5) by default
@@ -127,7 +82,7 @@ export default function MentorConnectPage() {
   const [isAvailPanelOpen, setIsAvailPanelOpen] = useState(false);
 
   // Loader state
-  const isCurrentlyLoading = loading || isTierLoading;
+  const isCurrentlyLoading = loading;
 
   useEffect(() => {
     try {
@@ -170,25 +125,22 @@ export default function MentorConnectPage() {
         if (authError || !user) return;
 
         setCurrentUserId(user.id);
-        setCurrentUserEmail(user.email || "");
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, full_name, phone")
+          .select("role")
           .eq("id", user.id)
           .single();
 
         const role = profile?.role || "user";
         setCurrentUserRole(role);
-        const resolvedName = await resolveUserName(supabase, user.id, user.email);
-        setCurrentUserName(resolvedName);
-        if (profile?.phone) setCurrentUserPhone(profile.phone);
-
-        if (role === "instructor" || role === "admin") {
-          await loadCalendarEvents(user.id);
-        } else {
-          await loadMentors();
+        const normalizedRole = role.toLowerCase();
+        if (normalizedRole !== "instructor" && normalizedRole !== "admin") {
+          router.replace("/dashboard");
+          return;
         }
+
+        await loadCalendarEvents(user.id);
       } catch (err) {
         console.error("Error loading user state:", err);
       } finally {
@@ -197,29 +149,7 @@ export default function MentorConnectPage() {
     }
 
     loadUser();
-  }, []);
-
-  // Fetch mentors for Student View based on their premium courses
-  async function loadMentors() {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setMentors([]);
-        return;
-      }
-
-      const { mentors: premiumMentors, error } = await getPremiumMentors(session.access_token);
-
-      if (error) {
-        throw new Error(error);
-      }
-
-      setMentors(premiumMentors || []);
-    } catch (err) {
-      console.error("Error loading mentors:", err);
-      setMentors([]);
-    }
-  }
+  }, [router]);
 
   // Fetch Calendar Events for Mentor View
   async function loadCalendarEvents(userId: string) {
@@ -308,8 +238,8 @@ export default function MentorConnectPage() {
       },
       {
         id: "mock-3",
-        title: "Webinar: Intro to Next.js",
-        description: "Weekly live cohort webinar regarding Next.js routes and loaders.",
+        title: "Live Session: Intro to Next.js",
+        description: "Weekly live cohort session regarding Next.js routes and loaders.",
         event_date: getDayOffset(2), // Tuesday
         event_time: "11:00:00",
         end_time: "12:30:00",
@@ -358,134 +288,6 @@ export default function MentorConnectPage() {
     const newDate = new Date(date.getTime() + mins * 60000);
     return `${String(newDate.getHours()).padStart(2, "0")}:${String(newDate.getMinutes()).padStart(2, "0")}:00`;
   }
-
-  // Initialize Cal.com styling parameters for student view
-  useEffect(() => {
-    (async function () {
-      try {
-        const cal = await getCalApi();
-        cal("ui", {
-          theme: "light",
-          styles: { branding: { brandColor: "#0f172a" } },
-          hideEventTypeDetails: false,
-          layout: "month_view",
-        });
-      } catch (e) {
-        console.error("Failed to initialize Cal.com Embed API:", e);
-      }
-    })();
-  }, []);
-
-  const [upgradingMentorId, setUpgradingMentorId] = useState<string | null>(null);
-
-  // Open booking embed modal for students
-  const handleOpenBooking = (mentor: Mentor) => {
-    setSelectedMentor(mentor);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setRequestDate(formatLocalDateStr(tomorrow));
-    setIsCalModalOpen(true);
-  };
-
-  // Fetch real-time available slots for the selected mentor and date
-  useEffect(() => {
-    if (!isCalModalOpen || !selectedMentor?.cal_event_type_id || !requestDate) {
-      setAvailableSlots([]);
-      setHasAttemptedSlotFetch(false);
-      return;
-    }
-
-    let isMounted = true;
-    setIsLoadingSlots(true);
-    setHasAttemptedSlotFetch(true);
-
-    const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Calcutta";
-    fetch(`/api/mentor-planner/slots?eventTypeId=${encodeURIComponent(selectedMentor.cal_event_type_id)}&date=${encodeURIComponent(requestDate)}&timeZone=${encodeURIComponent(clientTz)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isMounted) return;
-        if (data?.slots && Array.isArray(data.slots) && data.slots.length > 0) {
-          setAvailableSlots(data.slots);
-          setRequestTime(data.slots[0].value.slice(0, 5));
-        } else {
-          setAvailableSlots([]);
-        }
-      })
-      .catch((err) => {
-        console.warn("Failed to load mentor slots:", err);
-        if (isMounted) setAvailableSlots([]);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingSlots(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isCalModalOpen, selectedMentor?.cal_event_type_id, requestDate]);
-
-  // Follow the exact same Upgrade to Pro flow when student clicks Upgrade to Schedule
-  const handleUpgradeToSchedule = async (mentorId: string) => {
-    setUpgradingMentorId(mentorId);
-    try {
-      await initiateUpgradeFlow({
-        targetTier: "Pro",
-        userEmail: currentUserEmail,
-        userName: currentUserName,
-        userPhone: currentUserPhone,
-      });
-    } catch (err) {
-      console.error("Upgrade to schedule error:", err);
-    } finally {
-      setUpgradingMentorId(null);
-    }
-  };
-
-  const handleRequestSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMentor || !currentUserId) return;
-
-    setIsSubmittingRequest(true);
-    setRequestMessage({ type: "", text: "" });
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("Authentication token not found. Please log in again.");
-
-      const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Calcutta";
-      const res = await fetch("/api/mentor-planner/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          mentorId: selectedMentor.id,
-          date: requestDate,
-          time: requestTime,
-          duration: requestDuration,
-          topic: requestTopic,
-          timeZone: clientTz,
-        }),
-      });
-
-      const result = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(result?.error || "Failed to submit request.");
-
-      setRequestMessage({ type: "success", text: "Your booking request was sent to the mentor! You will be notified when they RSVP." });
-      setRequestDate("");
-      setRequestTopic("");
-      setTimeout(() => {
-        setIsCalModalOpen(false);
-        setRequestMessage({ type: "", text: "" });
-      }, 1200);
-    } catch (err: any) {
-      console.error("Error submitting connect request:", err);
-      setRequestMessage({ type: "error", text: err.message || "Failed to send request." });
-    } finally {
-      setIsSubmittingRequest(false);
-    }
-  };
 
   // --- MS Teams Weekly Scheduler Helpers ---
 
@@ -783,7 +585,7 @@ export default function MentorConnectPage() {
   }
 
   // --- MENTOR / ADMIN PLANNER VIEW (Microsoft Teams style) ---
-  if (currentUserRole === "instructor" || currentUserRole === "admin") {
+  if (currentUserRole?.toLowerCase() === "instructor" || currentUserRole?.toLowerCase() === "admin") {
     return (
       <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 font-sans text-gray-900">
         <div className="max-w-[1400px] mx-auto space-y-6">
@@ -963,7 +765,7 @@ export default function MentorConnectPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded bg-indigo-100 border border-indigo-300"></span>
-                  <span>Webinars</span>
+                  <span>Live Sessions</span>
                 </div>
               </div>
 
@@ -1249,7 +1051,7 @@ export default function MentorConnectPage() {
                       type="button"
                       onClick={() => {
                         setFormType("webinar");
-                        setFormTitle("Live Cohort Webinar");
+                        setFormTitle("Live Cohort Session");
                       }}
                       className={`py-2 px-3 rounded-xl border text-[11px] font-bold text-center transition-all ${
                         formType === "webinar"
@@ -1257,7 +1059,7 @@ export default function MentorConnectPage() {
                           : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-100"
                       }`}
                     >
-                      Live Webinar
+                      Live Session
                     </button>
                   </div>
                 </div>
@@ -1350,7 +1152,7 @@ export default function MentorConnectPage() {
                         ? "bg-indigo-50 text-indigo-600 border-indigo-150"
                         : "bg-emerald-50 text-emerald-600 border-emerald-150"
                   }`}>
-                    {selectedEvent.tag.includes("Blocked") ? "Blocked Block" : selectedEvent.event_type === "webinar" ? "Cohort Webinar" : "Office Hours"}
+                    {selectedEvent.tag.includes("Blocked") ? "Blocked Block" : selectedEvent.event_type === "webinar" ? "Cohort Live Session" : "Office Hours"}
                   </span>
                   <h4 className="text-base font-extrabold text-slate-900 mt-1.5">{selectedEvent.title}</h4>
                 </div>
@@ -1486,300 +1288,6 @@ export default function MentorConnectPage() {
     );
   }
 
-  // --- STANDARD SCHOLAR / STUDENT VIEW (Mentor connect cards directory) ---
-  return (
-    <div className="min-h-screen bg-surface-page p-4 sm:p-6 lg:p-10 font-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6 text-left">
-          <div>
-            <h1 className={`${TYPOGRAPHY_CLASSES.MAIN_HEADING} flex items-center gap-2.5`}>
-              <CalendarIcon className="w-7 h-7 text-brand-primary" />
-              Mentor Connect
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Connect 1-on-1 with cohort instructors and industry experts to unblock learning.
-            </p>
-          </div>
-
-          {!isCurrentlyLoading && (
-            <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-bold text-gray-700">
-                {mentors.length} Mentor{mentors.length !== 1 ? "s" : ""} Available
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Content Section */}
-        {!isTierLoading && !canAccess("Mentorship") && (
-          <div className="mb-6">
-            <UpgradeRequired 
-              title="1-on-1 Mentorship Locked" 
-              description="1-on-1 mentor booking sessions are exclusively available to Pro and Premium tier members. Upgrade today to schedule live sessions with your assigned instructors." 
-              requiredTier="Pro" 
-              userEmail={currentUserEmail}
-              userName={currentUserName}
-              userPhone={currentUserPhone}
-              compact={true}
-            />
-          </div>
-        )}
-
-        {/* Mentors Grid */}
-        {mentors.length === 0 ? (
-          <div className="py-16 px-4 bg-white border border-gray-100 rounded-3xl text-center shadow-sm max-w-3xl mx-auto my-8">
-            <div className="mx-auto w-16 h-16 bg-blue-50 text-brand-primary rounded-full flex items-center justify-center mb-4">
-              <CalendarDays className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No Mentors Assigned</h3>
-            <p className="text-gray-500 text-sm max-w-md mx-auto">
-              There are no mentors currently assigned to your courses. If you believe this is a mistake, please reach out to support.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mentors.map((mentor) => (
-              <div
-                key={mentor.id}
-                className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-gray-200 transition-all group min-h-[340px] text-left relative overflow-hidden"
-              >
-                <div className="space-y-5">
-                  {/* Header: Avatar + Role Badge */}
-                  <div className="flex items-start justify-between gap-2">
-                    <UserAvatar
-                      name={mentor.full_name}
-                      email={mentor.email || ""}
-                      size={60}
-                      textSize="text-xl"
-                    />
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                      mentor.role === "Lead Mentor"
-                        ? "bg-purple-50 text-purple-700 border-purple-100"
-                        : "bg-blue-50 text-blue-700 border-blue-100"
-                    }`}>
-                      {mentor.role}
-                    </span>
-                  </div>
-
-                  {/* Profile Information */}
-                  <div>
-                    <h3 className="font-bold text-gray-900 leading-snug text-base group-hover:text-brand-primary transition-colors">
-                      {mentor.full_name}
-                    </h3>
-                    {mentor.email && (
-                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5 truncate flex items-center gap-1">
-                        <Mail size={10} /> {mentor.email}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Bio */}
-                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 bg-gray-50 p-3 rounded-2xl border border-gray-50">
-                    {mentor.mentor_bio}
-                  </p>
-
-                  {/* Expertise Tags */}
-                  {mentor.mentor_expertise.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {mentor.mentor_expertise.slice(0, 3).map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[9px] font-bold text-gray-500 bg-gray-100/70 border border-gray-100 rounded px-1.5 py-0.5"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {mentor.mentor_expertise.length > 3 && (
-                        <span className="text-[9px] font-bold text-brand-primary bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5">
-                          +{mentor.mentor_expertise.length - 3} More
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* CTA button */}
-                <div className="pt-5 border-t border-gray-50 mt-5">
-                  {canAccess("Mentorship") ? (
-                    <Button
-                      onClick={() => handleOpenBooking(mentor)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-brand-primary hover:bg-brand-primary/95 text-white"
-                    >
-                      <CalendarIcon size={14} />
-                      Schedule 1-on-1
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => handleUpgradeToSchedule(mentor.id)}
-                      disabled={upgradingMentorId === mentor.id}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-brand-heading to-brand-primary hover:from-brand-heading-hover hover:to-brand-primary/95 text-white shadow-md cursor-pointer disabled:opacity-60"
-                    >
-                      {upgradingMentorId === mentor.id ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Starting Upgrade…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={14} className="text-amber-300" />
-                          Upgrade to Schedule
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Booking Calendar Modal */}
-      {isCalModalOpen && selectedMentor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-100">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 text-left">
-              <div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Request Connect with {selectedMentor.full_name}
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Propose a date and time for your 1-on-1 connect.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCalModalOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Form body */}
-            <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 text-left">
-              {/* Date */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Propose Date</label>
-                <input
-                  type="date"
-                  required
-                  value={requestDate}
-                  onChange={(e) => setRequestDate(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary font-semibold"
-                />
-              </div>
-
-              {/* Time & Duration */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    Propose Start Time
-                    {isLoadingSlots && <span className="ml-2 text-brand-primary animate-pulse font-normal lowercase">(checking available slots...)</span>}
-                  </label>
-                  {isLoadingSlots ? (
-                    <div className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-semibold flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-primary" />
-                      <span>Checking calendar availability...</span>
-                    </div>
-                  ) : availableSlots.length > 0 ? (
-                    <div>
-                      <select
-                        value={requestTime}
-                        onChange={(e) => setRequestTime(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
-                      >
-                        {availableSlots.map((slot) => (
-                          <option key={slot.value} value={slot.value.slice(0, 5)}>
-                            {slot.label} (Open)
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-emerald-600 mt-1 font-medium flex items-center gap-1">
-                        ✓ Showing available slots directly from mentor&apos;s live calendar
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <select
-                        value={requestTime}
-                        onChange={(e) => setRequestTime(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
-                      >
-                        {Array.from({ length: 13 }, (_, i) => 9 + i).map((h) => {
-                          const str = `${String(h).padStart(2, "0")}:00`;
-                          return <option key={str} value={str}>{h === 12 ? "12:00 PM" : h > 12 ? `${h-12}:00 PM` : `${h}:00 AM`}</option>;
-                        })}
-                      </select>
-                      {hasAttemptedSlotFetch && requestDate && (
-                        <p className="text-[10px] text-amber-600 mt-1 font-medium">
-                          No direct calendar open slots on this date. You may propose a time or pick another day.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Duration</label>
-                  <select
-                    value={requestDuration}
-                    onChange={(e) => setRequestDuration(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-primary cursor-pointer font-semibold"
-                  >
-                    <option value="30">30 minutes</option>
-                    <option value="60">1 hour</option>
-                    <option value="90">1.5 hours</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Description/Topic */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">What do you need help with? (Topic)</label>
-                <textarea
-                  required
-                  value={requestTopic}
-                  onChange={(e) => setRequestTopic(e.target.value)}
-                  rows={4}
-                  placeholder="e.g. Reviewing backend API route code block or capstone project details."
-                  className="w-full bg-slate-50 border border-slate-100 focus:border-brand-primary focus:bg-white focus:outline-none rounded-xl px-4 py-3 text-xs text-slate-700 leading-relaxed resize-none font-medium"
-                />
-              </div>
-
-              {requestMessage.text && (
-                <div className={`text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 ${
-                  requestMessage.type === "success"
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-250"
-                    : "bg-red-50 text-red-700 border border-red-250"
-                }`}>
-                  <AlertCircle size={14} />
-                  <span>{requestMessage.text}</span>
-                </div>
-              )}
-
-              {/* Submit CTA */}
-              <div className="pt-2">
-                <Button
-                  type="submit"
-                  disabled={isSubmittingRequest}
-                  className="w-full py-3 rounded-xl bg-brand-primary hover:bg-brand-primary/95 text-white text-xs font-bold transition-all justify-center"
-                >
-                  {isSubmittingRequest ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending Request...
-                    </>
-                  ) : (
-                    "Submit Connect Request"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  // Hide Mentor Connect on the user/scholar side; only instructors and admins can access
+  return null;
 }

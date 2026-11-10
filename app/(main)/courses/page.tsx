@@ -165,30 +165,30 @@ export default function MyLearningDashboard() {
       setUserProfileName(resolvedName);
 
       // --------------------------------------------------
-      // WEBINARS
+      // LIVE SESSIONS
       // --------------------------------------------------
-      const { data: webinarsData } = await supabase
-        .from("webinars")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      const mappedWebinars =
-        webinarsData?.map((w: any) => ({
-          id: w.id,
-          title: w.title,
-          subtitle: w.subtitle,
-          date: w.event_date,
-          icon: w.icon,
-          status: w.status,
-          linkText: w.link_text,
-          attendees: w.attendees_count,
-        })) || [];
-
-      setUpcomingWebinars(mappedWebinars);
+      let upcomingCount = 0;
+      if (session?.access_token) {
+        try {
+          const liveRes = await fetch("/api/live-sessions", {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          if (liveRes.ok) {
+            const liveJson = await liveRes.json();
+            const liveRows = Array.isArray(liveJson?.sessions) ? liveJson.sessions : [];
+            setUpcomingWebinars(liveRows);
+            upcomingCount = liveRows.length;
+          }
+        } catch (liveErr) {
+          console.error("Failed to fetch assigned live sessions:", liveErr);
+        }
+      }
 
       setStats((prev) => ({
         ...prev,
-        liveSessions: mappedWebinars.length,
+        liveSessions: upcomingCount,
       }));
 
       // --------------------------------------------------
@@ -501,10 +501,10 @@ export default function MyLearningDashboard() {
                   Welcome back to{" "}
                   <span className="font-bold text-brand-primary">The Automate</span>.
                   You have{" "}
-                  {!isTierLoading && canAccess("Webinars") && stats.liveSessions > 0 ? (
+                  {!isTierLoading && canAccess("LiveSessions") && stats.liveSessions > 0 ? (
                     <>
                       <span className="font-semibold text-brand-info underline decoration-dotted underline-offset-4">
-                        {stats.liveSessions} upcoming webinar{stats.liveSessions !== 1 ? "s" : ""}
+                        {stats.liveSessions} upcoming live session{stats.liveSessions !== 1 ? "s" : ""}
                       </span>{" "}
                       and{" "}
                     </>

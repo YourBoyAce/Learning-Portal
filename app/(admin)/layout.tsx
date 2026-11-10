@@ -132,10 +132,10 @@ export default function AdminLayout({
     },
 
     {
-      label: "Manage Webinars",
-      href: "/admin/webinars",
-      active: pathname === "/admin/webinars",
-      icon: pathname === "/admin/webinars"
+      label: "Manage Live Sessions",
+      href: "/admin/live-sessions",
+      active: pathname === "/admin/live-sessions" || pathname === "/admin/webinars",
+      icon: pathname === "/admin/live-sessions" || pathname === "/admin/webinars"
         ? ICONS.GLOBELIGHT
         : ICONS.GLOBE,
     },
